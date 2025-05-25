@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Check, Users, BarChart3, QrCode, Cloud, Building, Star, Menu, X, ArrowRight, Play } from 'lucide-react';
 
@@ -91,7 +90,7 @@ const Index = () => {
     {
       name: "Pr. Maria Santos",
       church: "Igreja Assembleia de Deus",
-      image: "https://images.unsplash.com/photo-1494790108755-2616b332e1e8?w=400&h=400&fit=crop&crop=face",
+      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
       text: "A facilidade de cadastrar visitantes com QR Code revolucionou nossa recepção. Recomendo para todas as igrejas."
     },
     {
