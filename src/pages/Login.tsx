@@ -40,7 +40,7 @@ const Login = () => {
         <div className="text-center mb-8">
           <div className="text-3xl font-bold text-slate-800 mb-2">
             <span className="text-blue-800">Obreiro</span>
-            <span className="text-fuchsia-600">Digital</span>
+            <span className="text-fuchsia-600">Virtual</span>
           </div>
           <h2 className="text-2xl font-bold text-slate-800 mb-2">
             Entre na sua conta

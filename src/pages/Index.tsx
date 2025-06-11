@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Check, Users, BarChart3, QrCode, Cloud, Building, Star, Menu, X, ArrowRight, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -86,7 +87,7 @@ const Index = () => {
       name: "Pastor João Silva",
       church: "Igreja Batista Central",
       image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-      text: "O Obreiro Digital transformou nossa gestão. Agora conseguimos acompanhar o crescimento da igreja com dados precisos."
+      text: "O Obreiro Virtual transformou nossa gestão. Agora conseguimos acompanhar o crescimento da igreja com dados precisos."
     },
     {
       name: "Pr. Maria Santos",
@@ -111,7 +112,7 @@ const Index = () => {
             <div className="flex items-center">
               <div className="text-2xl font-bold text-slate-800">
                 <span className="text-blue-800">Obreiro</span>
-                <span className="text-fuchsia-600">Digital</span>
+                <span className="text-fuchsia-600">Virtual</span>
               </div>
             </div>
             
@@ -385,7 +386,7 @@ const Index = () => {
             Comece Sua Transformação Digital Hoje
           </h2>
           <p className="text-xl text-blue-100 mb-12">
-            Junte-se a centenas de igrejas que já modernizaram sua gestão com o Obreiro Digital
+            Junte-se a centenas de igrejas que já modernizaram sua gestão com o Obreiro Virtual
           </p>
           <div className="bg-white rounded-2xl p-8 max-w-md mx-auto">
             <form className="space-y-4">
@@ -424,13 +425,13 @@ const Index = () => {
             <div>
               <div className="text-2xl font-bold mb-4">
                 <span className="text-blue-400">Obreiro</span>
-                <span className="text-fuchsia-400">Digital</span>
+                <span className="text-fuchsia-400">Virtual</span>
               </div>
               <p className="text-slate-400 mb-4">
                 Modernizando a gestão eclesiástica com tecnologia de ponta.
               </p>
               <div className="text-slate-400">
-                <p>📧 contato@obreirodigital.com.br</p>
+                <p>📧 contato@obreirovirtual.com.br</p>
                 <p>📞 (11) 3000-0000</p>
               </div>
             </div>
@@ -463,7 +464,7 @@ const Index = () => {
             </div>
           </div>
           <div className="border-t border-slate-700 mt-12 pt-8 text-center text-slate-400">
-            <p>&copy; 2024 Obreiro Digital. Todos os direitos reservados.</p>
+            <p>&copy; 2024 Obreiro Virtual. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>
