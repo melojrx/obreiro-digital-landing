@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Users, BarChart3, QrCode, Cloud, Building, Star, Menu, X, ArrowRight, Play } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -125,9 +126,12 @@ const Index = () => {
 
             {/* Desktop CTAs */}
             <div className="hidden md:flex items-center space-x-4">
-              <button className="text-blue-800 hover:text-blue-900 font-semibold px-4 py-2 rounded-lg transition-colors">
+              <Link 
+                to="/login"
+                className="text-blue-800 hover:text-blue-900 font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
                 Fazer Login
-              </button>
+              </Link>
               <button className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors shadow-lg">
                 Criar Conta Grátis
               </button>
@@ -152,9 +156,12 @@ const Index = () => {
                 <a href="#contato" className="text-slate-600 hover:text-blue-800 font-medium">Contato</a>
                 <a href="#api" className="text-slate-600 hover:text-blue-800 font-medium">API</a>
                 <div className="flex flex-col space-y-2 pt-4">
-                  <button className="text-blue-800 hover:text-blue-900 font-semibold px-4 py-2 rounded-lg text-left">
+                  <Link 
+                    to="/login"
+                    className="text-blue-800 hover:text-blue-900 font-semibold px-4 py-2 rounded-lg text-left"
+                  >
                     Fazer Login
-                  </button>
+                  </Link>
                   <button className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-4 py-2 rounded-lg">
                     Criar Conta Grátis
                   </button>
