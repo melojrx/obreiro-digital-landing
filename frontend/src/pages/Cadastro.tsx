@@ -91,7 +91,7 @@ const Cadastro = () => {
       
       // Aguardar um pouco para mostrar mensagem de sucesso
       setTimeout(() => {
-        navigate('/cadastro/etapa-2');
+        navigate('/dashboard');
       }, 2000);
     } catch (err) {
       // Erro já foi tratado pelo hook useAuth
@@ -110,7 +110,7 @@ const Cadastro = () => {
               Conta criada com sucesso!
             </h2>
             <p className="text-slate-600 mb-4">
-              Agora vamos completar seu perfil...
+              Redirecionando para o dashboard...
             </p>
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-fuchsia-600 mx-auto"></div>
           </div>

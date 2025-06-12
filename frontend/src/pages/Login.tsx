@@ -8,24 +8,41 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
   
-  const { login, isLoading, error, isAuthenticated, clearError } = useAuth();
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // Redirecionar se já estiver logado
+  // Monitorar mudança no estado de autenticação para redirecionamento
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log('✅ Usuário autenticado, redirecionando para dashboard...');
-      navigate('/dashboard');
+    console.log('🔍 Login useEffect - isAuthenticated:', isAuthenticated, 'loginSuccess:', loginSuccess);
+    
+    if (isAuthenticated && loginSuccess) {
+      console.log('🎯 Estado de autenticação atualizado, redirecionando para dashboard...');
+      
+      // Tentar navigate primeiro
+      navigate('/dashboard', { replace: true });
+      
+      // Fallback: se navigate não funcionar, usar window.location após delay
+      setTimeout(() => {
+        if (window.location.pathname === '/login') {
+          console.log('🔄 Navigate não funcionou, usando window.location.href...');
+          window.location.href = '/dashboard';
+        }
+      }, 1000);
+      
+      setLoginSuccess(false); // Reset para próximas tentativas
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, loginSuccess, navigate]);
 
   // Limpar erro quando campos mudarem
   useEffect(() => {
-    if (error && clearError) {
+    if (error) {
       clearError();
     }
-  }, [email, password, error, clearError]);
+    // Limpar flag de login quando usuário edita campos
+    setLoginSuccess(false);
+  }, [email, password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,10 +52,12 @@ const Login = () => {
     try {
       await login({ email, password });
       console.log('🎉 Login completed successfully');
-      // Navegação será feita pelo useEffect acima quando isAuthenticated mudar
+      console.log('🔄 Marcando loginSuccess para ativar redirecionamento...');
+      setLoginSuccess(true); // Ativar flag para redirecionamento
     } catch (err) {
       // Erro já foi tratado pelo hook useAuth
       console.error('Erro no login:', err);
+      setLoginSuccess(false); // Garantir que flag está limpa em caso de erro
     }
   };
 
@@ -203,35 +222,27 @@ const Login = () => {
 
             {/* Sign Up Link */}
             <div className="text-center">
-              <p className="text-sm text-slate-600">
-                Ainda não tem uma conta?{' '}
+              <p className="text-slate-600">
+                Ainda não tem conta?{' '}
                 <Link 
                   to="/cadastro" 
                   className="font-semibold text-blue-600 hover:text-blue-500 transition-colors"
                 >
-                  Criar conta gratuita
+                  Criar conta grátis
                 </Link>
               </p>
             </div>
           </form>
         </div>
 
-        {/* Trust Signals */}
-        <div className="mt-8 text-center">
-          <div className="flex items-center justify-center space-x-6 text-xs text-slate-500">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              SSL Seguro
-            </div>
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              LGPD Compliance
-            </div>
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              Suporte 24/7
-            </div>
-          </div>
+        {/* Footer */}
+        <div className="mt-8 text-center text-sm text-slate-500">
+          <p>
+            Protegido por criptografia de ponta.{' '}
+            <a href="#" className="text-blue-600 hover:text-blue-500">
+              Política de Privacidade
+            </a>
+          </p>
         </div>
       </div>
     </div>
@@ -239,3 +250,4 @@ const Login = () => {
 };
 
 export default Login;
+

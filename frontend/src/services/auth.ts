@@ -152,6 +152,7 @@ export const authService = {
     if (response.token) {
       localStorage.setItem('auth_token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
+      this.updateActivity();
     }
 
     return response;
@@ -224,15 +225,66 @@ export const authService = {
    * Fazer logout
    */
   logout(): void {
+    console.log('🧹 authService.logout - Limpando localStorage...');
+    console.log('🧹 Antes - token:', !!localStorage.getItem('auth_token'));
+    console.log('🧹 Antes - user:', !!localStorage.getItem('user'));
+    console.log('🧹 Antes - activity:', !!localStorage.getItem('last_activity'));
+    
+    // Remover itens específicos
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('last_activity');
+    
+    // Limpeza adicional - remover qualquer chave relacionada à auth
+    Object.keys(localStorage).forEach(key => {
+      if (key.includes('auth') || key.includes('user') || key.includes('token')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    console.log('🧹 Depois - token:', !!localStorage.getItem('auth_token'));
+    console.log('🧹 Depois - user:', !!localStorage.getItem('user'));
+    console.log('🧹 Depois - activity:', !!localStorage.getItem('last_activity'));
+    console.log('✅ authService.logout concluído');
   },
 
   /**
-   * Verificar se usuário está logado
+   * Verificar se usuário está logado e token não expirou
    */
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('auth_token');
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      console.log('🔍 isAuthenticated: false - sem token');
+      return false;
+    }
+    
+    // Verificar inatividade (30 minutos)
+    const lastActivity = localStorage.getItem('last_activity');
+    if (lastActivity) {
+      const timeDiff = Date.now() - parseInt(lastActivity);
+      const thirtyMinutes = 30 * 60 * 1000; // 30 minutos em ms
+      
+      if (timeDiff > thirtyMinutes) {
+        console.log('🕒 Sessão expirada por inatividade');
+        this.logout();
+        return false;
+      }
+    }
+    
+    // Atualizar atividade (somente se não estiver no processo de logout)
+    if (token) {
+      this.updateActivity();
+    }
+    
+    console.log('🔍 isAuthenticated: true - token válido');
+    return true;
+  },
+
+  /**
+   * Atualizar timestamp de última atividade
+   */
+  updateActivity(): void {
+    localStorage.setItem('last_activity', Date.now().toString());
   },
 
   /**

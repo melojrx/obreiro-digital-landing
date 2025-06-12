@@ -133,9 +133,12 @@ const Index = () => {
               >
                 Fazer Login
               </Link>
-              <button className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors shadow-lg">
+              <Link 
+                to="/cadastro"
+                className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors shadow-lg inline-block"
+              >
                 Criar Conta Grátis
-              </button>
+              </Link>
             </div>
 
             {/* Mobile menu button */}
@@ -163,9 +166,12 @@ const Index = () => {
                   >
                     Fazer Login
                   </Link>
-                  <button className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-4 py-2 rounded-lg">
+                  <Link 
+                    to="/cadastro"
+                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-4 py-2 rounded-lg inline-block"
+                  >
                     Criar Conta Grátis
-                  </button>
+                  </Link>
                 </div>
               </nav>
             </div>
@@ -188,10 +194,13 @@ const Index = () => {
                 Com QR Code para captação e API REST para integrações.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <button className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center">
+                <Link 
+                  to="/cadastro"
+                  className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center"
+                >
                   Começar Gratuitamente
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </button>
+                </Link>
                 <button className="border-2 border-blue-800 text-blue-800 hover:bg-blue-800 hover:text-white font-semibold px-8 py-4 rounded-xl transition-all duration-200 flex items-center justify-center">
                   <Play className="mr-2 h-5 w-5" />
                   Ver Demonstração
@@ -336,13 +345,16 @@ const Index = () => {
                       </li>
                     ))}
                   </ul>
-                  <button className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-200 ${
-                    plan.popular 
-                      ? 'bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5' 
-                      : 'border-2 border-blue-800 text-blue-800 hover:bg-blue-800 hover:text-white'
-                  }`}>
+                  <Link 
+                    to="/cadastro"
+                    className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-200 inline-block text-center ${
+                      plan.popular 
+                        ? 'bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5' 
+                        : 'border-2 border-blue-800 text-blue-800 hover:bg-blue-800 hover:text-white'
+                    }`}
+                  >
                     Começar Teste Gratuito
-                  </button>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -405,9 +417,12 @@ const Index = () => {
                 placeholder="Telefone"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fuchsia-600 focus:border-transparent outline-none"
               />
-              <button className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
+              <Link 
+                to="/cadastro"
+                className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors inline-block text-center"
+              >
                 Começar Agora - 14 Dias Grátis
-              </button>
+              </Link>
             </form>
             <div className="flex justify-center space-x-6 mt-6 text-sm text-slate-600">
               <span>✓ 14 dias grátis</span>

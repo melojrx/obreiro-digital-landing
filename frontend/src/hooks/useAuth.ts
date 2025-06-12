@@ -22,7 +22,7 @@ interface UseAuthReturn {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   completeProfile: (data: CompleteProfileData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   clearError: () => void;
   getAvailableChurches: () => Promise<Church[]>;
 }
@@ -34,15 +34,27 @@ export const useAuth = (): UseAuthReturn => {
 
   // Verificar autenticação ao carregar
   useEffect(() => {
+    console.log('🔄 useAuth useEffect - Verificando localStorage...');
     const token = authService.getToken();
     const savedUser = authService.getCurrentUserFromStorage();
     
-    if (token && savedUser) {
+    console.log('🔄 Token encontrado:', !!token);
+    console.log('🔄 User encontrado:', !!savedUser);
+    console.log('🔄 authService.isAuthenticated():', authService.isAuthenticated());
+    
+    // Verificar se token é válido e não expirou
+    if (token && savedUser && authService.isAuthenticated()) {
+      console.log('✅ Restaurando sessão do localStorage');
       setUser(savedUser);
+    } else {
+      console.log('❌ Sessão inválida, limpando localStorage');
+      authService.logout();
+      setUser(null);
     }
   }, []);
 
-  const isAuthenticated = !!user && authService.isAuthenticated();
+  // isAuthenticated deve depender primeiro do estado local, depois do service
+  const isAuthenticated = !!user;
 
   const clearError = () => setError(null);
 
@@ -106,10 +118,12 @@ export const useAuth = (): UseAuthReturn => {
     }
   };
 
-  const logout = () => {
+  const logout = async (): Promise<void> => {
+    console.log('🚪 Fazendo logout...');
     authService.logout();
     setUser(null);
     setError(null);
+    console.log('✅ Logout concluído');
   };
 
   const getAvailableChurches = async (): Promise<Church[]> => {

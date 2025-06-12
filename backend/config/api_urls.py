@@ -53,10 +53,6 @@ urlpatterns = [
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     
-    # Endpoints principais
-    path('v1/', include(router.urls)),
-    
-    # Endpoints específicos por app (se necessário)
-    # path('v1/accounts/', include('apps.accounts.urls')),
-    # path('v1/branches/', include('apps.branches.urls')),
+    # Endpoints principais do router
+    path('', include(router.urls)),
 ] 
