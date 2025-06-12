@@ -1,73 +1,149 @@
-# Welcome to your Lovable project
+# 🏛️ Obreiro Virtual - Sistema de Gestão Eclesiástica
 
-## Project info
+Sistema completo de gestão eclesiástica moderno, desenvolvido com Django REST Framework e React TypeScript.
 
-**URL**: https://lovable.dev/projects/d969a24b-f521-4d2a-bf85-24ca3ec0673d
+## 🏗️ Arquitetura Monorepo
 
-## How can I edit this code?
+```
+obreiro-virtual/
+├── 🔧 backend/          # Django REST API
+│   ├── apps/           # Apps Django organizados
+│   ├── config/         # Configurações Django
+│   ├── static/         # Arquivos estáticos
+│   ├── manage.py       # Django CLI
+│   └── requirements.txt # Dependências Python
+├── 🎨 frontend/        # React + TypeScript + Vite
+│   ├── src/           # Código fonte React
+│   │   ├── pages/     # Login, Cadastro, Dashboard
+│   │   ├── components/ # Componentes UI (shadcn/ui)
+│   │   ├── config/    # Configuração da API
+│   │   └── hooks/     # Custom hooks
+│   ├── public/        # Arquivos públicos
+│   └── package.json   # Dependências Node.js
+├── 📄 package.json    # Scripts de desenvolvimento
+└── 📖 README.md       # Esta documentação
+```
 
-There are several ways of editing your application.
+## 🚀 Início Rápido
 
-**Use Lovable**
+### Pré-requisitos
+- Python 3.12+
+- Node.js 18+
+- Git
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d969a24b-f521-4d2a-bf85-24ca3ec0673d) and start prompting.
+### Instalação Completa
 
-Changes made via Lovable will be committed automatically to this repo.
+```bash
+# 1. Clone o repositório
+git clone https://github.com/melojrx/obreiro-digital-landing.git
+cd obreiro-digital-landing
 
-**Use your preferred IDE**
+# 2. Setup completo (instala tudo e configura)
+npm run setup
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Desenvolvimento
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+# Inicia backend + frontend simultaneamente
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 🔧 Scripts Disponíveis
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Desenvolvimento
+- `npm run dev` - Inicia backend (Django) + frontend (React)
+- `npm run dev:backend` - Apenas Django (porta 8000)
+- `npm run dev:frontend` - Apenas React (porta 3000)
 
-**Use GitHub Codespaces**
+### Instalação
+- `npm run setup` - Setup completo do projeto
+- `npm run install:all` - Instala todas as dependências
+- `npm run install:backend` - Dependências Python
+- `npm run install:frontend` - Dependências Node.js
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Database
+- `npm run migrate` - Executa migrações Django
 
-## What technologies are used for this project?
+### Testes
+- `npm run test:backend` - Testes Django
+- `npm run test:frontend` - Testes React
 
-This project is built with:
+### Build
+- `npm run build:frontend` - Build de produção React
+- `npm run collectstatic` - Coleta arquivos estáticos Django
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🌐 URLs de Desenvolvimento
 
-## How can I deploy this project?
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000/api/v1/
+- **Admin Django**: http://localhost:8000/admin/
+- **API Docs**: http://localhost:8000/api/schema/swagger-ui/
 
-Simply open [Lovable](https://lovable.dev/projects/d969a24b-f521-4d2a-bf85-24ca3ec0673d) and click on Share -> Publish.
+## 📋 Funcionalidades
 
-## Can I connect a custom domain to my Lovable project?
+### ✅ Frontend (React + TypeScript)
+- 🔐 **Tela de Login** - Autenticação por email
+- 📝 **Tela de Cadastro** - Registro em 2 etapas
+- 🎨 **UI Moderna** - shadcn/ui + Tailwind CSS
+- 📱 **Responsivo** - Design mobile-first
+- ⚡ **Vite** - Build rápido e HMR
 
-Yes, you can!
+### ✅ Backend (Django REST API)
+- 🔐 **Autenticação** - Email + Token
+- 👥 **Gestão de Usuários** - Perfis completos
+- ⛪ **Gestão de Igrejas** - Denominações e filiais
+- 👨‍👩‍👧‍👦 **Membros e Visitantes** - Cadastro completo
+- 📅 **Atividades** - Eventos e ministérios
+- 📊 **Dashboard** - Relatórios e estatísticas
+- 📖 **API Docs** - Swagger/OpenAPI
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🛠️ Tecnologias
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Frontend
+- **React 18** - Interface de usuário
+- **TypeScript** - Type safety
+- **Vite** - Build tool moderna
+- **Tailwind CSS** - Styling utilitário
+- **shadcn/ui** - Componentes UI
+- **React Router** - Navegação
+- **React Hook Form** - Formulários
+- **Zod** - Validação de schemas
+
+### Backend
+- **Django 5.2** - Framework web
+- **Django REST Framework** - API REST
+- **PostgreSQL** - Banco de dados (produção)
+- **SQLite** - Banco de dados (desenvolvimento)
+- **Redis** - Cache e Celery
+- **Celery** - Tarefas assíncronas
+
+## 🔌 Integração API
+
+O frontend está configurado para se comunicar automaticamente com o backend Django:
+
+- **Configuração**: `frontend/src/config/api.ts`
+- **Base URL**: `http://127.0.0.1:8000/api/v1`
+- **Autenticação**: Token-based
+- **CORS**: Configurado para desenvolvimento
+
+## 📖 Documentação
+
+- **API Backend**: http://localhost:8000/api/schema/swagger-ui/
+- **Componentes Frontend**: Documentação inline no código
+
+## 🤝 Contribuição
+
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
+3. Commit suas mudanças (`git commit -am 'Adiciona nova funcionalidade'`)
+4. Push para a branch (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+---
+
+**Desenvolvido com ❤️ para a gestão eclesiástica moderna**

@@ -13,8 +13,7 @@
     "test:frontend": "cd frontend && npm run test",
     "build:frontend": "cd frontend && npm run build",
     "migrate": "cd backend && python manage.py migrate",
-    "collectstatic": "cd backend && python manage.py collectstatic --noinput",
-    "setup": "npm install && npm run install:all && npm run migrate"
+    "collectstatic": "cd backend && python manage.py collectstatic --noinput"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
@@ -24,13 +23,8 @@
     "react",
     "typescript",
     "church-management",
-    "saas",
-    "monorepo"
+    "saas"
   ],
   "author": "ObreiroVirtual Team",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/melojrx/obreiro-digital-landing.git"
-  }
+  "license": "MIT"
 } 
