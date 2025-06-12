@@ -1,7 +1,7 @@
-
-import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 const Cadastro = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -12,8 +12,25 @@ const Cadastro = () => {
     password: '',
     password_confirm: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [success, setSuccess] = useState(false);
+
+  const { register, isLoading, error, isAuthenticated, clearError } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirecionar se já estiver logado
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Limpar erro da API quando campos mudarem
+  useEffect(() => {
+    if (error) {
+      clearError();
+    }
+  }, [formData, clearError]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -68,15 +85,39 @@ const Cadastro = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    // Simular chamada para API
-    setTimeout(() => {
-      setIsLoading(false);
-      console.log('Dados do cadastro - Etapa 1:', formData);
-      // Aqui seria feita a chamada para POST /api/v1/auth/register/register/
-    }, 2000);
+    try {
+      await register(formData);
+      setSuccess(true);
+      
+      // Aguardar um pouco para mostrar mensagem de sucesso
+      setTimeout(() => {
+        navigate('/cadastro/etapa-2');
+      }, 2000);
+    } catch (err) {
+      // Erro já foi tratado pelo hook useAuth
+      console.error('Erro no registro:', err);
+    }
   };
+
+  // Se cadastro foi bem-sucedido, mostrar mensagem
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="relative sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white/80 backdrop-blur-md py-8 px-6 shadow-xl rounded-2xl border border-white/20 text-center">
+            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">
+              Conta criada com sucesso!
+            </h2>
+            <p className="text-slate-600 mb-4">
+              Agora vamos completar seu perfil...
+            </p>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-fuchsia-600 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -128,6 +169,14 @@ const Cadastro = () => {
 
         {/* Cadastro Form */}
         <div className="bg-white/80 backdrop-blur-md py-8 px-6 shadow-xl rounded-2xl border border-white/20">
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2 text-red-700">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Nome Completo Field */}
             <div>
@@ -146,7 +195,8 @@ const Cadastro = () => {
                   required
                   value={formData.full_name}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 ${
+                  disabled={isLoading}
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.full_name ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="Seu nome completo"
@@ -174,7 +224,8 @@ const Cadastro = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 ${
+                  disabled={isLoading}
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.email ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="seu@email.com"
@@ -202,7 +253,8 @@ const Cadastro = () => {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 ${
+                  disabled={isLoading}
+                  className={`block w-full pl-10 pr-10 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.password ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="Mínimo 8 caracteres"
@@ -211,6 +263,7 @@ const Cadastro = () => {
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600" />
@@ -241,7 +294,8 @@ const Cadastro = () => {
                   required
                   value={formData.password_confirm}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 ${
+                  disabled={isLoading}
+                  className={`block w-full pl-10 pr-10 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.password_confirm ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="Confirme sua senha"
@@ -250,6 +304,7 @@ const Cadastro = () => {
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                  disabled={isLoading}
                 >
                   {showPasswordConfirm ? (
                     <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600" />
@@ -279,7 +334,7 @@ const Cadastro = () => {
             <div>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !formData.email || !formData.full_name || !formData.password || !formData.password_confirm}
                 className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-fuchsia-600 hover:bg-fuchsia-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-fuchsia-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                 {isLoading ? (

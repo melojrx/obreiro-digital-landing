@@ -4,10 +4,49 @@ Gerencia papéis hierárquicos e acesso por igreja
 """
 
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
 from apps.core.models import BaseModel, ActiveManager, RoleChoices
 from apps.core.models import validate_cpf, phone_validator
+
+
+class CustomUserManager(BaseUserManager):
+    """
+    Manager personalizado para CustomUser que usa email como campo de login.
+    """
+    
+    def create_user(self, email, password=None, **extra_fields):
+        """
+        Cria e salva um usuário regular com email e senha.
+        """
+        if not email:
+            raise ValueError('O campo email é obrigatório')
+        
+        email = self.normalize_email(email)
+        
+        # Se não tem username, usar parte do email
+        if 'username' not in extra_fields:
+            extra_fields['username'] = email.split('@')[0]
+        
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+    
+    def create_superuser(self, email, password=None, **extra_fields):
+        """
+        Cria e salva um superusuário com email e senha.
+        """
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+        
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser deve ter is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser deve ter is_superuser=True.')
+        
+        return self.create_user(email, password, **extra_fields)
 
 
 class CustomUser(AbstractUser):
@@ -40,7 +79,10 @@ class CustomUser(AbstractUser):
     
     # Configurar email como campo de login
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'full_name']  # Campos obrigatórios além do email
+    REQUIRED_FIELDS = ['full_name']  # Campos obrigatórios além do email
+    
+    # Usar o manager personalizado
+    objects = CustomUserManager()
     
     class Meta:
         verbose_name = "Usuário"
