@@ -106,10 +106,10 @@ npm run dev
 
 | Serviço | URL | Descrição |
 |---------|-----|-----------|
-| 🎨 **Frontend** | http://localhost:3000 | Interface principal |
-| 🔧 **Backend API** | http://localhost:8000/api/v1/ | API REST |
-| ⚙️ **Admin Django** | http://localhost:8000/admin/ | Painel administrativo |
-| 📚 **Swagger Docs** | http://localhost:8000/api/schema/swagger-ui/ | Documentação da API |
+| 🎨 **Frontend** | <http://localhost:8001> | Interface principal |
+| 🔧 **Backend API** | <http://localhost:8000/api/v1/> | API REST |
+| ⚙️ **Admin Django** | <http://localhost:8000/admin/> | Painel administrativo |
+| 📚 **Swagger Docs** | <http://localhost:8000/api/v1/docs/> | Documentação da API |
 
 ## 🔐 Sistema de Autenticação
 
