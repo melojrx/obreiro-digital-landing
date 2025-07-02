@@ -1,27 +1,97 @@
-import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, CreditCard, AlertCircle } from 'lucide-react';
 
-const NotFound = () => {
+const Pagamento = () => {
+  const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
-  }, [location.pathname]);
+  const { plan, churchData } = location.state || {};
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="relative sm:mx-auto sm:w-full sm:max-w-md">
+        {/* Back Button */}
+        <button 
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center text-slate-600 hover:text-blue-800 transition-colors mb-8 group"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+          Voltar
+        </button>
+
+        {/* Card */}
+        <div className="bg-white/80 backdrop-blur-md py-8 px-6 shadow-xl rounded-2xl border border-white/20 text-center">
+          <CreditCard className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+          
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+            Página de Pagamento
+          </h2>
+          
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-center space-x-2 text-blue-700 mb-2">
+              <AlertCircle className="h-5 w-5" />
+              <span className="font-semibold">Em Desenvolvimento</span>
+            </div>
+            <p className="text-sm text-blue-600">
+              A interface de pagamento será implementada em breve.
+            </p>
+          </div>
+
+          {plan && (
+            <div className="mb-6 p-4 bg-slate-50 rounded-lg text-left">
+              <h3 className="font-semibold text-slate-800 mb-2">Plano Selecionado:</h3>
+              <p className="text-slate-600">
+                <strong>{plan.name}</strong> - R$ {plan.price}/{plan.period}
+              </p>
+            </div>
+          )}
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="w-full py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+            >
+              Ir para Dashboard (Temporário)
+            </button>
+            
+            <button
+              onClick={() => navigate('/cadastro/etapa-3')}
+              className="w-full py-3 px-4 border border-gray-300 text-sm font-semibold rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-200"
+            >
+              Escolher Outro Plano
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
+const NotFound = () => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="relative sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white/80 backdrop-blur-md py-8 px-6 shadow-xl rounded-2xl border border-white/20 text-center">
+          <div className="text-6xl mb-4">🔍</div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+            Página não encontrada
+          </h2>
+          <p className="text-slate-600 mb-6">
+            A página que você está procurando não existe ou foi movida.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="w-full py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+          >
+            Voltar ao Início
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export { Pagamento };
 export default NotFound;

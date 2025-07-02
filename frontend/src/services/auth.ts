@@ -3,7 +3,8 @@
  * Gerencia login, registro e autenticação com a API Django
  */
 
-import { API_BASE_URL, API_ENDPOINTS, getAuthHeaders } from '../config/api';
+import { api } from '@/config/api';
+import { AxiosError } from 'axios';
 
 // Tipos TypeScript
 export interface LoginCredentials {
@@ -14,17 +15,26 @@ export interface LoginCredentials {
 export interface RegisterData {
   email: string;
   full_name: string;
+  phone: string;
+  birth_date: string;
+  gender: string;
   password: string;
   password_confirm: string;
-  phone?: string;
+  accept_terms: boolean;
 }
 
 export interface CompleteProfileData {
+  denomination_id?: number;
+  church_name: string;
+  church_cnpj?: string;
+  church_email: string;
+  church_phone: string;
+  branch_name?: string;
+  church_address: string;
+  pastor_name: string;
   cpf?: string;
-  birth_date?: string;
   bio?: string;
-  church_id: number;
-  role: string;
+  role?: string;
   email_notifications?: boolean;
   sms_notifications?: boolean;
 }
@@ -38,6 +48,7 @@ export interface User {
   phone?: string;
   is_active: boolean;
   date_joined: string;
+  is_profile_complete: boolean;
 }
 
 export interface AuthResponse {
@@ -51,6 +62,31 @@ export interface Church {
   denomination?: string;
   city?: string;
   state?: string;
+}
+
+export interface UserChurch {
+  id: number;
+  name: string;
+  short_name: string;
+  cnpj: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  zipcode: string;
+  subscription_plan: string;
+  user_role: string;
+}
+
+export interface Denomination {
+  id: number;
+  name: string;
+  short_name?: string;
+  display_name: string;
+  headquarters_city?: string;
+  headquarters_state?: string;
+  churches_count: number;
 }
 
 export interface ApiError {
@@ -72,139 +108,105 @@ export class AuthError extends Error {
   }
 }
 
-// Helper para fazer requests
-async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  
-  console.log('🔄 API Request:', {
-    url,
-    method: options.method || 'GET',
-    headers: options.headers,
-    body: options.body
-  });
-  
-  const config: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  };
+// Helper para tratar erros do Axios
+function handleApiError(error: unknown): AuthError {
+  const axiosError = error as AxiosError<Record<string, string[] | string>>;
 
-  try {
-    console.log('🚀 Fazendo requisição para:', url);
-    const response = await fetch(url, config);
-    
-    console.log('📡 Response Status:', response.status);
-    console.log('📡 Response Headers:', Object.fromEntries(response.headers.entries()));
-    
-    const data = await response.json();
-    
-    console.log('📡 Response Data:', data);
+  if (axiosError.response) {
+    const data = axiosError.response.data;
+    let errorMessage = 'Ocorreu um erro.';
 
-    if (!response.ok) {
-      console.error('❌ Erro na API:', {
-        status: response.status,
-        data
-      });
-      
-      throw new AuthError(
-        data.detail || data.message || 'Erro na requisição',
-        response.status,
-        data.errors || data
-      );
-    }
-
-    console.log('✅ Sucesso na API:', data);
-    return data;
-  } catch (error) {
-    console.error('💥 Erro na requisição:', error);
-    
-    if (error instanceof AuthError) {
-      throw error;
+    if (data) {
+      if (typeof data.detail === 'string') {
+        errorMessage = data.detail;
+      } else {
+        const firstErrorKey = Object.keys(data)[0];
+        if (firstErrorKey && Array.isArray(data[firstErrorKey]) && data[firstErrorKey].length > 0) {
+          errorMessage = data[firstErrorKey][0];
+        }
+      }
     }
     
-    throw new AuthError(
-      'Erro de conexão. Verifique sua internet.',
-      0
-    );
+    return new AuthError(errorMessage, axiosError.response.status, data as Record<string, string[]>);
+  } else if (axiosError.request) {
+    return new AuthError('Sem resposta do servidor. Verifique sua conexão.', 0);
+  } else {
+    const genericError = error as Error;
+    return new AuthError(genericError.message || 'Erro desconhecido', 0);
   }
 }
 
-// Serviços de autenticação
+// Serviços de autenticação refatorados
 export const authService = {
   /**
    * Fazer login do usuário
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await apiRequest<AuthResponse>(
-      API_ENDPOINTS.auth.login,
-      {
-        method: 'POST',
-        body: JSON.stringify(credentials),
+    try {
+      const response = await api.post<AuthResponse>('/auth/login/', credentials);
+      if (response.data.token) {
+        localStorage.setItem('auth_token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        this.updateActivity();
       }
-    );
-
-    // Salvar token no localStorage
-    if (response.token) {
-      localStorage.setItem('auth_token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      this.updateActivity();
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
     }
-
-    return response;
   },
 
   /**
    * Registrar novo usuário (Etapa 1)
    */
   async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await apiRequest<AuthResponse>(
-      API_ENDPOINTS.auth.register,
-      {
-        method: 'POST',
-        body: JSON.stringify(data),
+    try {
+      const response = await api.post<AuthResponse>('/users/register/register/', data);
+      if (response.data.token) {
+        localStorage.setItem('auth_token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
       }
-    );
-
-    // Salvar token temporário para etapa 2
-    if (response.token) {
-      localStorage.setItem('auth_token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
     }
-
-    return response;
   },
 
   /**
    * Completar perfil do usuário (Etapa 2)
    */
   async completeProfile(data: CompleteProfileData): Promise<User> {
-    const token = localStorage.getItem('auth_token');
-    
-    const response = await apiRequest<User>(
-      API_ENDPOINTS.auth.completeProfile,
-      {
-        method: 'POST',
-        headers: getAuthHeaders(token),
-        body: JSON.stringify(data),
-      }
-    );
-
-    // Atualizar dados do usuário
-    localStorage.setItem('user', JSON.stringify(response));
-
-    return response;
+    try {
+      // O interceptor do Axios já adiciona o token
+      const response = await api.post<User>('/users/register/complete_profile/', data);
+      localStorage.setItem('user', JSON.stringify(response.data));
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 
   /**
    * Buscar igrejas disponíveis para cadastro
    */
   async getAvailableChurches(): Promise<Church[]> {
-    return await apiRequest<Church[]>(API_ENDPOINTS.auth.availableChurches);
+    try {
+      const response = await api.get<Church[]>('/churches/available_for_registration/');
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Buscar denominações disponíveis para cadastro
+   */
+  async getAvailableDenominations(): Promise<Denomination[]> {
+    try {
+      const response = await api.get<Denomination[]>('/denominations/available_for_registration/');
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 
   /**
@@ -213,12 +215,10 @@ export const authService = {
   async getCurrentUser(): Promise<User> {
     const token = localStorage.getItem('auth_token');
     
-    return await apiRequest<User>(
-      API_ENDPOINTS.users.me,
-      {
-        headers: getAuthHeaders(token),
-      }
-    );
+    // O interceptor já adiciona o token, mas para o primeiro carregamento
+    // pode ser necessário garantir que ele esteja no header.
+    const response = await api.get<User>('/users/me/');
+    return response.data;
   },
 
   /**
@@ -300,5 +300,59 @@ export const authService = {
   getCurrentUserFromStorage(): User | null {
     const userStr = localStorage.getItem('user');
     return userStr ? JSON.parse(userStr) : null;
+  },
+
+  /**
+   * Obter dados da igreja do usuário atual
+   */
+  async getUserChurch(): Promise<UserChurch> {
+    try {
+      const response = await api.get<UserChurch>('/users/me/my_church/');
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Atualizar dados pessoais do usuário
+   */
+  async updatePersonalData(data: {
+    full_name?: string;
+    email?: string;
+    phone?: string;
+    bio?: string;
+    email_notifications?: boolean;
+    sms_notifications?: boolean;
+  }): Promise<User> {
+    try {
+      const response = await api.patch<{user: User; message: string}>('/users/me/update_personal_data/', data);
+      // Atualizar localStorage com os novos dados
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      return response.data.user;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Atualizar dados da igreja
+   */
+  async updateChurchData(data: {
+    name?: string;
+    cnpj?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipcode?: string;
+  }): Promise<UserChurch> {
+    try {
+      const response = await api.patch<{church: UserChurch; message: string}>('/users/me/update_church_data/', data);
+      return response.data.church;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 }; 

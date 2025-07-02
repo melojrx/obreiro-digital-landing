@@ -6,7 +6,7 @@ Gerencia papéis hierárquicos e acesso por igreja
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
-from apps.core.models import BaseModel, ActiveManager, RoleChoices
+from apps.core.models import BaseModel, ActiveManager, RoleChoices, GenderChoices
 from apps.core.models import validate_cpf, phone_validator
 
 
@@ -73,8 +73,29 @@ class CustomUser(AbstractUser):
         "Telefone",
         max_length=20,
         validators=[phone_validator],
-        blank=True,
         help_text="Telefone no formato (XX) XXXXX-XXXX"
+    )
+    
+    # Novos campos para cadastro inicial
+    birth_date = models.DateField(
+        "Data de Nascimento",
+        null=True,
+        help_text="Data de nascimento do usuário"
+    )
+    
+    gender = models.CharField(
+        "Gênero",
+        max_length=1,
+        choices=[('M', 'Masculino'), ('F', 'Feminino'), ('O', 'Outro'), ('N', 'Não informar')],
+        blank=True,
+        null=True
+    )
+    
+    # Novo campo para rastrear o status do cadastro
+    is_profile_complete = models.BooleanField(
+        default=False,
+        verbose_name="Perfil Completo",
+        help_text="Indica se o usuário completou todas as etapas do cadastro."
     )
     
     # Configurar email como campo de login
@@ -96,6 +117,17 @@ class CustomUser(AbstractUser):
     def display_name(self):
         """Nome para exibição"""
         return self.full_name or self.get_full_name() or self.email
+    
+    @property
+    def age(self):
+        """Calcula idade se data de nascimento disponível"""
+        if self.birth_date:
+            from datetime import date
+            today = date.today()
+            return today.year - self.birth_date.year - (
+                (today.month, today.day) < (self.birth_date.month, self.birth_date.day)
+            )
+        return None
     
     def save(self, *args, **kwargs):
         """Override save para garantir consistência"""
@@ -204,6 +236,7 @@ class UserProfile(BaseModel):
     bio = models.TextField(
         "Bio",
         blank=True,
+        default='',
         help_text="Biografia ou descrição do usuário"
     )
     

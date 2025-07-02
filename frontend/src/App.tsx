@@ -4,12 +4,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AuthProvider } from "./hooks/useAuth";
 import { useInactivityLogout } from "./hooks/useInactivityLogout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
+import CadastroEtapa2 from "./pages/CadastroEtapa2";
+import CadastroEtapa3 from "./pages/CadastroEtapa3";
 import Dashboard from "./pages/Dashboard";
-import NotFound from "./pages/NotFound";
+import Perfil from "./pages/Perfil";
+import NotFound, { Pagamento } from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -23,7 +27,7 @@ const AppContent = () => {
       <Route 
         path="/login" 
         element={
-          <ProtectedRoute requireAuth={false}>
+          <ProtectedRoute level="public">
             <Login />
           </ProtectedRoute>
         } 
@@ -31,16 +35,48 @@ const AppContent = () => {
       <Route 
         path="/cadastro" 
         element={
-          <ProtectedRoute requireAuth={false}>
+          <ProtectedRoute level="public">
             <Cadastro />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/cadastro/etapa-2" 
+        element={
+          <ProtectedRoute level="auth_incomplete">
+            <CadastroEtapa2 />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/cadastro/etapa-3" 
+        element={
+          <ProtectedRoute level="auth_incomplete">
+            <CadastroEtapa3 />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/pagamento" 
+        element={
+          <ProtectedRoute level="auth_incomplete">
+            <Pagamento />
           </ProtectedRoute>
         } 
       />
       <Route 
         path="/dashboard" 
         element={
-          <ProtectedRoute requireAuth={true}>
+          <ProtectedRoute level="auth_complete">
             <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/perfil" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <Perfil />
           </ProtectedRoute>
         } 
       />
@@ -52,13 +88,15 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
-    </TooltipProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <TooltipProvider>
+          <AppContent />
+          <Toaster />
+          <Sonner />
+        </TooltipProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

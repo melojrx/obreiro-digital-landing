@@ -131,6 +131,11 @@ class UserRegistrationViewSet(viewsets.GenericViewSet):
             with transaction.atomic():
                 result = serializer.save()
                 
+                # Marcar o perfil do usuário como completo
+                user = request.user
+                user.is_profile_complete = True
+                user.save(update_fields=['is_profile_complete'])
+                
                 return Response({
                     'user': UserSerializer(result['user']).data,
                     'profile': UserProfileSerializer(result['profile']).data,
@@ -141,17 +146,13 @@ class UserRegistrationViewSet(viewsets.GenericViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['get'])
-    def available_churches(self, request):
-        """Listar igrejas disponíveis para registro"""
-        from apps.churches.models import Church
-        from apps.churches.serializers import ChurchSummarySerializer
+    def available_denominations(self, request):
+        """Listar denominações disponíveis para registro"""
+        from apps.denominations.models import Denomination
+        from apps.denominations.serializers import DenominationSummarySerializer
         
-        churches = Church.objects.filter(
-            is_active=True,
-            subscription_status='active'
-        ).order_by('name')
-        
-        serializer = ChurchSummarySerializer(churches, many=True)
+        denominations = Denomination.objects.filter(is_active=True).order_by('name')
+        serializer = DenominationSummarySerializer(denominations, many=True)
         return Response(serializer.data)
 
 
@@ -208,6 +209,151 @@ class UserViewSet(viewsets.ModelViewSet):
             })
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['patch'])
+    def update_personal_data(self, request):
+        """Atualizar dados pessoais do usuário"""
+        try:
+            user = request.user
+            data = request.data
+            
+            # Atualizar dados do usuário
+            user_fields = ['full_name', 'email', 'phone']
+            user_updated = False
+            
+            for field in user_fields:
+                if field in data and data[field] != getattr(user, field):
+                    setattr(user, field, data[field])
+                    user_updated = True
+            
+            if user_updated:
+                user.save()
+            
+            # Atualizar ou criar perfil
+            profile_data = {}
+            profile_fields = ['bio', 'email_notifications', 'sms_notifications']
+            
+            for field in profile_fields:
+                if field in data:
+                    profile_data[field] = data[field]
+            
+            if profile_data:
+                profile, created = UserProfile.objects.get_or_create(
+                    user=user,
+                    defaults=profile_data
+                )
+                
+                if not created:
+                    for field, value in profile_data.items():
+                        setattr(profile, field, value)
+                    profile.save()
+            
+            return Response({
+                'user': UserSerializer(user).data,
+                'message': 'Dados pessoais atualizados com sucesso!'
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'])
+    def my_church(self, request):
+        """Dados da igreja do usuário atual"""
+        try:
+            # Buscar o ChurchUser do usuário atual
+            church_user = request.user.church_users.filter(is_active=True).first()
+            
+            if not church_user:
+                return Response({
+                    'error': 'Usuário não está associado a nenhuma igreja'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            church = church_user.church
+            
+            # Retornar dados básicos da igreja
+            return Response({
+                'id': church.id,
+                'name': church.name,
+                'short_name': church.short_name,
+                'cnpj': church.cnpj or '',
+                'email': church.email,
+                'phone': church.phone,
+                'address': church.address,
+                'city': church.city,
+                'state': church.state,
+                'zipcode': church.zipcode,
+                'subscription_plan': church.subscription_plan,
+                'user_role': church_user.get_role_display(),
+            })
+            
+        except Exception as e:
+                         return Response({
+                 'error': 'Erro ao buscar dados da igreja'
+             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['patch'])
+    def update_church_data(self, request):
+        """Atualizar dados da igreja do usuário"""
+        try:
+            # Buscar a igreja do usuário
+            church_user = request.user.church_users.filter(is_active=True).first()
+            
+            if not church_user:
+                return Response({
+                    'error': 'Usuário não está associado a nenhuma igreja'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Verificar se o usuário tem permissão para editar
+            if not church_user.can_access_admin:
+                return Response({
+                    'error': 'Sem permissão para editar dados da igreja'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            church = church_user.church
+            data = request.data
+            
+            # Campos que podem ser atualizados
+            church_fields = ['name', 'short_name', 'cnpj', 'email', 'phone', 'address', 'city', 'state', 'zipcode']
+            church_updated = False
+            
+            for field in church_fields:
+                if field in data:
+                    new_value = data[field]
+                    if field == 'short_name' and not new_value:
+                        # Se short_name estiver vazio, usar o name
+                        new_value = data.get('name', church.name)
+                    
+                    if new_value != getattr(church, field):
+                        setattr(church, field, new_value)
+                        church_updated = True
+            
+            if church_updated:
+                church.save()
+            
+            return Response({
+                'church': {
+                    'id': church.id,
+                    'name': church.name,
+                    'short_name': church.short_name,
+                    'cnpj': church.cnpj or '',
+                    'email': church.email,
+                    'phone': church.phone,
+                    'address': church.address,
+                    'city': church.city,
+                    'state': church.state,
+                    'zipcode': church.zipcode,
+                    'subscription_plan': church.subscription_plan,
+                    'user_role': church_user.get_role_display(),
+                },
+                'message': 'Dados da igreja atualizados com sucesso!'
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserProfileViewSet(viewsets.ModelViewSet):

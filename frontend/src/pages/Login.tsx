@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const Login = () => {
@@ -8,41 +8,20 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const [loginSuccess, setLoginSuccess] = useState(false);
   
-  const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
+  const { login, isLoading, error, clearError } = useAuth();
   const navigate = useNavigate();
-
-  // Monitorar mudança no estado de autenticação para redirecionamento
-  useEffect(() => {
-    console.log('🔍 Login useEffect - isAuthenticated:', isAuthenticated, 'loginSuccess:', loginSuccess);
-    
-    if (isAuthenticated && loginSuccess) {
-      console.log('🎯 Estado de autenticação atualizado, redirecionando para dashboard...');
-      
-      // Tentar navigate primeiro
-      navigate('/dashboard', { replace: true });
-      
-      // Fallback: se navigate não funcionar, usar window.location após delay
-      setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          console.log('🔄 Navigate não funcionou, usando window.location.href...');
-          window.location.href = '/dashboard';
-        }
-      }, 1000);
-      
-      setLoginSuccess(false); // Reset para próximas tentativas
-    }
-  }, [isAuthenticated, loginSuccess, navigate]);
+  const location = useLocation();
+  
+  // Extrair mensagem de sucesso do location.state
+  const successMessage = location.state?.successMessage;
 
   // Limpar erro quando campos mudarem
   useEffect(() => {
     if (error) {
       clearError();
     }
-    // Limpar flag de login quando usuário edita campos
-    setLoginSuccess(false);
-  }, [email, password]);
+  }, [email, password, clearError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,12 +31,11 @@ const Login = () => {
     try {
       await login({ email, password });
       console.log('🎉 Login completed successfully');
-      console.log('🔄 Marcando loginSuccess para ativar redirecionamento...');
-      setLoginSuccess(true); // Ativar flag para redirecionamento
+      // ProtectedRoute irá redirecionar automaticamente
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       // Erro já foi tratado pelo hook useAuth
       console.error('Erro no login:', err);
-      setLoginSuccess(false); // Garantir que flag está limpa em caso de erro
     }
   };
 
@@ -92,6 +70,14 @@ const Login = () => {
 
         {/* Login Form */}
         <div className="bg-white/80 backdrop-blur-md py-8 px-6 shadow-xl rounded-2xl border border-white/20">
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-2 text-green-700">
+              <CheckCircle className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm">{successMessage}</span>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2 text-red-700">

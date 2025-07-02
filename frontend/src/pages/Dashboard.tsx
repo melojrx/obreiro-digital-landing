@@ -1,68 +1,97 @@
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import AppLayout from '@/components/layout/AppLayout';
+import StatsCard from '@/components/dashboard/StatsCard';
+import RecentActivities from '@/components/dashboard/RecentActivities';
+import QuickActions from '@/components/dashboard/QuickActions';
+import EventsTable from '@/components/dashboard/EventsTable';
+import { Users, UserPlus, Calendar, DollarSign } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
+  const location = useLocation();
+  const { toast } = useToast();
 
-  const handleLogout = async () => {
-    console.log('🔐 Iniciando processo de logout...');
-    console.log('🔐 Antes - localStorage token:', !!localStorage.getItem('auth_token'));
-    console.log('🔐 Antes - localStorage user:', !!localStorage.getItem('user'));
-    
-    await logout();
-    
-    console.log('🔐 Depois - localStorage token:', !!localStorage.getItem('auth_token'));
-    console.log('🔐 Depois - localStorage user:', !!localStorage.getItem('user'));
-    console.log('🔄 Redirecionando para login...');
-    
-    // Forçar reload da página para garantir que o estado seja limpo
-    window.location.href = '/login';
-  };
+  // Mostrar mensagem de sucesso se vier do cadastro
+  useEffect(() => {
+    if (location.state?.successMessage) {
+      toast({
+        title: "Bem-vindo!",
+        description: location.state.successMessage,
+        duration: 5000,
+      });
+      // Limpar o state para não mostrar novamente
+      window.history.replaceState({}, document.title);
+    }
+  }, [location, toast]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Dashboard - Obreiro Virtual
-            </h1>
-            <Button onClick={handleLogout} variant="outline">
-              Logout
-            </Button>
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Welcome Section */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Bem-vindo, {user?.full_name?.split(' ')[0] || 'admin'}!
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Este é o seu painel de controle do Obreiro Virtual. Aqui você pode gerenciar todos os aspectos da sua igreja.
+          </p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatsCard
+            title="Membros"
+            value="42"
+            icon={Users}
+            iconColor="text-blue-600"
+            iconBg="bg-blue-100"
+            trend={{ value: 5, isPositive: true }}
+          />
+          <StatsCard
+            title="Visitantes (mês)"
+            value="12"
+            icon={UserPlus}
+            iconColor="text-green-600"
+            iconBg="bg-green-100"
+            trend={{ value: 20, isPositive: true }}
+          />
+          <StatsCard
+            title="Eventos Ativos"
+            value="3"
+            icon={Calendar}
+            iconColor="text-yellow-600"
+            iconBg="bg-yellow-100"
+          />
+          <StatsCard
+            title="Dízimos (mês)"
+            value="R$ 3.250"
+            icon={DollarSign}
+            iconColor="text-purple-600"
+            iconBg="bg-purple-100"
+            trend={{ value: 15, isPositive: true }}
+          />
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Activities - 2 columns */}
+          <div className="lg:col-span-2">
+            <RecentActivities />
           </div>
           
-          <div className="bg-green-50 border border-green-200 rounded p-4 mb-6">
-            <h2 className="text-lg font-semibold text-green-800 mb-2">
-              ✅ Login realizado com sucesso!
-            </h2>
-            <p className="text-green-700">
-              Bem-vindo ao Obreiro Virtual. O sistema de autenticação está funcionando perfeitamente.
-            </p>
-          </div>
-
-          <div className="bg-gray-50 rounded p-4 mb-4">
-            <h3 className="font-semibold text-gray-800 mb-2">Dados do usuário:</h3>
-            <div className="text-sm text-gray-600">
-              <p><strong>Email:</strong> {user?.email}</p>
-              <p><strong>Nome:</strong> {user?.full_name}</p>
-              <p><strong>ID:</strong> {user?.id}</p>
-            </div>
-          </div>
-
-          <div className="bg-blue-50 rounded p-4">
-            <h3 className="font-semibold text-blue-800 mb-2">Status da Sessão:</h3>
-            <div className="text-sm text-blue-700">
-              <p><strong>Token:</strong> {localStorage.getItem('auth_token') ? '✅ Presente' : '❌ Ausente'}</p>
-              <p><strong>Última Atividade:</strong> {localStorage.getItem('last_activity') ? new Date(parseInt(localStorage.getItem('last_activity')!)).toLocaleString() : 'N/A'}</p>
-              <p><strong>Logout automático:</strong> 30 minutos de inatividade</p>
-            </div>
+          {/* Quick Actions - 1 column */}
+          <div>
+            <QuickActions />
           </div>
         </div>
+
+        {/* Events Table */}
+        <EventsTable />
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

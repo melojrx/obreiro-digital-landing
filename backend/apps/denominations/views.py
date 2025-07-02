@@ -47,6 +47,8 @@ class DenominationViewSet(viewsets.ModelViewSet):
             permission_classes = [permissions.IsAuthenticated]
         elif self.action in ['update', 'partial_update', 'destroy']:
             permission_classes = [permissions.IsAuthenticated, IsDenominationAdmin]
+        elif self.action == 'available_for_registration':
+            permission_classes = [permissions.AllowAny]  # Público
         else:
             permission_classes = [permissions.IsAuthenticated]
         
@@ -55,11 +57,18 @@ class DenominationViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'create':
             return DenominationCreateSerializer
-        elif self.action == 'list':
+        elif self.action in ['list', 'available_for_registration']:
             return DenominationSummarySerializer
         elif self.action == 'stats':
             return DenominationStatsSerializer
         return DenominationSerializer
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
+    def available_for_registration(self, request):
+        """Denominações disponíveis para cadastro público"""
+        denominations = Denomination.objects.filter(is_active=True).order_by('name')
+        serializer = DenominationSummarySerializer(denominations, many=True)
+        return Response(serializer.data)
     
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):

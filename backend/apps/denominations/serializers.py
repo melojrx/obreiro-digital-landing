@@ -53,7 +53,7 @@ class DenominationSummarySerializer(serializers.ModelSerializer):
     """Serializer resumido para listagens"""
     
     display_name = serializers.ReadOnlyField()
-    churches_count = serializers.ReadOnlyField()
+    churches_count = serializers.SerializerMethodField()
     
     class Meta:
         model = Denomination
@@ -61,6 +61,13 @@ class DenominationSummarySerializer(serializers.ModelSerializer):
             'id', 'name', 'short_name', 'display_name', 'headquarters_city',
             'headquarters_state', 'churches_count', 'is_active'
         ]
+
+    def get_churches_count(self, obj):
+        """
+        Calcula a contagem de igrejas ativas para a denominação.
+        """
+        # Usar o método count() do manager relacionado é mais eficiente
+        return obj.churches.filter(is_active=True).count()
 
 
 class DenominationStatsSerializer(serializers.ModelSerializer):

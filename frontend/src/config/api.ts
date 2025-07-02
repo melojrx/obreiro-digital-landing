@@ -1,10 +1,37 @@
+import axios from 'axios';
+
 /**
  * Configuração da API do ObreiroVirtual
  * Centraliza URLs e configurações de comunicação com o backend Django
  */
 
 // URL base da API Django
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+// Criação da instância do Axios
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor para adicionar o token de autenticação em cada requisição
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers['Authorization'] = `Token ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export { api };
 
 // Endpoints da API
 export const API_ENDPOINTS = {
@@ -15,6 +42,7 @@ export const API_ENDPOINTS = {
     register: '/auth/register/register/',
     completeProfile: '/auth/register/complete_profile/',
     availableChurches: '/auth/register/available_churches/',
+    availableDenominations: '/auth/register/available_denominations/',
   },
   
   // Usuários
@@ -61,24 +89,7 @@ export const API_ENDPOINTS = {
   },
 } as const;
 
-// Configuração padrão do Axios/Fetch
-export const API_CONFIG = {
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-};
-
 // Helper para construir URLs completas
 export const buildApiUrl = (endpoint: string): string => {
   return `${API_BASE_URL}${endpoint}`;
-};
-
-// Helper para headers com autenticação
-export const getAuthHeaders = (token?: string) => {
-  const authToken = token || localStorage.getItem('auth_token');
-  return {
-    ...API_CONFIG.headers,
-    ...(authToken && { Authorization: `Token ${authToken}` }),
-  };
 }; 
