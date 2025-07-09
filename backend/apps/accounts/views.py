@@ -264,14 +264,14 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             # Buscar o ChurchUser do usuário atual
             church_user = request.user.church_users.filter(is_active=True).first()
-            
+
             if not church_user:
                 return Response({
-                    'error': 'Usuário não está associado a nenhuma igreja'
-                }, status=status.HTTP_404_NOT_FOUND)
-            
+                    'message': 'Usuário não está associado a nenhuma igreja ainda.'
+                }, status=status.HTTP_200_OK)
+
             church = church_user.church
-            
+
             # Retornar dados básicos da igreja
             return Response({
                 'id': church.id,
@@ -287,7 +287,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 'subscription_plan': church.subscription_plan,
                 'user_role': church_user.get_role_display(),
             })
-            
+
         except Exception as e:
                          return Response({
                  'error': 'Erro ao buscar dados da igreja'
@@ -295,43 +295,53 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['patch'])
     def update_church_data(self, request):
-        """Atualizar dados da igreja do usuário"""
+        """
+        Atualizar dados da igreja do usuário.
+        Cria a associação se não existir.
+        """
         try:
-            # Buscar a igreja do usuário
-            church_user = request.user.church_users.filter(is_active=True).first()
-            
-            if not church_user:
-                return Response({
-                    'error': 'Usuário não está associado a nenhuma igreja'
-                }, status=status.HTTP_404_NOT_FOUND)
-            
-            # Verificar se o usuário tem permissão para editar
-            if not church_user.can_access_admin:
-                return Response({
-                    'error': 'Sem permissão para editar dados da igreja'
-                }, status=status.HTTP_403_FORBIDDEN)
-            
-            church = church_user.church
+            from apps.churches.models import Church
+
             data = request.data
+            church_name = data.get('name')
+
+            if not church_name:
+                return Response(
+                    {'error': 'O nome da igreja é obrigatório.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Buscar ou criar a associação do usuário com uma igreja
+            church_user, created_church_user = request.user.church_users.get_or_create(
+                defaults={'role': 'member'}
+            )
             
-            # Campos que podem ser atualizados
+            # Campos que podem ser atualizados na igreja
             church_fields = ['name', 'short_name', 'cnpj', 'email', 'phone', 'address', 'city', 'state', 'zipcode']
-            church_updated = False
-            
-            for field in church_fields:
-                if field in data:
-                    new_value = data[field]
-                    if field == 'short_name' and not new_value:
-                        # Se short_name estiver vazio, usar o name
-                        new_value = data.get('name', church.name)
-                    
-                    if new_value != getattr(church, field):
-                        setattr(church, field, new_value)
-                        church_updated = True
-            
-            if church_updated:
+            church_data_to_update = {
+                field: data[field] for field in church_fields if field in data
+            }
+
+            # Buscar ou criar a igreja
+            church, created_church = Church.objects.get_or_create(
+                name=church_name,
+                defaults={
+                    **church_data_to_update,
+                    'administrator': request.user
+                }
+            )
+
+            # Se a igreja já existia e o usuário tem permissão, atualiza os dados
+            if not created_church and church_user.can_access_admin:
+                for field, value in church_data_to_update.items():
+                    setattr(church, field, value)
                 church.save()
             
+            # Associa a igreja ao usuário se ainda não estiver associada
+            if not church_user.church:
+                church_user.church = church
+                church_user.save()
+
             return Response({
                 'church': {
                     'id': church.id,
@@ -349,7 +359,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 },
                 'message': 'Dados da igreja atualizados com sucesso!'
             })
-            
+
         except Exception as e:
             return Response({
                 'error': str(e)

@@ -307,7 +307,7 @@ export const authService = {
    */
   async getUserChurch(): Promise<UserChurch> {
     try {
-      const response = await api.get<UserChurch>('/users/me/my_church/');
+      const response = await api.get<UserChurch>('/users/my_church/');
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -326,7 +326,7 @@ export const authService = {
     sms_notifications?: boolean;
   }): Promise<User> {
     try {
-      const response = await api.patch<{user: User; message: string}>('/users/me/update_personal_data/', data);
+      const response = await api.patch<{user: User; message: string}>('/users/update_personal_data/', data);
       // Atualizar localStorage com os novos dados
       localStorage.setItem('user', JSON.stringify(response.data.user));
       return response.data.user;
@@ -349,7 +349,7 @@ export const authService = {
     zipcode?: string;
   }): Promise<UserChurch> {
     try {
-      const response = await api.patch<{church: UserChurch; message: string}>('/users/me/update_church_data/', data);
+      const response = await api.patch<{church: UserChurch; message: string}>('/users/update_church_data/', data);
       return response.data.church;
     } catch (error) {
       throw handleApiError(error);
