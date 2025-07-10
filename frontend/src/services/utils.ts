@@ -26,7 +26,9 @@ export interface CEPAddress {
 // Função para buscar endereço por CEP
 export const getAddressByCEP = async (cep: string): Promise<CEPAddress> => {
   try {
-    const response = await api.get(`/utils/cep/${cep}/`);
+    // Limpar o CEP (remover caracteres não numéricos)
+    const cleanCep = cep.replace(/\D/g, '');
+    const response = await api.get(`/core/cep/${cleanCep}/`);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<{ error: string }>;
@@ -52,7 +54,7 @@ export interface SubscriptionPlan {
 // Função para buscar planos de assinatura
 export const getSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
   try {
-    const response = await api.get('/utils/subscription-plans/');
+    const response = await api.get('/core/subscription-plans/');
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError;

@@ -386,4 +386,25 @@ export const authService = {
       throw handleApiError(error);
     }
   },
+
+  /**
+   * Deletar conta do usuário permanentemente
+   */
+  async deleteAccount(password: string): Promise<{message: string; deleted_at: string}> {
+    try {
+      const response = await api.delete<{message: string; deleted_at: string}>('/users/delete-account/', {
+        data: {
+          password,
+          confirm_deletion: true
+        }
+      });
+      
+      // Limpar dados locais após deletar conta
+      this.logout();
+      
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
 }; 

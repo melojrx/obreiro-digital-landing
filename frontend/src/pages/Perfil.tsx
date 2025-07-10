@@ -40,9 +40,9 @@ const Perfil: React.FC = () => {
     if (!file) return;
 
     // Validações básicas no frontend
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      toast.error('Tipo de arquivo não permitido. Use apenas JPG, PNG ou GIF.');
+      toast.error('Tipo de arquivo não permitido. Use JPEG, PNG, GIF ou WebP.');
       return;
     }
 
@@ -55,15 +55,10 @@ const Perfil: React.FC = () => {
     setIsUploadingAvatar(true);
     try {
       await uploadAvatar(file);
-      toast.success('Foto de perfil atualizada com sucesso!');
-      
-      // Forçar atualização visual após pequeno delay
-      setTimeout(() => {
-        console.log('🔄 Forçando re-renderização do avatar');
-      }, 100);
+      toast.success('🎉 Foto de perfil atualizada com sucesso!');
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
-      toast.error('Erro ao fazer upload da foto. Tente novamente.');
+      toast.error('❌ Erro ao fazer upload da foto. Tente novamente.');
     } finally {
       setIsUploadingAvatar(false);
       // Limpar o input para permitir selecionar o mesmo arquivo novamente

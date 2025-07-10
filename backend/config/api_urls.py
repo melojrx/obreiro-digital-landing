@@ -15,6 +15,9 @@ from apps.members.views import MemberViewSet
 from apps.visitors.views import VisitorViewSet
 from apps.activities.views import ActivityViewSet
 
+# Importar views de usuários
+from apps.accounts import views
+
 # Router para ViewSets
 router = DefaultRouter()
 
@@ -29,6 +32,14 @@ router.register(r'activities', ActivityViewSet, basename='activity')
 urlpatterns = [
     # Autenticação e usuários (views baseadas em função/classe)
     path('auth/', include('apps.accounts.urls')),
+    
+    # Usuários (endpoints de perfil) - URLs diretas
+    path('users/me/', views.user_me_view, name='users-me'),
+    path('users/update_personal_data/', views.update_personal_data_view, name='users-update-personal-data'),
+    path('users/update_church_data/', views.update_church_data_view, name='users-update-church-data'),
+    path('users/upload-avatar/', views.upload_avatar_view, name='users-upload-avatar'),
+    path('users/delete-account/', views.delete_account_view, name='users-delete-account'),
+    path('users/my_church/', views.user_church_view, name='users-my-church'),
     
     # Core (health check, etc)
     path('core/', include('apps.core.urls')),

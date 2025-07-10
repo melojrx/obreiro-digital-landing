@@ -361,12 +361,28 @@ class MemberViewSet(viewsets.ModelViewSet):
 - Igreja anterior
 - Carta de transferência
 
-**Seção: Acesso ao Sistema**
-- Checkbox "Criar usuário do sistema"
-- Select com papéis disponíveis (baseado na hierarquia)
-- E-mail para login
-- Senha inicial
-- Preview do papel selecionado
+**Seção: Acesso ao Sistema** ⭐
+Esta é uma das funcionalidades mais importantes do sistema, permitindo transformar um membro comum em um usuário do sistema com permissões específicas.
+
+- **Checkbox "Criar usuário do sistema"**: Habilita/desabilita toda a seção
+- **Select com papéis disponíveis**: Baseado na hierarquia do usuário logado
+- **E-mail para login**: Deve ser único no sistema
+- **Senha inicial**: Obrigatória para primeiro acesso
+- **Preview do papel selecionado**: Mostra permissões que serão concedidas
+
+**Validações Críticas:**
+- ✅ Usuário só pode atribuir papéis **inferiores** ao seu próprio papel
+- ✅ E-mail deve ser **único** em todo o sistema
+- ✅ Senha deve atender aos **critérios de segurança**
+- ✅ Igreja do membro será **automaticamente** vinculada ao usuário
+
+**Fluxo de Criação:**
+1. Membro é criado normalmente
+2. Se "Criar usuário" estiver marcado:
+   - CustomUser é criado com email/senha
+   - ChurchUser é criado vinculando usuário à igreja
+   - Papel selecionado é atribuído
+   - Membro é vinculado ao usuário criado
 
 ##### **Aba 4: Informações Adicionais**
 - Profissão
@@ -601,74 +617,603 @@ def export_members(self):
 
 ---
 
-## 🔄 Integração com Sistema de Usuários
+## 🔐 Sistema de Acesso e Criação de Usuários
 
-### Fluxo: Membro → Usuário do Sistema
+### 📋 Visão Geral da Funcionalidade
 
-#### **1. Cadastro do Membro**
-```python
-# Dados básicos do membro
-member_data = {
-    'full_name': 'João Silva',
-    'email': 'joao@email.com',
-    'phone': '(11) 99999-9999',
-    # ... outros dados
+Uma das funcionalidades **mais críticas** do Módulo de Membros é a capacidade de transformar um membro comum em um **usuário do sistema** com permissões específicas. Esta funcionalidade permite que administradores concedam acesso ao sistema Obreiro Virtual para membros selecionados, respeitando rigorosamente a **hierarquia de permissões**.
+
+### 🎯 Objetivo
+Permitir que membros da igreja tenham acesso ao sistema administrativo com diferentes níveis de permissão, mantendo a **segurança** e **isolamento** entre igrejas.
+
+---
+
+### 🏗️ Arquitetura do Sistema de Acesso
+
+#### **Entidades Envolvidas**
+1. **Member** - Dados do membro da igreja
+2. **CustomUser** - Usuário do sistema (login/senha)
+3. **ChurchUser** - Vínculo entre usuário e igreja com papel específico
+4. **RoleHierarchy** - Sistema de hierarquia de permissões
+
+#### **Relacionamentos**
+```
+Member (1:1) CustomUser (1:N) ChurchUser (N:1) Church
+                    ↓
+              Role + Permissions
+```
+
+---
+
+### 🔧 Implementação Frontend
+
+#### **Interface de Criação de Usuário**
+
+**Localização:** Formulário de Cadastro de Membro → Aba 3: Dados Eclesiásticos
+
+```typescript
+// Seção: Acesso ao Sistema
+interface SystemAccessForm {
+  create_system_user: boolean;
+  system_role: string;
+  user_email: string;
+  user_password: string;
 }
 ```
 
-#### **2. Criação de Usuário (Opcional)**
-```python
-# Se create_system_user = True
-user_data = {
-    'create_system_user': True,
-    'system_role': 'secretary',
-    'user_email': 'joao@email.com',
-    'user_password': 'senha123'
-}
+#### **Componente: SystemUserSection**
+```typescript
+const SystemUserSection = ({ 
+  form, 
+  availableRoles, 
+  canAssignRoles 
+}: SystemUserSectionProps) => {
+  const [createUser, setCreateUser] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('');
+  
+  return (
+    <Card className="border-indigo-200 bg-indigo-50/30">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-indigo-600" />
+          Acesso ao Sistema
+        </CardTitle>
+        <CardDescription>
+          Conceder acesso ao sistema administrativo para este membro
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        {/* Checkbox principal */}
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="create_system_user"
+            checked={createUser}
+            onCheckedChange={setCreateUser}
+          />
+          <Label htmlFor="create_system_user" className="font-medium">
+            Criar usuário do sistema
+          </Label>
+        </div>
+        
+        {createUser && (
+          <>
+            {/* Seleção de papel */}
+            <div className="space-y-2">
+              <Label>Papel no Sistema *</Label>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um papel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRoles.map(role => (
+                    <SelectItem key={role.value} value={role.value}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Preview de permissões */}
+            {selectedRole && (
+              <RolePreview role={selectedRole} />
+            )}
+            
+            {/* Dados de login */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>E-mail para Login *</Label>
+                <Input
+                  type="email"
+                  placeholder="usuario@email.com"
+                  {...form.register('user_email')}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Senha Inicial *</Label>
+                <Input
+                  type="password"
+                  placeholder="Senha segura"
+                  {...form.register('user_password')}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 ```
 
-#### **3. Processamento no Backend**
-```python
-def create_member_with_user(self, validated_data):
-    # Criar membro
-    member = Member.objects.create(**member_data)
-    
-    # Se solicitado, criar usuário
-    if validated_data.get('create_system_user'):
-        user = CustomUser.objects.create_user(
-            email=validated_data['user_email'],
-            password=validated_data['user_password'],
-            full_name=member.full_name
-        )
-        
-        # Criar vínculo com a igreja
-        ChurchUser.objects.create(
-            user=user,
-            church=member.church,
-            role=validated_data['system_role']
-        )
-        
-        # Vincular membro ao usuário
-        member.user = user
-        member.save()
-    
-    return member
+#### **Hook: useRoleHierarchy**
+```typescript
+export const useRoleHierarchy = () => {
+  const [hierarchy, setHierarchy] = useState<RoleHierarchyData | null>(null);
+  const [loading, setLoading] = useState(false);
+  
+  const loadHierarchy = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/auth/available-roles/');
+      setHierarchy(response.data);
+    } catch (error) {
+      console.error('Erro ao carregar hierarquia:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  useEffect(() => {
+    loadHierarchy();
+  }, [loadHierarchy]);
+  
+  return {
+    availableRoles: hierarchy?.available_roles || [],
+    canAssignRoles: hierarchy?.can_assign_roles || false,
+    userRole: hierarchy?.user_role,
+    userRoleLabel: hierarchy?.user_role_label,
+    loading,
+    refresh: loadHierarchy
+  };
+};
 ```
 
-#### **4. Validação de Hierarquia**
+---
+
+### 🔧 Implementação Backend
+
+#### **Endpoint: Available Roles**
 ```python
-def validate_system_role(self, value):
-    """Valida se o usuário pode atribuir o papel selecionado"""
-    user_role = self.context['request'].user.church_users.first().role
-    available_roles = get_available_roles_for_user(user_role)
-    
-    if value not in available_roles:
-        raise serializers.ValidationError(
-            f"Você não pode atribuir o papel '{value}'"
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def available_roles_view(request):
+    """
+    Retorna os papéis disponíveis para atribuição baseado na hierarquia.
+    """
+    church_user = request.user.church_users.first()
+    if not church_user:
+        return Response(
+            {'error': 'Usuário não está associado a nenhuma igreja'},
+            status=status.HTTP_400_BAD_REQUEST
         )
     
-    return value
+    user_role = church_user.role
+    
+    # Hierarquia de papéis
+    role_hierarchy = {
+        RoleChoices.SUPER_ADMIN: [
+            RoleChoices.DENOMINATION_ADMIN,
+            RoleChoices.CHURCH_ADMIN,
+            RoleChoices.PASTOR,
+            RoleChoices.SECRETARY,
+            RoleChoices.LEADER,
+            RoleChoices.MEMBER,
+            RoleChoices.READ_ONLY
+        ],
+        RoleChoices.DENOMINATION_ADMIN: [
+            RoleChoices.CHURCH_ADMIN,
+            RoleChoices.PASTOR,
+            RoleChoices.SECRETARY,
+            RoleChoices.LEADER,
+            RoleChoices.MEMBER,
+            RoleChoices.READ_ONLY
+        ],
+        RoleChoices.CHURCH_ADMIN: [
+            RoleChoices.PASTOR,
+            RoleChoices.SECRETARY,
+            RoleChoices.LEADER,
+            RoleChoices.MEMBER,
+            RoleChoices.READ_ONLY
+        ],
+        RoleChoices.PASTOR: [
+            RoleChoices.SECRETARY,
+            RoleChoices.LEADER,
+            RoleChoices.MEMBER,
+            RoleChoices.READ_ONLY
+        ],
+        RoleChoices.SECRETARY: [
+            RoleChoices.LEADER,
+            RoleChoices.MEMBER,
+            RoleChoices.READ_ONLY
+        ],
+        RoleChoices.LEADER: [
+            RoleChoices.MEMBER,
+            RoleChoices.READ_ONLY
+        ],
+        RoleChoices.MEMBER: [],
+        RoleChoices.READ_ONLY: []
+    }
+    
+    available_roles = role_hierarchy.get(user_role, [])
+    
+    roles_data = []
+    for role in available_roles:
+        roles_data.append({
+            'value': role,
+            'label': dict(RoleChoices.choices)[role],
+            'description': get_role_description(role),
+            'permissions': get_role_permissions(role)
+        })
+    
+    return Response({
+        'user_role': user_role,
+        'user_role_label': dict(RoleChoices.choices)[user_role],
+        'available_roles': roles_data,
+        'can_assign_roles': len(available_roles) > 0
+    })
 ```
+
+#### **Serializer: Member com Sistema de Usuário**
+```python
+class MemberCreateSerializer(serializers.ModelSerializer):
+    # Campos do sistema de usuário
+    create_system_user = serializers.BooleanField(default=False, write_only=True)
+    system_role = serializers.CharField(required=False, write_only=True)
+    user_email = serializers.EmailField(required=False, write_only=True)
+    user_password = serializers.CharField(required=False, write_only=True)
+    
+    class Meta:
+        model = Member
+        fields = '__all__'
+        extra_kwargs = {
+            'church': {'read_only': True},
+        }
+    
+    def validate(self, attrs):
+        """Validações para criação de usuário do sistema"""
+        create_user = attrs.get('create_system_user', False)
+        
+        if create_user:
+            # Validar campos obrigatórios
+            required_fields = ['system_role', 'user_email', 'user_password']
+            for field in required_fields:
+                if not attrs.get(field):
+                    raise serializers.ValidationError(
+                        f"Campo '{field}' é obrigatório para criar usuário do sistema"
+                    )
+            
+            # Validar email único
+            if CustomUser.objects.filter(email=attrs['user_email']).exists():
+                raise serializers.ValidationError(
+                    "Este e-mail já está sendo usado por outro usuário"
+                )
+            
+            # Validar hierarquia de papéis
+            self.validate_role_hierarchy(attrs['system_role'])
+        
+        return attrs
+    
+    def validate_role_hierarchy(self, role):
+        """Valida se o usuário pode atribuir o papel selecionado"""
+        request_user = self.context['request'].user
+        user_church = request_user.church_users.first()
+        
+        if not user_church:
+            raise serializers.ValidationError("Usuário não está vinculado a uma igreja")
+        
+        user_role = user_church.role
+        available_roles = get_available_roles_for_user(user_role)
+        
+        if role not in available_roles:
+            raise serializers.ValidationError(
+                f"Você não pode atribuir o papel '{role}'. "
+                f"Papéis disponíveis: {', '.join(available_roles)}"
+            )
+        
+        return role
+    
+    def create(self, validated_data):
+        """Cria membro e opcionalmente usuário do sistema"""
+        # Extrair dados do sistema de usuário
+        create_user = validated_data.pop('create_system_user', False)
+        system_role = validated_data.pop('system_role', None)
+        user_email = validated_data.pop('user_email', None)
+        user_password = validated_data.pop('user_password', None)
+        
+        # Definir igreja do usuário logado
+        request_user = self.context['request'].user
+        user_church = request_user.church_users.first().church
+        validated_data['church'] = user_church
+        
+        # Criar membro
+        with transaction.atomic():
+            member = Member.objects.create(**validated_data)
+            
+            # Criar usuário do sistema se solicitado
+            if create_user:
+                # Criar CustomUser
+                system_user = CustomUser.objects.create_user(
+                    email=user_email,
+                    password=user_password,
+                    full_name=member.full_name,
+                    is_profile_complete=True
+                )
+                
+                # Criar ChurchUser (vínculo com igreja e papel)
+                ChurchUser.objects.create(
+                    user=system_user,
+                    church=user_church,
+                    role=system_role
+                )
+                
+                # Vincular membro ao usuário
+                member.user = system_user
+                member.save()
+                
+                # Log da criação
+                logger.info(
+                    f"Usuário do sistema criado: {user_email} "
+                    f"com papel {system_role} na igreja {user_church.name}"
+                )
+        
+        return member
+```
+
+---
+
+### 🔒 Sistema de Validações
+
+#### **Validações de Segurança**
+
+1. **Hierarquia de Papéis**
+```python
+def get_available_roles_for_user(user_role: str) -> List[str]:
+    """Retorna papéis que o usuário pode atribuir"""
+    hierarchy = {
+        'SUPER_ADMIN': ['DENOMINATION_ADMIN', 'CHURCH_ADMIN', 'PASTOR', 'SECRETARY', 'LEADER', 'MEMBER', 'READ_ONLY'],
+        'DENOMINATION_ADMIN': ['CHURCH_ADMIN', 'PASTOR', 'SECRETARY', 'LEADER', 'MEMBER', 'READ_ONLY'],
+        'CHURCH_ADMIN': ['PASTOR', 'SECRETARY', 'LEADER', 'MEMBER', 'READ_ONLY'],
+        'PASTOR': ['SECRETARY', 'LEADER', 'MEMBER', 'READ_ONLY'],
+        'SECRETARY': ['LEADER', 'MEMBER', 'READ_ONLY'],
+        'LEADER': ['MEMBER', 'READ_ONLY'],
+        'MEMBER': [],
+        'READ_ONLY': []
+    }
+    return hierarchy.get(user_role, [])
+```
+
+2. **Validação de Email Único**
+```python
+def validate_unique_email(email: str) -> bool:
+    """Verifica se email já está em uso"""
+    return not CustomUser.objects.filter(email=email).exists()
+```
+
+3. **Validação de Senha**
+```python
+def validate_password_strength(password: str) -> bool:
+    """Valida força da senha"""
+    if len(password) < 8:
+        return False
+    if not re.search(r'[A-Z]', password):
+        return False
+    if not re.search(r'[a-z]', password):
+        return False
+    if not re.search(r'\d', password):
+        return False
+    return True
+```
+
+#### **Validações Frontend (Zod)**
+```typescript
+const systemUserSchema = z.object({
+  create_system_user: z.boolean(),
+  system_role: z.string().optional(),
+  user_email: z.string().email('E-mail inválido').optional(),
+  user_password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres').optional(),
+}).refine((data) => {
+  // Se criar usuário, todos os campos são obrigatórios
+  if (data.create_system_user) {
+    return data.system_role && data.user_email && data.user_password;
+  }
+  return true;
+}, {
+  message: "Todos os campos são obrigatórios para criar usuário do sistema"
+});
+```
+
+---
+
+### 📊 Fluxo Completo de Criação
+
+#### **1. Frontend - Seleção de Papel**
+```typescript
+const handleRoleChange = (role: string) => {
+  setSelectedRole(role);
+  // Carregar preview de permissões
+  loadRolePermissions(role);
+};
+```
+
+#### **2. Frontend - Preview de Permissões**
+```typescript
+const RolePreview = ({ role }: { role: string }) => {
+  const permissions = ROLE_PERMISSIONS[role];
+  
+  return (
+    <Alert className="border-blue-200 bg-blue-50">
+      <Info className="h-4 w-4" />
+      <AlertTitle>Permissões do papel: {role}</AlertTitle>
+      <AlertDescription>
+        <ul className="mt-2 space-y-1">
+          {permissions.map(permission => (
+            <li key={permission} className="flex items-center gap-2">
+              <Check className="h-3 w-3 text-green-600" />
+              {permission}
+            </li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
+  );
+};
+```
+
+#### **3. Backend - Processamento**
+```python
+# 1. Validar hierarquia
+validate_role_hierarchy(system_role)
+
+# 2. Validar email único
+validate_unique_email(user_email)
+
+# 3. Criar membro
+member = Member.objects.create(**member_data)
+
+# 4. Criar usuário
+system_user = CustomUser.objects.create_user(
+    email=user_email,
+    password=user_password,
+    full_name=member.full_name
+)
+
+# 5. Criar vínculo com igreja
+ChurchUser.objects.create(
+    user=system_user,
+    church=user_church,
+    role=system_role
+)
+
+# 6. Vincular membro ao usuário
+member.user = system_user
+member.save()
+```
+
+#### **4. Resultado Final**
+- ✅ Membro criado na igreja
+- ✅ Usuário do sistema criado
+- ✅ Papel atribuído conforme hierarquia
+- ✅ Vínculo estabelecido entre membro e usuário
+- ✅ Permissões ativas imediatamente
+
+---
+
+### 🎯 Casos de Uso Práticos
+
+#### **Caso 1: Pastor criando Secretário**
+```
+Pastor (PASTOR) → pode criar → Secretário (SECRETARY)
+✅ Permitido: SECRETARY está abaixo de PASTOR na hierarquia
+```
+
+#### **Caso 2: Secretário tentando criar Pastor**
+```
+Secretário (SECRETARY) → tenta criar → Pastor (PASTOR)
+❌ Negado: PASTOR está acima de SECRETARY na hierarquia
+```
+
+#### **Caso 3: Admin criando qualquer papel**
+```
+Church Admin (CHURCH_ADMIN) → pode criar → qualquer papel abaixo
+✅ Permitido: CHURCH_ADMIN tem autoridade sobre todos os papéis inferiores
+```
+
+---
+
+### 📈 Métricas e Auditoria
+
+#### **Logs de Auditoria**
+```python
+# Log de criação de usuário
+logger.info(
+    f"Sistema de usuário criado - "
+    f"Membro: {member.full_name} | "
+    f"Email: {user_email} | "
+    f"Papel: {system_role} | "
+    f"Igreja: {user_church.name} | "
+    f"Criado por: {request_user.email}"
+)
+```
+
+#### **Métricas do Dashboard**
+- **Usuários criados por mês**
+- **Distribuição de papéis atribuídos**
+- **Taxa de adoção do sistema por igreja**
+- **Usuários ativos vs inativos**
+
+---
+
+### 🚨 Considerações de Segurança
+
+#### **Princípios de Segurança**
+1. **Princípio do Menor Privilégio**: Usuários só podem atribuir papéis inferiores
+2. **Isolamento Multi-Tenant**: Usuários só veem dados de sua igreja
+3. **Auditoria Completa**: Todas as ações são registradas
+4. **Validação Dupla**: Frontend + Backend validam hierarquia
+5. **Senhas Seguras**: Critérios mínimos de segurança
+
+#### **Prevenção de Escalação de Privilégios**
+```python
+def prevent_privilege_escalation(request_user_role: str, target_role: str) -> bool:
+    """Impede que usuário atribua papel superior ao seu"""
+    role_levels = {
+        'SUPER_ADMIN': 10,
+        'DENOMINATION_ADMIN': 9,
+        'CHURCH_ADMIN': 8,
+        'PASTOR': 7,
+        'SECRETARY': 6,
+        'LEADER': 5,
+        'MEMBER': 4,
+        'READ_ONLY': 3
+    }
+    
+    user_level = role_levels.get(request_user_role, 0)
+    target_level = role_levels.get(target_role, 0)
+    
+    return user_level > target_level
+```
+
+---
+
+## 🔄 Resumo da Integração com Sistema de Usuários
+
+### 🎯 Fluxo Simplificado
+
+O **Sistema de Acesso e Criação de Usuários** (documentado detalhadamente na seção anterior) permite:
+
+1. **Cadastro de Membro**: Dados básicos do membro são inseridos
+2. **Opção de Acesso**: Checkbox para "Criar usuário do sistema"
+3. **Seleção de Papel**: Baseada na hierarquia do usuário logado
+4. **Validações**: Email único + hierarquia de permissões
+5. **Criação Automática**: CustomUser + ChurchUser + vínculo com Member
+
+### 🔗 Entidades Criadas
+
+```
+Membro → [Opcionalmente] → Usuário do Sistema
+   ↓                            ↓
+Member                    CustomUser + ChurchUser
+```
+
+### 🛡️ Segurança Garantida
+
+- ✅ **Hierarquia respeitada**: Usuário só atribui papéis inferiores
+- ✅ **Isolamento**: Usuário só acessa dados de sua igreja  
+- ✅ **Auditoria**: Todas as criações são registradas
+- ✅ **Validação dupla**: Frontend + Backend
 
 ---
 
@@ -864,12 +1409,19 @@ describe('useMembers', () => {
 - [x] Máscaras automáticas
 - [x] Interface responsiva
 
-### ✅ Integração Sistema de Usuários
-- [x] Endpoint de papéis disponíveis
-- [x] Validação de hierarquia
-- [x] Criação automática de ChurchUser
-- [x] Interface para atribuição de papéis
-- [x] Preview do papel selecionado
+### ✅ Sistema de Acesso e Criação de Usuários
+- [x] Endpoint `/auth/available-roles/` com hierarquia
+- [x] Hook `useRoleHierarchy` para carregar papéis disponíveis
+- [x] Interface completa de criação de usuário no formulário
+- [x] Validação de hierarquia (frontend + backend)
+- [x] Preview de permissões por papel
+- [x] Validação de email único no sistema
+- [x] Validação de força de senha
+- [x] Criação automática de CustomUser + ChurchUser
+- [x] Vínculo automático Member ↔ User
+- [x] Logs de auditoria para criação de usuários
+- [x] Prevenção de escalação de privilégios
+- [x] Isolamento multi-tenant por igreja
 
 ### ✅ Funcionalidades Avançadas
 - [x] Dashboard com KPIs em tempo real
