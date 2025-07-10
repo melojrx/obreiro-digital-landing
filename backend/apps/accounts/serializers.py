@@ -9,7 +9,7 @@ from django.contrib.auth.password_validation import validate_password
 from .models import UserProfile, ChurchUser
 from django.db import transaction
 from rest_framework.validators import UniqueTogetherValidator
-from apps.core.models import GenderChoices
+from apps.core.models import GenderChoices, RoleChoices
 
 User = get_user_model()
 
