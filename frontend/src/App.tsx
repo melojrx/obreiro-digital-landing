@@ -14,6 +14,10 @@ import CadastroEtapa2 from "./pages/CadastroEtapa2";
 import CadastroEtapa3 from "./pages/CadastroEtapa3";
 import Dashboard from "./pages/Dashboard";
 import Perfil from "./pages/Perfil";
+import Membros from "./pages/Membros";
+import NovoMembro from "./pages/NovoMembro";
+import DetalhesMembro from "./pages/DetalhesMembro";
+import EditarMembro from "./pages/EditarMembro";
 import NotFound, { Pagamento } from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -78,6 +82,38 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="auth_complete">
             <Perfil />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/membros" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <Membros />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/membros/novo" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <NovoMembro />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/membros/:id" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <DetalhesMembro />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/membros/:id/editar" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <EditarMembro />
           </ProtectedRoute>
         } 
       />

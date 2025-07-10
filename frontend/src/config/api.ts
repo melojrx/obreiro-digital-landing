@@ -68,6 +68,14 @@ export const API_ENDPOINTS = {
   members: {
     list: '/members/',
     detail: (id: number) => `/members/${id}/`,
+    create: '/members/',
+    update: (id: number) => `/members/${id}/`,
+    delete: (id: number) => `/members/${id}/`,
+    dashboard: '/members/dashboard/',
+    statistics: '/members/statistics/',
+    profile: (id: number) => `/members/${id}/profile/`,
+    updateStatus: (id: number) => `/members/${id}/update_status/`,
+    export: '/members/export/',
   },
   
   // Visitantes
