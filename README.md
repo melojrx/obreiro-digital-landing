@@ -11,6 +11,18 @@
 
 O **Obreiro Virtual** é uma plataforma SaaS completa de gestão eclesiástica desenvolvida para modernizar a administração de igrejas brasileiras. Combina uma API robusta em Django com uma interface React moderna, oferecendo ferramentas profissionais para gestão completa de membros, visitantes, finanças, atividades e muito mais.
 
+### 🖼️ Preview da Landing Page
+
+![Landing Page - Hero Section](https://github.com/user-attachments/assets/landing-hero-preview.png)
+
+*Landing page moderna e responsiva com design profissional*
+
+### 💰 Planos de Assinatura
+
+![Planos de Preços](https://github.com/user-attachments/assets/pricing-plans-preview.png)
+
+*Três planos flexíveis: Gratuito, Crescimento e Ministério*
+
 ### ✨ Principais Diferenciais
 
 - 🏛️ **Multi-denominacional**: Suporte completo a diferentes denominações e filiais
@@ -431,6 +443,43 @@ npm run type-check              # Verificar tipos
 - **👤 Gestão de Perfil**: `backend/docs/Módulo de Gestão de Perfil.md`
 - **🏗️ Bootstrap do Projeto**: `backend/docs/Bootstrap do projeto Django.md`
 - **📊 Análise Técnica**: `backend/docs/ANÁLISE TÉCNICA - PLATAFORMA SAAS - OBREIRO DIGITAL.md`
+
+## 💰 Planos e Preços
+
+### 🆓 **Plano Gratuito** - R$ 0/mês
+*Ideal para igrejas pequenas*
+
+- ✅ Até 60 membros cadastrados
+- ✅ Comunicação e engajamento básicos
+- ✅ Gestão de eventos simples
+- ✅ Relatórios mensais
+- ✅ Suporte por e-mail
+
+### 📈 **Plano Crescimento** - R$ 99/mês ⭐ *Mais Popular*
+*Perfeito para igrejas em expansão*
+
+- ✅ Até 500 membros cadastrados
+- ✅ Comunicação e engajamento avançados
+- ✅ Gestão completa de eventos e ministérios
+- ✅ Relatórios semanais e dashboards
+- ✅ Suporte prioritário por WhatsApp
+- ✅ Gestão financeira básica
+- ✅ Personalizações no sistema
+- ✅ Ferramentas de IA para postagens automáticas
+
+### 🏛️ **Plano Ministério** - R$ 199/mês
+*Para igrejas de médio e grande porte*
+
+- ✅ Membros ilimitados
+- ✅ Todas as funcionalidades de comunicação
+- ✅ Gestão completa de eventos e ministérios
+- ✅ Relatórios personalizados e em tempo real
+- ✅ Suporte VIP 24/7
+- ✅ Gestão financeira completa
+- ✅ Personalizações avançadas no sistema
+- ✅ Pacotes de funcionalidades personalizadas
+
+---
 
 ## 🎯 Diferenciais Competitivos
 

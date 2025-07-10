@@ -42,42 +42,51 @@ const Index = () => {
 
   const pricing = [
     {
-      name: "Básico",
-      price: "49",
+      name: "Plano Gratuito",
+      price: "0",
       period: "/mês",
       popular: false,
+      description: "Ideal para igrejas pequenas",
       features: [
-        "1 Igreja, 3 Filiais",
-        "Até 500 membros",
-        "Dashboard básico",
-        "QR Code visitantes",
-        "Suporte por email"
+        "Até 60 membros cadastrados",
+        "Comunicação e engajamento básicos",
+        "Gestão de eventos simples",
+        "Relatórios mensais",
+        "Suporte por e-mail"
       ]
     },
     {
-      name: "Profissional",
+      name: "Plano Crescimento",
       price: "99",
       period: "/mês",
       popular: true,
+      description: "Perfeito para igrejas em expansão",
       features: [
-        "1 Igreja, 10 filiais",
-        "Até 2.000 membros",
-        "Analytics completo",
-        "API básica (50k calls/mês)",
-        "Suporte prioritário"
+        "Até 500 membros cadastrados",
+        "Comunicação e engajamento avançados",
+        "Gestão completa de eventos e ministérios",
+        "Relatórios semanais e dashboards",
+        "Suporte prioritário por WhatsApp",
+        "Gestão financeira básica",
+        "Personalizações no sistema",
+        "Ferramentas de IA para postagens automáticas"
       ]
     },
     {
-      name: "Enterprise",
+      name: "Plano Ministério",
       price: "199",
       period: "/mês",
       popular: false,
+      description: "Para igrejas de médio e grande porte",
       features: [
-        "Filiais ilimitadas",
         "Membros ilimitados",
-        "API completa (200k calls/mês)",
-        "Integrações customizadas",
-        "Suporte 24/7 + SLA"
+        "Todas as funcionalidades de comunicação",
+        "Gestão completa de eventos e ministérios",
+        "Relatórios personalizados e em tempo real",
+        "Suporte VIP 24/7",
+        "Gestão financeira completa",
+        "Personalizações avançadas no sistema",
+        "Pacotes de funcionalidades personalizadas"
       ]
     }
   ];
@@ -110,6 +119,13 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-blue-800 mr-3 flex-shrink-0">
+                <path d="M10 9h4"></path>
+                <path d="M12 7v5"></path>
+                <path d="M14 22v-4a2 2 0 0 0-4 0v4"></path>
+                <path d="M18 22V5.618a1 1 0 0 0-.553-.894l-4.553-2.277a2 2 0 0 0-1.788 0L6.553 4.724A1 1 0 0 0 6 5.618V22"></path>
+                <path d="m18 7 3.447 1.724a1 1 0 0 1 .553.894V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9.618a1 1 0 0 1 .553-.894L6 7"></path>
+              </svg>
               <div className="text-2xl font-bold text-slate-800">
                 <span className="text-blue-800">Obreiro</span>
                 <span className="text-fuchsia-600">Virtual</span>
@@ -121,12 +137,12 @@ const Index = () => {
               <a href="#home" className="text-slate-600 hover:text-blue-800 font-medium transition-colors">Home</a>
               <a href="#recursos" className="text-slate-600 hover:text-blue-800 font-medium transition-colors">Recursos</a>
               <a href="#precos" className="text-slate-600 hover:text-blue-800 font-medium transition-colors">Preços</a>
-              <a href="#contato" className="text-slate-600 hover:text-blue-800 font-medium transition-colors">Contato</a>
-              <a href="#api" className="text-slate-600 hover:text-blue-800 font-medium transition-colors">API</a>
+              <a href="#comparativo" className="text-slate-600 hover:text-blue-800 font-medium transition-colors">Comparativo</a>
+              <a href="#depoimentos" className="text-slate-600 hover:text-blue-800 font-medium transition-colors">Depoimentos</a>
             </nav>
 
             {/* Desktop CTAs */}
-            <div className="hidden md:flex items-center space-x-4">
+                          <div className="hidden md:flex items-center space-x-4">
               <Link 
                 to="/login"
                 className="text-blue-800 hover:text-blue-900 font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -137,7 +153,7 @@ const Index = () => {
                 to="/cadastro"
                 className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors shadow-lg inline-block"
               >
-                Criar Conta Grátis
+                Comece Gratuitamente
               </Link>
             </div>
 
@@ -157,8 +173,8 @@ const Index = () => {
                 <a href="#home" className="text-slate-600 hover:text-blue-800 font-medium">Home</a>
                 <a href="#recursos" className="text-slate-600 hover:text-blue-800 font-medium">Recursos</a>
                 <a href="#precos" className="text-slate-600 hover:text-blue-800 font-medium">Preços</a>
-                <a href="#contato" className="text-slate-600 hover:text-blue-800 font-medium">Contato</a>
-                <a href="#api" className="text-slate-600 hover:text-blue-800 font-medium">API</a>
+                <a href="#comparativo" className="text-slate-600 hover:text-blue-800 font-medium">Comparativo</a>
+                <a href="#depoimentos" className="text-slate-600 hover:text-blue-800 font-medium">Depoimentos</a>
                 <div className="flex flex-col space-y-2 pt-4">
                   <Link 
                     to="/login"
@@ -170,7 +186,7 @@ const Index = () => {
                     to="/cadastro"
                     className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-4 py-2 rounded-lg inline-block"
                   >
-                    Criar Conta Grátis
+                    Comece Gratuitamente
                   </Link>
                 </div>
               </nav>
@@ -209,7 +225,7 @@ const Index = () => {
               <div className="mt-12 flex items-center space-x-8 text-sm text-slate-600">
                 <div className="flex items-center">
                   <Check className="h-5 w-5 text-green-500 mr-2" />
-                  14 dias grátis
+                  Planos gratuitos
                 </div>
                 <div className="flex items-center">
                   <Check className="h-5 w-5 text-green-500 mr-2" />
@@ -331,11 +347,12 @@ const Index = () => {
                 )}
                 <div className={`bg-white border-2 ${plan.popular ? 'border-fuchsia-600 shadow-xl' : 'border-gray-100'} rounded-3xl p-8 h-full`}>
                   <div className="text-center mb-8">
-                    <h3 className="text-2xl font-bold text-slate-800 mb-4">{plan.name}</h3>
-                    <div className="flex items-center justify-center mb-2">
+                    <h3 className="text-2xl font-bold text-slate-800 mb-2">{plan.name}</h3>
+                    <div className="flex items-center justify-center mb-4">
                       <span className="text-4xl font-bold text-slate-800">R$ {plan.price}</span>
                       <span className="text-slate-600 ml-2">{plan.period}</span>
                     </div>
+                    <p className="text-slate-600 text-sm">{plan.description}</p>
                   </div>
                   <ul className="space-y-4 mb-8">
                     {plan.features.map((feature, featureIndex) => (
@@ -350,10 +367,12 @@ const Index = () => {
                     className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-200 inline-block text-center ${
                       plan.popular 
                         ? 'bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5' 
+                        : plan.price === "0"
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
                         : 'border-2 border-blue-800 text-blue-800 hover:bg-blue-800 hover:text-white'
                     }`}
                   >
-                    Começar Teste Gratuito
+                    {plan.price === "0" ? "Começar Gratuitamente" : plan.popular ? "Escolher Plano" : "Escolher Plano"}
                   </Link>
                 </div>
               </div>
@@ -362,8 +381,115 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Comparison Table */}
+      <section id="comparativo" className="py-20 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-5xl font-bold text-slate-800 mb-6">
+              <span className="text-blue-800">Comparativo</span> de Recursos
+            </h2>
+            <p className="text-xl text-slate-600 max-w-3xl mx-auto">
+              Compare todos os recursos disponíveis em cada plano
+            </p>
+          </div>
+          
+          <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-blue-800 to-fuchsia-600 text-white">
+                    <th className="px-6 py-4 text-left font-semibold">Recursos</th>
+                    <th className="px-6 py-4 text-center font-semibold">Gratuito</th>
+                    <th className="px-6 py-4 text-center font-semibold">Crescimento</th>
+                    <th className="px-6 py-4 text-center font-semibold">Ministério</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Membros cadastrados</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Até 60</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Até 500</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Ilimitados</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Devocionais diários</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Texto</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Texto e Áudio</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Texto, Áudio e Vídeo</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Respostas a dúvidas bíblicas</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Básicas</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Avançadas</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Personalizadas</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Gestão de eventos</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Básica</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Completa</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Completa + Personalizada</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Relatórios</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Mensais</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Semanais</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Tempo real</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Gestão financeira</td>
+                    <td className="px-6 py-4 text-center text-slate-600">-</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Básica</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Completa</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Suporte técnico</td>
+                    <td className="px-6 py-4 text-center text-slate-600">E-mail</td>
+                    <td className="px-6 py-4 text-center text-slate-600">WhatsApp</td>
+                    <td className="px-6 py-4 text-center text-slate-600">VIP 24/7</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Personalizações no sistema</td>
+                    <td className="px-6 py-4 text-center text-slate-600">-</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Básicas</td>
+                    <td className="px-6 py-4 text-center text-slate-600">Avançadas</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">IA para postagens automáticas</td>
+                    <td className="px-6 py-4 text-center text-slate-600">-</td>
+                    <td className="px-6 py-4 text-center text-green-500">
+                      <Check className="h-5 w-5 mx-auto" />
+                    </td>
+                    <td className="px-6 py-4 text-center text-green-500">
+                      <Check className="h-5 w-5 mx-auto" />
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">Pacotes de funcionalidades personalizadas</td>
+                    <td className="px-6 py-4 text-center text-slate-600">-</td>
+                    <td className="px-6 py-4 text-center text-slate-600">-</td>
+                    <td className="px-6 py-4 text-center text-green-500">
+                      <Check className="h-5 w-5 mx-auto" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div className="text-center mt-12">
+            <Link 
+              to="/cadastro"
+              className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 inline-flex items-center"
+            >
+              Começar com o Plano Gratuito
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Testimonials */}
-      <section className="py-20 bg-slate-50">
+      <section id="depoimentos" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl lg:text-5xl font-bold text-slate-800 mb-6">
@@ -421,11 +547,11 @@ const Index = () => {
                 to="/cadastro"
                 className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors inline-block text-center"
               >
-                Começar Agora - 14 Dias Grátis
+                Começar Agora - Plano Gratuito
               </Link>
             </form>
             <div className="flex justify-center space-x-6 mt-6 text-sm text-slate-600">
-              <span>✓ 14 dias grátis</span>
+              <span>✓ Planos gratuitos</span>
               <span>✓ Sem compromisso</span>
               <span>✓ Suporte incluído</span>
             </div>
@@ -438,9 +564,18 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <div className="text-2xl font-bold mb-4">
-                <span className="text-blue-400">Obreiro</span>
-                <span className="text-fuchsia-400">Virtual</span>
+              <div className="flex items-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-blue-400 mr-3 flex-shrink-0">
+                  <path d="M10 9h4"></path>
+                  <path d="M12 7v5"></path>
+                  <path d="M14 22v-4a2 2 0 0 0-4 0v4"></path>
+                  <path d="M18 22V5.618a1 1 0 0 0-.553-.894l-4.553-2.277a2 2 0 0 0-1.788 0L6.553 4.724A1 1 0 0 0 6 5.618V22"></path>
+                  <path d="m18 7 3.447 1.724a1 1 0 0 1 .553.894V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9.618a1 1 0 0 1 .553-.894L6 7"></path>
+                </svg>
+                <div className="text-2xl font-bold">
+                  <span className="text-blue-400">Obreiro</span>
+                  <span className="text-fuchsia-400">Virtual</span>
+                </div>
               </div>
               <p className="text-slate-400 mb-4">
                 Modernizando a gestão eclesiástica com tecnologia de ponta.
