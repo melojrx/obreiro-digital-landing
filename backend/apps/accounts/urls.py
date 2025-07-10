@@ -12,6 +12,10 @@ urlpatterns = [
     # Autenticação
     path('login/', views.UserLoginView.as_view(), name='user-login'),
     
+    # Registro de usuários
+    path('register/', views.UserRegistrationView.as_view(), name='user-register'),
+    path('complete_profile/', views.CompleteProfileView.as_view(), name='complete-profile'),
+    
     # Papéis e hierarquia
     path('available-roles/', views.available_roles_view, name='available-roles'),
     

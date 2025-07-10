@@ -24,9 +24,18 @@ class CustomUserManager(BaseUserManager):
         
         email = self.normalize_email(email)
         
-        # Se não tem username, usar parte do email
+        # Se não tem username, gerar um único baseado no email
         if 'username' not in extra_fields:
-            extra_fields['username'] = email.split('@')[0]
+            base_username = email.split('@')[0]
+            username = base_username
+            counter = 1
+            
+            # Garantir que o username seja único
+            while self.model.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            extra_fields['username'] = username
         
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
@@ -131,9 +140,18 @@ class CustomUser(AbstractUser):
     
     def save(self, *args, **kwargs):
         """Override save para garantir consistência"""
-        # Se não tem username, usar parte do email
-        if not self.username:
-            self.username = self.email.split('@')[0]
+        # Se não tem username, gerar um único baseado no email
+        if not self.username and self.email:
+            base_username = self.email.split('@')[0]
+            username = base_username
+            counter = 1
+            
+            # Garantir que o username seja único (excluindo o próprio objeto se já existe)
+            while CustomUser.objects.filter(username=username).exclude(pk=self.pk).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            self.username = username
         
         # Se não tem first_name/last_name, dividir full_name
         if self.full_name and not (self.first_name or self.last_name):

@@ -34,6 +34,82 @@ from apps.churches.models import Church
 from apps.denominations.models import Denomination
 
 
+class UserRegistrationView(generics.CreateAPIView):
+    """
+    View para registro inicial de usuário via cadastro SaaS (Etapa 1 de 3).
+    
+    Fluxo: Dados pessoais básicos → Escolha denominação → Plano assinatura
+    Resultado: Usuário vira Denomination Admin (assinante pagante)
+    """
+    queryset = CustomUser.objects.all()
+    serializer_class = UserRegistrationSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Criar usuário
+        user = serializer.save()
+        
+        # Criar token de autenticação
+        token, created = Token.objects.get_or_create(user=user)
+        
+        return Response({
+            'token': token.key,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'full_name': user.full_name,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'phone': user.phone,
+                'is_active': user.is_active,
+                'date_joined': user.date_joined,
+                'is_profile_complete': user.is_profile_complete
+            }
+        }, status=status.HTTP_201_CREATED)
+
+
+class CompleteProfileView(generics.CreateAPIView):
+    """
+    View para completar perfil do usuário via cadastro SaaS (Etapa 2 de 3).
+    
+    Recebe: Denominação escolhida + dados da primeira igreja
+    Cria: Igreja inicial + Filial sede + Vínculo como Denomination Admin
+    """
+    serializer_class = UserCompleteRegistrationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'user': request.user}
+        )
+        serializer.is_valid(raise_exception=True)
+        
+        # Completar perfil
+        result = serializer.save()
+        
+        return Response({
+            'id': result['user'].id,
+            'email': result['user'].email,
+            'full_name': result['user'].full_name,
+            'first_name': result['user'].first_name,
+            'last_name': result['user'].last_name,
+            'phone': result['user'].phone,
+            'is_active': result['user'].is_active,
+            'date_joined': result['user'].date_joined,
+            'is_profile_complete': result['user'].is_profile_complete,
+            'profile': {
+                'bio': result['profile'].bio if result['profile'] else '',
+                'birth_date': result['profile'].birth_date if result['profile'] else None,
+                'gender': result['profile'].gender if result['profile'] else '',
+                'avatar': result['profile'].avatar.url if result['profile'] and result['profile'].avatar else None,
+            } if result['profile'] else None
+        }, status=status.HTTP_200_OK)
+
+
 class UserLoginView(ObtainAuthToken):
     """
     View personalizada para login

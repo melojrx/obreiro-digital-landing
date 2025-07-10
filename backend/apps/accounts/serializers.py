@@ -78,11 +78,20 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         write_only=True,
         help_text="Aceite dos termos de uso e política de privacidade"
     )
+    birth_date = serializers.DateField(
+        required=False,
+        help_text="Data de nascimento"
+    )
+    gender = serializers.ChoiceField(
+        choices=GenderChoices.choices,
+        required=False,
+        help_text="Gênero"
+    )
     
     class Meta:
         model = User
         fields = [
-            'email', 'full_name', 'phone',
+            'email', 'full_name', 'phone', 'birth_date', 'gender',
             'password', 'password_confirm', 'accept_terms'
         ]
         extra_kwargs = {
@@ -108,15 +117,29 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        """Criar usuário com senha criptografada"""
+        """Criar usuário com senha criptografada e perfil"""
         validated_data.pop('password_confirm')
         validated_data.pop('accept_terms')  # Não salvar no banco
         password = validated_data.pop('password')
         
+        # Extrair dados do perfil
+        birth_date = validated_data.pop('birth_date', None)
+        gender = validated_data.pop('gender', None)
+        
+        # Criar usuário
         user = User.objects.create_user(
             password=password,
             **validated_data
         )
+        
+        # Criar perfil se tiver dados
+        if birth_date or gender:
+            UserProfile.objects.create(
+                user=user,
+                birth_date=birth_date,
+                gender=gender
+            )
+        
         return user
 
 
@@ -171,8 +194,15 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserCompleteRegistrationSerializer(serializers.Serializer):
     """
-    Serializer para completar registro do usuário.
-    Inclui dados da igreja (etapa 2 do cadastro).
+    Serializer para completar registro do usuário via cadastro SaaS.
+    
+    Fluxo de Cadastro SaaS (3 etapas):
+    1. Dados pessoais básicos (UserRegistrationSerializer)
+    2. Escolha da denominação + dados da igreja (este serializer)  
+    3. Escolha do plano de assinatura (frontend)
+    
+    Resultado: Usuário vira Denomination Admin (assinante pagante)
+    que pode criar e gerenciar múltiplas igrejas da denominação.
     """
     
     # Dados da igreja
@@ -241,8 +271,8 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
     
     # Papel na igreja
     role = serializers.CharField(
-        default='pastor',
-        help_text="Papel na igreja (pastor, admin, etc.)"
+        default=RoleChoices.DENOMINATION_ADMIN,
+        help_text="Papel na denominação (usuário assinante do SaaS)"
     )
     
     def validate_role(self, value):
@@ -290,8 +320,11 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
     
     def create(self, validated_data):
         """
-        Orquestra a conclusão do cadastro, criando a igreja, filial sede, 
-        perfil e o vínculo do usuário como 'owner'.
+        Orquestra a conclusão do cadastro SaaS, criando:
+        1. Igreja inicial da denominação
+        2. Filial sede da igreja
+        3. Perfil do usuário
+        4. Vínculo como Denomination Admin (assinante pagante)
         """
         from apps.churches.models import Church
         from apps.branches.models import Branch
@@ -300,11 +333,16 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
         user = self.context['user']
 
         with transaction.atomic():
-            # 1. Preparar e criar a Igreja (Tenant)
+            # 1. Obter denominação escolhida (obrigatória para cadastro SaaS)
             denomination = None
             if validated_data.get('denomination_id'):
                 denomination = Denomination.objects.get(id=validated_data['denomination_id'])
+            else:
+                raise serializers.ValidationError(
+                    "Denominação é obrigatória para cadastro via SaaS."
+                )
             
+            # 2. Criar a primeira Igreja da denominação para este assinante
             church = Church.objects.create(
                 name=validated_data['church_name'],
                 short_name=validated_data.get('church_name')[:50],
@@ -319,7 +357,7 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
                 subscription_plan=validated_data.get('subscription_plan', 'basic')
             )
 
-            # 2. Criar a Filial Sede
+            # 3. Criar a Filial Sede
             branch_name = validated_data.get('branch_name') or "Sede"
             branch = Branch.objects.create(
                 church=church,
@@ -330,11 +368,12 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
                 zipcode=church.zipcode
             )
 
-            # 3. Vincular o Usuário à Igreja como 'church_admin'
+            # 4. Vincular o Usuário à Igreja como Denomination Admin (assinante SaaS)
+            user_role = validated_data.get('role', RoleChoices.DENOMINATION_ADMIN)
             church_user, created = ChurchUser.objects.get_or_create(
                 user=user,
                 church=church,
-                defaults={'role': 'church_admin'}
+                defaults={'role': user_role}
             )
             
             # Garantir que as permissões sejam definidas corretamente
@@ -342,11 +381,11 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
                 church_user.set_permissions_by_role()
                 church_user.save()
 
-            # Se o usuário for admin/pastor, ele gerencia a filial sede por padrão
-            if church_user.role in ['church_admin', 'pastor']:
+            # Denomination Admin gerencia todas as filiais da denominação por padrão
+            if church_user.role in [RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN, RoleChoices.PASTOR]:
                 church_user.managed_branches.add(branch)
 
-            # 4. Criar ou atualizar o UserProfile
+            # 5. Criar ou atualizar o UserProfile
             profile_data = {
                 'cpf': validated_data.get('cpf'),
                 'bio': validated_data.get('bio', ''),
@@ -361,7 +400,7 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
                 defaults=profile_data
             )
             
-            # 5. Marcar perfil como completo
+            # 6. Marcar perfil como completo
             user.is_profile_complete = True
             user.save(update_fields=['is_profile_complete'])
 

@@ -33,6 +33,10 @@ urlpatterns = [
     # Autenticação e usuários (views baseadas em função/classe)
     path('auth/', include('apps.accounts.urls')),
     
+    # Endpoints de registro de usuários
+    path('users/register/', views.UserRegistrationView.as_view(), name='users-register'),
+    path('users/complete_profile/', views.CompleteProfileView.as_view(), name='users-complete-profile'),
+    
     # Usuários (endpoints de perfil) - URLs diretas
     path('users/me/', views.user_me_view, name='users-me'),
     path('users/update_personal_data/', views.update_personal_data_view, name='users-update-personal-data'),

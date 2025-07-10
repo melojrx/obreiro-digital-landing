@@ -166,7 +166,7 @@ export const authService = {
    */
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
-      const response = await api.post<AuthResponse>('/users/register/register/', data);
+      const response = await api.post<AuthResponse>('/users/register/', data);
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -183,7 +183,7 @@ export const authService = {
   async completeProfile(data: CompleteProfileData): Promise<User> {
     try {
       // O interceptor do Axios já adiciona o token
-      const response = await api.post<User>('/users/register/complete_profile/', data);
+      const response = await api.post<User>('/users/complete_profile/', data);
       localStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
     } catch (error) {
