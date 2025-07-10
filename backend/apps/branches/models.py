@@ -193,9 +193,7 @@ class Branch(BaseModel):
     )
     
     # Managers
-    objects = models.Manager()
-    active = ActiveManager()
-    church_branches = BranchManager()
+    objects = TenantManager()
     
     class Meta:
         verbose_name = "Filial"

@@ -25,13 +25,14 @@ const CadastroEtapa2 = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
   const [denominations, setDenominations] = useState<Denomination[]>([]);
+  const [isDenominationsLoading, setIsDenominationsLoading] = useState(true);
   const [isCepLoading, setIsCepLoading] = useState(false);
   const [cepError, setCepError] = useState<string | null>(null);
 
   const { completeProfile, getAvailableDenominations, isLoading, error, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { personalData, savedChurchData } = location.state || {}; // Receber dados da Etapa 1 e dados salvos da Etapa 3
+  const { personalData, savedChurchData } = location.state || {};
 
   // Carregar dados salvos se existirem
   useEffect(() => {
@@ -59,10 +60,13 @@ const CadastroEtapa2 = () => {
   useEffect(() => {
     const loadDenominations = async () => {
       try {
+        setIsDenominationsLoading(true);
         const data = await getAvailableDenominations();
         setDenominations(data);
       } catch (err) {
         console.error('Erro ao carregar denominações:', err);
+      } finally {
+        setIsDenominationsLoading(false);
       }
     };
 
@@ -259,7 +263,7 @@ const CadastroEtapa2 = () => {
       state: { 
         personalData: personalData, // Dados da Etapa 1
         churchData: profileData,    // Dados da Etapa 2
-        rawFormData: formData 
+        rawFormData: formData
       } 
     });
   };
@@ -376,12 +380,12 @@ const CadastroEtapa2 = () => {
                 required
                 value={formData.denomination_id}
                 onChange={handleInputChange}
-                disabled={isLoading}
+                disabled={isLoading || isDenominationsLoading}
                 className={`block w-full px-3 py-3 border rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
                   errors.denomination_id ? 'border-red-300' : 'border-gray-200'
                 }`}
               >
-                <option value="">Selecione a denominação</option>
+                <option value="">{isDenominationsLoading ? 'Carregando...' : 'Selecione a denominação'}</option>
                 {denominations.map((denomination) => (
                   <option key={denomination.id} value={denomination.id}>
                     {denomination.display_name || denomination.name}
@@ -555,7 +559,7 @@ const CadastroEtapa2 = () => {
                     required
                     value={formData.church_zipcode}
                     onChange={handleCEPChange}
-                    disabled={isLoading}
+                    disabled={isLoading || isCepLoading}
                     className={`block w-full pr-10 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed`}
                     placeholder="Digite o CEP"
                     maxLength={9}

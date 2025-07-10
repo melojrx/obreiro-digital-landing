@@ -76,20 +76,20 @@ class CustomUser(AbstractUser):
         help_text="Telefone no formato (XX) XXXXX-XXXX"
     )
     
-    # Novos campos para cadastro inicial
-    birth_date = models.DateField(
-        "Data de Nascimento",
-        null=True,
-        help_text="Data de nascimento do usuário"
-    )
+    # Estes campos foram movidos para UserProfile para melhor normalização.
+    # birth_date = models.DateField(
+    #     "Data de Nascimento",
+    #     null=True,
+    #     help_text="Data de nascimento do usuário"
+    # )
     
-    gender = models.CharField(
-        "Gênero",
-        max_length=1,
-        choices=[('M', 'Masculino'), ('F', 'Feminino'), ('O', 'Outro'), ('N', 'Não informar')],
-        blank=True,
-        null=True
-    )
+    # gender = models.CharField(
+    #     "Gênero",
+    #     max_length=1,
+    #     choices=[('M', 'Masculino'), ('F', 'Feminino'), ('O', 'Outro'), ('N', 'Não informar')],
+    #     blank=True,
+    #     null=True
+    # )
     
     # Novo campo para rastrear o status do cadastro
     is_profile_complete = models.BooleanField(
@@ -120,12 +120,12 @@ class CustomUser(AbstractUser):
     
     @property
     def age(self):
-        """Calcula idade se data de nascimento disponível"""
-        if self.birth_date:
+        """Calcula idade se data de nascimento disponível no perfil"""
+        if hasattr(self, 'profile') and self.profile.birth_date:
             from datetime import date
             today = date.today()
-            return today.year - self.birth_date.year - (
-                (today.month, today.day) < (self.birth_date.month, self.birth_date.day)
+            return today.year - self.profile.birth_date.year - (
+                (today.month, today.day) < (self.profile.birth_date.month, self.profile.birth_date.day)
             )
         return None
     
@@ -185,6 +185,22 @@ class UserProfile(BaseModel):
     )
     
     # Dados pessoais adicionais
+    birth_date = models.DateField(
+        "Data de Nascimento",
+        blank=True,
+        null=True,
+        help_text="Data de nascimento"
+    )
+    
+    gender = models.CharField(
+        "Gênero",
+        max_length=1,
+        choices=GenderChoices.choices,
+        blank=True,
+        null=True,
+        help_text="Gênero do usuário"
+    )
+
     cpf = models.CharField(
         "CPF",
         max_length=14,
@@ -193,13 +209,6 @@ class UserProfile(BaseModel):
         null=True,
         validators=[validate_cpf],
         help_text="CPF do usuário (opcional)"
-    )
-    
-    birth_date = models.DateField(
-        "Data de Nascimento",
-        blank=True,
-        null=True,
-        help_text="Data de nascimento"
     )
     
     # Foto de perfil

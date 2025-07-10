@@ -73,20 +73,47 @@ class ActiveManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(is_active=True)
 
+class TenantQuerySet(models.QuerySet):
+    """
+    QuerySet que aplica o filtro de tenant (igreja) automaticamente.
+    """
+    def for_church(self, church):
+        if not church:
+            # Se não houver igreja no contexto, retorna um queryset vazio
+            # para evitar vazamento de dados.
+            return self.none()
+        return self.filter(church=church)
 
 class TenantManager(models.Manager):
     """
-    Manager para models multi-tenant.
-    Filtra automaticamente por igreja quando aplicável.
+    Manager para models multi-tenant. Filtra automaticamente pela
+    igreja do usuário logado, obtida a partir do request.
     """
-    def for_church(self, church):
-        """Retorna queryset filtrado para uma igreja específica"""
-        return self.get_queryset().filter(church=church)
-
-    def active_for_church(self, church):
-        """Retorna apenas registros ativos para uma igreja"""
-        return self.for_church(church).filter(is_active=True)
-
+    def get_queryset(self):
+        """
+        Sobrescreve o queryset padrão para aplicar o filtro de tenant.
+        """
+        from .middleware import get_current_request # Importação movida para cá
+        
+        qs = TenantQuerySet(self.model, using=self._db).filter(is_active=True)
+        
+        request = get_current_request()
+        if request and hasattr(request, 'church') and request.church:
+            return qs.for_church(request.church)
+        
+        # Se não houver request ou church (ex: em scripts, shell),
+        # retorna o queryset de ativos, mas sem filtro de tenant.
+        # Adicionar um warning aqui pode ser útil em desenvolvimento.
+        # import warnings
+        # warnings.warn("TenantManager usado sem um request de igreja no contexto.")
+        return qs
+    
+    def all_for_church(self, church):
+        """
+        Retorna TODOS os registros para uma igreja, incluindo os inativos.
+        Útil para tarefas administrativas.
+        """
+        return TenantQuerySet(self.model, using=self._db).for_church(church)
 
 # =================================
 # VALIDATORS CUSTOMIZADOS

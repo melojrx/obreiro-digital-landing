@@ -75,9 +75,10 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # Nosso middleware multi-tenant.
+    # Deve vir após a autenticação para que `request.user` exista.
+    "apps.core.middleware.TenantMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # Multi-tenant middleware (temporariamente desabilitado)
-    # "apps.core.middleware.TenantMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

@@ -381,9 +381,7 @@ class Member(BaseModel):
     # MANAGERS
     # =====================================
     
-    objects = models.Manager()
-    active = ActiveManager()
-    church_members = MemberManager()
+    objects = TenantManager()
     
     class Meta:
         verbose_name = "Membro"

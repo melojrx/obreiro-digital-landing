@@ -300,9 +300,7 @@ class Visitor(BaseModel):
     # MANAGERS
     # =====================================
     
-    objects = models.Manager()
-    active = ActiveManager()
-    church_visitors = VisitorManager()
+    objects = TenantManager()
     
     class Meta:
         verbose_name = "Visitante"

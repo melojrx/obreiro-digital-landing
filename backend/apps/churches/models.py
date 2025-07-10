@@ -201,8 +201,7 @@ class Church(BaseModel):
     )
     
     # Managers
-    objects = models.Manager()
-    active = ActiveManager()
+    objects = TenantManager()
     
     class Meta:
         verbose_name = "Igreja"

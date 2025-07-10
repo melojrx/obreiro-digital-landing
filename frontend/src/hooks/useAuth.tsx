@@ -31,6 +31,7 @@ interface AuthContextType {
   getAvailableChurches: () => Promise<Church[]>;
   getAvailableDenominations: () => Promise<Denomination[]>;
   getUserChurch: () => Promise<void>;
+  updateUser: (data: Partial<User>) => Promise<void>;
   updatePersonalData: (data: {
     full_name?: string;
     email?: string;
@@ -49,6 +50,7 @@ interface AuthContextType {
     state?: string;
     zipcode?: string;
   }) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -208,6 +210,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  const updateUser = useCallback(async (data: Partial<User>) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const updatedUserData = await authService.updatePersonalData(data);
+      setUser(updatedUserData);
+    } catch (err) {
+      if (err instanceof AuthError) {
+        setError(err.message);
+      } else {
+        setError('Erro inesperado ao atualizar dados.');
+      }
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const updatePersonalData = useCallback(async (data: {
     full_name?: string;
     email?: string;
@@ -244,6 +264,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setError(null);
       const updatedChurch = await authService.updateChurchData(data);
       setUserChurch(updatedChurch);
+      
+      // Forçar re-renderização se necessário
+      console.log('✅ Dados da igreja atualizados no contexto:', updatedChurch);
     } catch (err) {
       if (err instanceof AuthError) {
         setError(err.message);
@@ -251,6 +274,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setError('Erro ao atualizar dados da igreja.');
       }
       throw err;
+    }
+  }, []);
+
+  const uploadAvatar = useCallback(async (file: File): Promise<void> => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      const response = await authService.uploadAvatar(file);
+      
+      // Forçar atualização do estado
+      setUser(prevUser => ({
+        ...response.user,
+        // Garantir que o profile seja atualizado corretamente
+        profile: response.user.profile || prevUser?.profile || null
+      }));
+      
+      console.log('✅ Avatar atualizado no contexto:', response.avatar_url);
+      console.log('✅ Usuário atualizado:', response.user);
+    } catch (err) {
+      if (err instanceof AuthError) {
+        setError(err.message);
+      } else {
+        setError('Erro ao fazer upload do avatar.');
+      }
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -269,9 +319,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     getAvailableChurches,
     getAvailableDenominations,
     getUserChurch,
+    updateUser,
     updatePersonalData,
     updateChurchData,
-  }), [user, userChurch, isAuthenticated, isInitializing, isLoading, error, login, register, completeProfile, logout, clearError, getAvailableChurches, getAvailableDenominations, getUserChurch, updatePersonalData, updateChurchData]);
+    uploadAvatar,
+  }), [user, userChurch, isAuthenticated, isInitializing, isLoading, error, login, register, completeProfile, logout, clearError, getAvailableChurches, getAvailableDenominations, getUserChurch, updateUser, updatePersonalData, updateChurchData, uploadAvatar]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

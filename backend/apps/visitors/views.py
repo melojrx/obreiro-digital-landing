@@ -28,14 +28,24 @@ class VisitorViewSet(viewsets.ModelViewSet):
     ordering = ['-last_visit_date']
     
     def get_queryset(self):
-        """Filtrar visitantes baseado no usuário"""
+        """
+        Filtra o queryset de visitantes.
+        - O TenantManager já filtra por `church`.
+        - Adiciona filtro por `branch` se o usuário não for admin/pastor.
+        """
         user = self.request.user
         
         if user.is_superuser:
-            return Visitor.objects.all()
-        
-        # Por enquanto, retorna todos os visitantes para teste
-        return Visitor.objects.all()
+            return Visitor.objects.all_for_church(self.request.church)
+
+        queryset = Visitor.objects.all() 
+
+        church_user = user.church_users.filter(church=self.request.church).first()
+
+        if church_user and church_user.branch and church_user.role not in ['church_admin', 'pastor']:
+            queryset = queryset.filter(branch=church_user.branch)
+            
+        return queryset
     
     def get_serializer_class(self):
         if self.action == 'create':

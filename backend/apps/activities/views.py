@@ -32,13 +32,16 @@ class MinistryViewSet(viewsets.ModelViewSet):
     ordering = ['name']
     
     def get_queryset(self):
-        """Filtrar ministérios baseado no usuário"""
+        """
+        Filtra o queryset de ministérios.
+        - O TenantManager já filtra por `church`.
+        """
         user = self.request.user
         
         if user.is_superuser:
-            return Ministry.objects.all()
-        
-        # Por enquanto, retorna todos os ministérios para teste
+            return Ministry.objects.all_for_church(self.request.church)
+
+        # O TenantManager já aplicou o filtro por request.church
         return Ministry.objects.all()
     
     def get_serializer_class(self):
@@ -79,14 +82,24 @@ class ActivityViewSet(viewsets.ModelViewSet):
     ordering = ['-start_datetime']
     
     def get_queryset(self):
-        """Filtrar atividades baseado no usuário"""
+        """
+        Filtra o queryset de atividades.
+        - O TenantManager já filtra por `church`.
+        - Adiciona filtro por `branch` se o usuário não for admin/pastor.
+        """
         user = self.request.user
         
         if user.is_superuser:
-            return Activity.objects.all()
-        
-        # Por enquanto, retorna todas as atividades para teste
-        return Activity.objects.all()
+            return Activity.objects.all_for_church(self.request.church)
+
+        queryset = Activity.objects.all()
+
+        church_user = user.church_users.filter(church=self.request.church).first()
+
+        if church_user and church_user.branch and church_user.role not in ['church_admin', 'pastor']:
+            queryset = queryset.filter(branch=church_user.branch)
+            
+        return queryset
     
     def get_serializer_class(self):
         if self.action == 'create':
