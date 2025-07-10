@@ -20,7 +20,7 @@ from .serializers import (
     UserRegistrationSerializer, UserCompleteRegistrationSerializer,
     ChurchUserCreateSerializer, UserProfileCreateSerializer
 )
-from apps.core.permissions import IsChurchMember
+from apps.core.permissions import IsMemberUser
 
 User = get_user_model()
 
@@ -454,7 +454,7 @@ class UserProfileViewSet(viewsets.ModelViewSet):
     
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer
-    permission_classes = [permissions.IsAuthenticated, IsChurchMember]
+    permission_classes = [permissions.IsAuthenticated, IsMemberUser]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['user__full_name', 'user__email', 'cpf']
     filterset_fields = ['email_notifications', 'sms_notifications', 'is_active']
@@ -494,7 +494,7 @@ class ChurchUserViewSet(viewsets.ModelViewSet):
     
     queryset = ChurchUser.objects.all()
     serializer_class = ChurchUserSerializer
-    permission_classes = [permissions.IsAuthenticated, IsChurchMember]
+    permission_classes = [permissions.IsAuthenticated, IsMemberUser]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['user__full_name', 'user__email', 'church__name']
     filterset_fields = ['church', 'role', 'is_active']
