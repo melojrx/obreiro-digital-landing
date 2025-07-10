@@ -7,6 +7,9 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from .models import UserProfile, ChurchUser
+from django.db import transaction
+from rest_framework.validators import UniqueTogetherValidator
+from apps.core.models import GenderChoices
 
 User = get_user_model()
 
@@ -79,15 +82,13 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'email', 'full_name', 'phone', 'birth_date', 'gender', 
+            'email', 'full_name', 'phone',
             'password', 'password_confirm', 'accept_terms'
         ]
         extra_kwargs = {
             'email': {'help_text': 'E-mail será usado para login'},
             'full_name': {'help_text': 'Nome completo do usuário'},
             'phone': {'help_text': 'Telefone no formato (XX) XXXXX-XXXX'},
-            'birth_date': {'help_text': 'Data de nascimento (deve ter pelo menos 18 anos)'},
-            'gender': {'help_text': 'Gênero do usuário'},
         }
     
     def validate_accept_terms(self, value):
@@ -96,18 +97,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 'É obrigatório aceitar os Termos de Uso e Política de Privacidade.'
             )
-        return value
-    
-    def validate_birth_date(self, value):
-        """Validar idade mínima"""
-        if value:
-            from datetime import date
-            today = date.today()
-            age = today.year - value.year - ((today.month, today.day) < (value.month, value.day))
-            if age < 18:
-                raise serializers.ValidationError(
-                    'Você deve ter pelo menos 18 anos para se cadastrar.'
-                )
         return value
     
     def validate(self, attrs):
@@ -129,6 +118,55 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return user
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Serializer para UserProfile, sem aninhar o UserSerializer para evitar dependência circular."""
+    
+    age = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = UserProfile
+        fields = [
+            'id', 'user', 'cpf', 'birth_date', 'gender', 'age', 'avatar',
+            'email_notifications', 'sms_notifications', 'last_login_ip',
+            'bio', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at', 'last_login_ip', 'age']
+        
+    def to_representation(self, instance):
+        """Customizar a representação para incluir URL completa do avatar"""
+        data = super().to_representation(instance)
+        if instance.avatar:
+            request = self.context.get('request')
+            if request:
+                data['avatar'] = request.build_absolute_uri(instance.avatar.url)
+            else:
+                data['avatar'] = instance.avatar.url
+        return data
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """Serializer para User personalizado, incluindo o perfil."""
+    
+    display_name = serializers.ReadOnlyField()
+    profile = serializers.SerializerMethodField()
+    
+    def get_profile(self, obj):
+        """Método para incluir o perfil com contexto da request"""
+        if hasattr(obj, 'profile'):
+            return UserProfileSerializer(obj.profile, context=self.context).data
+        return None
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'username', 'full_name', 'phone',
+            'first_name', 'last_name', 'display_name',
+            'is_active', 'date_joined', 'last_login', 'is_profile_complete',
+            'profile'
+        ]
+        read_only_fields = ['id', 'username', 'date_joined', 'last_login', 'is_profile_complete', 'profile']
 
 
 class UserCompleteRegistrationSerializer(serializers.Serializer):
@@ -174,6 +212,10 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
         help_text="Nome do pastor responsável"
     )
     
+    # Adicionar os campos que foram movidos do CustomUser
+    birth_date = serializers.DateField(required=False)
+    gender = serializers.ChoiceField(choices=GenderChoices.choices, required=False)
+
     # Dados do perfil do usuário (opcional)
     cpf = serializers.CharField(
         max_length=14,
@@ -237,153 +279,89 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
         return value
     
     def create(self, validated_data):
-        """Completar registro do usuário e criar igreja"""
-        user = self.context['user']
-        
-        # Extrair dados da igreja
-        church_data = {
-            'name': validated_data['church_name'],
-            'short_name': validated_data['church_name'],  # Usar o mesmo nome por padrão
-            'email': validated_data['church_email'],
-            'phone': validated_data['church_phone'],
-            'address': validated_data['church_address'],
-            'city': 'Não informado',  # Valor padrão
-            'state': 'SP',  # Valor padrão
-            'zipcode': '00000-000',  # Valor padrão
-            'cnpj': validated_data.get('church_cnpj') or None,
-        }
-        
-        # Tentar extrair cidade/estado do endereço se possível
-        address_parts = validated_data['church_address'].split(',')
-        if len(address_parts) >= 2:
-            # Tentar extrair cidade/estado da última parte
-            last_part = address_parts[-1].strip()
-            if '/' in last_part:
-                city_state = last_part.split('/')
-                if len(city_state) == 2:
-                    church_data['city'] = city_state[0].strip()
-                    church_data['state'] = city_state[1].strip()[:2].upper()
-        
-        # Definir plano de assinatura se fornecido
-        if 'subscription_plan' in validated_data:
-            church_data['subscription_plan'] = validated_data['subscription_plan']
-        
-        # Criar igreja
+        """
+        Orquestra a conclusão do cadastro, criando a igreja, filial sede, 
+        perfil e o vínculo do usuário como 'owner'.
+        """
         from apps.churches.models import Church
+        from apps.branches.models import Branch
         from apps.denominations.models import Denomination
         
-        # Adicionar denominação se fornecida
-        if validated_data.get('denomination_id'):
-            try:
-                church_data['denomination'] = Denomination.objects.get(
-                    id=validated_data['denomination_id']
-                )
-            except Denomination.DoesNotExist:
-                pass  # Ignorar se não encontrar
-        
-        church = Church.objects.create(**church_data)
-        
-        # Criar perfil do usuário
-        profile_data = {
-            'cpf': validated_data.get('cpf'),
-            'bio': validated_data.get('bio', ''),  # Valor padrão vazio
-            'email_notifications': validated_data.get('email_notifications', True),
-            'sms_notifications': validated_data.get('sms_notifications', False),
-        }
-        
-        profile, created = UserProfile.objects.get_or_create(
-            user=user,
-            defaults=profile_data
-        )
-        
-        if not created:
-            # Atualizar perfil existente
-            for key, value in profile_data.items():
-                if value is not None:
-                    setattr(profile, key, value)
-            profile.save()
-        
-        # Marcar o perfil do usuário como completo
-        user.is_profile_complete = True
-        user.save()
-        
-        # Criar associação do usuário com a igreja como pastor/admin
-        role = validated_data.get('role', 'pastor')
-        
-        church_user, created = ChurchUser.objects.get_or_create(
-            user=user,
-            church=church,
-            defaults={'role': role}
-        )
-        
-        # Definir pastor responsável
-        pastor_name = validated_data.get('pastor_name')
-        if pastor_name:
-            if pastor_name == user.full_name:
-                # Se é o próprio usuário, definir como pastor principal
-                church.main_pastor = user
-                church.save()
-            else:
-                # Se é outro pastor, salvar no campo description
-                church.description = f"Pastor responsável: {pastor_name}"
-                church.save()
-        
-        # Criar filial se especificada
-        branch = None
-        if validated_data.get('branch_name'):
-            try:
-                from apps.branches.models import Branch
-                branch = Branch.objects.create(
-                    church=church,
-                    name=validated_data['branch_name'],
-                    address=church.address,
-                    city=church.city,
-                    state=church.state,
-                    zipcode=church.zipcode,
-                    is_headquarters=False
-                )
-            except Exception:
-                # Ignorar erro de filial se o modelo não existir ainda
-                pass
-        
-        return {
-            'user': user,
-            'profile': profile,
-            'church': church,
-            'church_user': church_user,
-            'branch': branch
-        }
+        user = self.context['user']
 
+        with transaction.atomic():
+            # 1. Preparar e criar a Igreja (Tenant)
+            denomination = None
+            if validated_data.get('denomination_id'):
+                denomination = Denomination.objects.get(id=validated_data['denomination_id'])
+            
+            church = Church.objects.create(
+                name=validated_data['church_name'],
+                short_name=validated_data.get('church_name')[:50],
+                cnpj=validated_data.get('church_cnpj'),
+                email=validated_data.get('church_email'),
+                phone=validated_data.get('church_phone'),
+                address=validated_data.get('church_address'),
+                city="Cidade",
+                state="SP",
+                zipcode="00000-000",
+                denomination=denomination,
+                subscription_plan=validated_data.get('subscription_plan', 'basic')
+            )
 
-class UserSerializer(serializers.ModelSerializer):
-    """Serializer para User personalizado"""
-    
-    display_name = serializers.ReadOnlyField()
-    
-    class Meta:
-        model = User
-        fields = [
-            'id', 'email', 'username', 'full_name', 'phone',
-            'first_name', 'last_name', 'display_name',
-            'is_active', 'date_joined', 'last_login', 'is_profile_complete'
-        ]
-        read_only_fields = ['id', 'username', 'date_joined', 'last_login', 'is_profile_complete']
+            # 2. Criar a Filial Sede
+            branch_name = validated_data.get('branch_name') or "Sede"
+            branch = Branch.objects.create(
+                church=church,
+                name=branch_name,
+                address=church.address,
+                city=church.city,
+                state=church.state,
+                zipcode=church.zipcode
+            )
 
+            # 3. Vincular o Usuário à Igreja como 'church_admin'
+            church_user, created = ChurchUser.objects.get_or_create(
+                user=user,
+                church=church,
+                defaults={'role': 'church_admin'}
+            )
+            
+            # Garantir que as permissões sejam definidas corretamente
+            if created:
+                church_user.set_permissions_by_role()
+                church_user.save()
 
-class UserProfileSerializer(serializers.ModelSerializer):
-    """Serializer para UserProfile"""
-    
-    user = UserSerializer(read_only=True)
-    age = serializers.ReadOnlyField()
-    
-    class Meta:
-        model = UserProfile
-        fields = [
-            'id', 'user', 'cpf', 'birth_date', 'age', 'avatar',
-            'email_notifications', 'sms_notifications', 'last_login_ip',
-            'bio', 'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'last_login_ip']
+            # Se o usuário for admin/pastor, ele gerencia a filial sede por padrão
+            if church_user.role in ['church_admin', 'pastor']:
+                church_user.managed_branches.add(branch)
+
+            # 4. Criar ou atualizar o UserProfile
+            profile_data = {
+                'cpf': validated_data.get('cpf'),
+                'bio': validated_data.get('bio', ''),
+                'birth_date': validated_data.get('birth_date'),
+                'gender': validated_data.get('gender'),
+                'email_notifications': validated_data.get('email_notifications', True),
+                'sms_notifications': validated_data.get('sms_notifications', False),
+            }
+            # Usar update_or_create para criar o perfil se não existir, ou atualizá-lo.
+            profile, created = UserProfile.objects.update_or_create(
+                user=user,
+                defaults=profile_data
+            )
+            
+            # 5. Marcar perfil como completo
+            user.is_profile_complete = True
+            user.save(update_fields=['is_profile_complete'])
+
+            return {
+                'user': user,
+                'profile': profile,
+                'church': church,
+                'church_user': church_user,
+                'branch': branch
+            }
 
 
 class ChurchUserSerializer(serializers.ModelSerializer):
@@ -422,12 +400,21 @@ class ChurchUserCreateSerializer(serializers.ModelSerializer):
         model = ChurchUser
         fields = [
             'email', 'full_name', 'phone', 'password',
-            'church', 'role', 'can_access_admin', 'can_manage_members',
+            'church', 'branch', 'role', 'can_access_admin', 'can_manage_members',
             'can_manage_visitors', 'can_manage_activities', 'can_view_reports',
             'can_manage_branches', 'notes'
         ]
+        # Adiciona validação para garantir que a branch pertença à church
+        validators = [
+            UniqueTogetherValidator(
+                queryset=ChurchUser.objects.all(),
+                fields=('user', 'church'),
+                message="Este usuário já está associado a esta igreja."
+            )
+        ]
     
     def create(self, validated_data):
+        """Cria um novo usuário e o associa a uma igreja."""
         # Extrair dados do usuário
         user_data = {
             'email': validated_data.pop('email'),
@@ -439,7 +426,7 @@ class ChurchUserCreateSerializer(serializers.ModelSerializer):
         # Criar usuário
         user = User.objects.create_user(**user_data)
         
-        # Criar ChurchUser
+        # Criar ChurchUser com os dados restantes
         church_user = ChurchUser.objects.create(user=user, **validated_data)
         
         return church_user

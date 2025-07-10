@@ -28,14 +28,28 @@ class MemberViewSet(viewsets.ModelViewSet):
     ordering = ['full_name']
     
     def get_queryset(self):
-        """Filtrar membros baseado no usuário"""
+        """
+        Filtra o queryset de membros.
+        - O TenantManager já filtra por `church`.
+        - Adiciona filtro por `branch` se o usuário não for admin/pastor.
+        """
         user = self.request.user
         
         if user.is_superuser:
-            return Member.objects.all()
-        
-        # Por enquanto, retorna todos os membros para teste
-        return Member.objects.all()
+            return Member.objects.all_for_church(self.request.church)
+
+        # O TenantManager já aplicou o filtro por request.church
+        queryset = Member.objects.all() 
+
+        # Busca o vínculo do usuário para verificar o papel e a filial
+        church_user = user.church_users.filter(church=self.request.church).first()
+
+        if church_user and church_user.branch and church_user.role not in ['church_admin', 'pastor']:
+            # Se o usuário está associado a uma filial e não é admin/pastor da igreja,
+            # restringe a visão para apenas os membros da sua filial.
+            queryset = queryset.filter(branch=church_user.branch)
+            
+        return queryset
     
     def get_serializer_class(self):
         if self.action == 'create':

@@ -12,6 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.contrib.auth import get_user_model, authenticate
 from django.db import transaction
+from django.contrib.auth.password_validation import validate_password, ValidationError
 
 from .models import UserProfile, ChurchUser
 from .serializers import (
@@ -119,31 +120,23 @@ class UserRegistrationViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def complete_profile(self, request):
         """
-        Completar perfil do usuário.
-        Inclui dados pessoais e associação com igreja.
+        Completa o registro do usuário orquestrando a criação da igreja,
+        perfil e vínculo de 'owner' através do serializer.
         """
         serializer = UserCompleteRegistrationSerializer(
             data=request.data,
             context={'user': request.user}
         )
+        serializer.is_valid(raise_exception=True)
         
-        if serializer.is_valid():
-            with transaction.atomic():
-                result = serializer.save()
-                
-                # Marcar o perfil do usuário como completo
-                user = request.user
-                user.is_profile_complete = True
-                user.save(update_fields=['is_profile_complete'])
-                
-                return Response({
-                    'user': UserSerializer(result['user']).data,
-                    'profile': UserProfileSerializer(result['profile']).data,
-                    'church_user': ChurchUserSerializer(result['church_user']).data,
-                    'message': 'Perfil completado com sucesso!'
-                }, status=status.HTTP_200_OK)
+        # O método `create` do serializer agora cuida de toda a lógica transacional
+        result = serializer.save()
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'user': UserSerializer(result['user']).data,
+            'church': ChurchUserSerializer(result['church_user']).data, # Retorna o contexto da igreja do usuário
+            'message': 'Perfil completado com sucesso!'
+        }, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['get'])
     def available_denominations(self, request):
@@ -212,51 +205,42 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['patch'])
     def update_personal_data(self, request):
-        """Atualizar dados pessoais do usuário"""
+        """Atualizar dados pessoais e de perfil do usuário."""
         try:
             user = request.user
+            profile, created = UserProfile.objects.get_or_create(user=user)
             data = request.data
             
-            # Atualizar dados do usuário
+            # Campos do modelo User (apenas os que são de autenticação/contato)
             user_fields = ['full_name', 'email', 'phone']
             user_updated = False
-            
             for field in user_fields:
-                if field in data and data[field] != getattr(user, field):
+                if field in data and data.get(field) != getattr(user, field, None):
                     setattr(user, field, data[field])
                     user_updated = True
-            
             if user_updated:
                 user.save()
-            
-            # Atualizar ou criar perfil
-            profile_data = {}
-            profile_fields = ['bio', 'email_notifications', 'sms_notifications']
-            
+
+            # Campos do modelo UserProfile
+            profile_fields = ['birth_date', 'gender', 'bio', 'email_notifications', 'sms_notifications', 'cpf']
+            profile_updated = False
             for field in profile_fields:
-                if field in data:
-                    profile_data[field] = data[field]
+                if field in data and data.get(field) != getattr(profile, field, None):
+                    setattr(profile, field, data[field])
+                    profile_updated = True
+            if profile_updated:
+                profile.save()
             
-            if profile_data:
-                profile, created = UserProfile.objects.get_or_create(
-                    user=user,
-                    defaults=profile_data
-                )
-                
-                if not created:
-                    for field, value in profile_data.items():
-                        setattr(profile, field, value)
-                    profile.save()
-            
+            # Recarregar o usuário para garantir que o 'profile' aninhado esteja atualizado
+            user.refresh_from_db()
+
             return Response({
                 'user': UserSerializer(user).data,
                 'message': 'Dados pessoais atualizados com sucesso!'
             })
             
         except Exception as e:
-            return Response({
-                'error': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=False, methods=['get'])
     def my_church(self, request):
@@ -297,50 +281,49 @@ class UserViewSet(viewsets.ModelViewSet):
     def update_church_data(self, request):
         """
         Atualizar dados da igreja do usuário.
-        Cria a associação se não existir.
         """
         try:
             from apps.churches.models import Church
+            
+            # Buscar a associação do usuário com uma igreja
+            church_user = request.user.church_users.filter(is_active=True).first()
 
-            data = request.data
-            church_name = data.get('name')
-
-            if not church_name:
+            if not church_user:
                 return Response(
-                    {'error': 'O nome da igreja é obrigatório.'},
+                    {'error': 'Usuário não está associado a nenhuma igreja.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Buscar ou criar a associação do usuário com uma igreja
-            church_user, created_church_user = request.user.church_users.get_or_create(
-                defaults={'role': 'member'}
-            )
-            
+            # Verificar se o usuário tem permissão para alterar dados da igreja
+            if not church_user.is_admin:
+                return Response(
+                    {'error': 'Sem permissão para alterar dados da igreja.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            church = church_user.church
+            data = request.data
+
             # Campos que podem ser atualizados na igreja
             church_fields = ['name', 'short_name', 'cnpj', 'email', 'phone', 'address', 'city', 'state', 'zipcode']
-            church_data_to_update = {
-                field: data[field] for field in church_fields if field in data
-            }
-
-            # Buscar ou criar a igreja
-            church, created_church = Church.objects.get_or_create(
-                name=church_name,
-                defaults={
-                    **church_data_to_update,
-                    'administrator': request.user
-                }
-            )
-
-            # Se a igreja já existia e o usuário tem permissão, atualiza os dados
-            if not created_church and church_user.can_access_admin:
-                for field, value in church_data_to_update.items():
-                    setattr(church, field, value)
-                church.save()
             
-            # Associa a igreja ao usuário se ainda não estiver associada
-            if not church_user.church:
-                church_user.church = church
-                church_user.save()
+            # Atualizar os campos da igreja
+            updated_fields = []
+            for field in church_fields:
+                if field in data:
+                    # Tratar o short_name automaticamente se não fornecido
+                    if field == 'short_name' and not data.get('short_name') and field == 'name':
+                        value = data['name'][:50]  # Limitar a 50 caracteres
+                    else:
+                        value = data[field]
+                    
+                    if getattr(church, field) != value:
+                        setattr(church, field, value)
+                        updated_fields.append(field)
+
+            # Salvar apenas se houver mudanças
+            if updated_fields:
+                church.save(update_fields=updated_fields)
 
             return Response({
                 'church': {
@@ -363,6 +346,104 @@ class UserViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({
                 'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='change-password')
+    def change_password(self, request):
+        """Altera a senha do usuário logado."""
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+
+        if not all([old_password, new_password, confirm_password]):
+            return Response({'error': 'Todos os campos são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not user.check_password(old_password):
+            return Response({'error': 'Senha antiga incorreta.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if new_password != confirm_password:
+            return Response({'error': 'As novas senhas não coincidem.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            validate_password(new_password, user)
+        except ValidationError as e:
+            return Response({'error': list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({'message': 'Senha alterada com sucesso.'})
+
+    @action(detail=False, methods=['post'], url_path='update-subscription')
+    def update_subscription(self, request):
+        """Atualiza o plano de assinatura da igreja do usuário."""
+        # Lógica de atualização de plano (simulada)
+        plan = request.data.get('plan')
+        return Response({'message': f'Plano atualizado para {plan} com sucesso!'})
+
+    @action(detail=False, methods=['post'], url_path='delete-account')
+    def delete_account(self, request):
+        """Exclui a conta do usuário logado."""
+        user = request.user
+        user.is_active = False
+        user.save()
+        # Idealmente, aqui você invalidaria o token de autenticação
+        return Response({'message': 'Sua conta foi desativada com sucesso.'})
+
+    @action(detail=False, methods=['post'], url_path='upload-avatar')
+    def upload_avatar(self, request):
+        """Upload de avatar do usuário logado."""
+        try:
+            if 'avatar' not in request.FILES:
+                return Response(
+                    {'error': 'Nenhum arquivo enviado.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            avatar_file = request.FILES['avatar']
+            
+            # Validar tipo de arquivo
+            allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+            if avatar_file.content_type not in allowed_types:
+                return Response(
+                    {'error': 'Tipo de arquivo não permitido. Use apenas JPG, PNG ou GIF.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validar tamanho (5MB máximo)
+            max_size = 5 * 1024 * 1024  # 5MB
+            if avatar_file.size > max_size:
+                return Response(
+                    {'error': 'Arquivo muito grande. Tamanho máximo: 5MB.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Criar ou atualizar perfil
+            profile, created = UserProfile.objects.get_or_create(user=request.user)
+            
+            # Remover avatar antigo se existir
+            if profile.avatar:
+                try:
+                    profile.avatar.delete(save=False)
+                except:
+                    pass  # Ignorar erro se arquivo não existir
+            
+            # Salvar novo avatar
+            profile.avatar = avatar_file
+            profile.save()
+            
+            # Recarregar o usuário para garantir que as mudanças sejam refletidas
+            request.user.refresh_from_db()
+            
+            return Response({
+                'message': 'Avatar atualizado com sucesso!',
+                'avatar_url': request.build_absolute_uri(profile.avatar.url) if profile.avatar else None,
+                'user': UserSerializer(request.user, context={'request': request}).data
+            })
+
+        except Exception as e:
+            return Response({
+                'error': f'Erro ao fazer upload: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

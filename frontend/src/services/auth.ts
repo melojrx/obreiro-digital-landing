@@ -46,6 +46,12 @@ export interface User {
   first_name: string;
   last_name: string;
   phone?: string;
+  profile?: {
+    bio?: string;
+    birth_date?: string;
+    gender?: string;
+    avatar?: string;
+  };
   is_active: boolean;
   date_joined: string;
   is_profile_complete: boolean;
@@ -351,6 +357,31 @@ export const authService = {
     try {
       const response = await api.patch<{church: UserChurch; message: string}>('/users/update_church_data/', data);
       return response.data.church;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Upload de avatar do usuário
+   */
+  async uploadAvatar(file: File): Promise<{user: User; avatar_url: string; message: string}> {
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      
+      const response = await api.post<{user: User; avatar_url: string; message: string}>('/users/upload-avatar/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      // Atualizar localStorage com os novos dados do usuário
+      console.log('📸 Avatar response:', response.data);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      this.updateActivity();
+      
+      return response.data;
     } catch (error) {
       throw handleApiError(error);
     }

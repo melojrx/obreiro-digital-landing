@@ -231,7 +231,7 @@ class Activity(BaseModel):
         "Data/Hora de Término",
         help_text="Data e hora de término da atividade"
     )
-    
+
     # Recorrência
     is_recurring = models.BooleanField(
         "Atividade Recorrente",
@@ -292,12 +292,10 @@ class Activity(BaseModel):
         help_text="Se requer inscrição prévia"
     )
     
-    is_public = models.BooleanField(
-        "Público",
-        default=True,
-        help_text="Se aparece publicamente"
-    )
-    
+    # Status e visibilidade
+    is_active = models.BooleanField(default=True)
+    is_public = models.BooleanField(default=False)
+
     # Estatísticas
     participants_count = models.PositiveIntegerField(
         "Participantes Confirmados",
@@ -313,9 +311,7 @@ class Activity(BaseModel):
     )
     
     # Managers
-    objects = models.Manager()
-    active = ActiveManager()
-    church_activities = ActivityManager()
+    objects = TenantManager()
     
     class Meta:
         verbose_name = "Atividade"
@@ -323,11 +319,6 @@ class Activity(BaseModel):
         ordering = ['-start_datetime']
         indexes = [
             models.Index(fields=['church', '-start_datetime']),
-            models.Index(fields=['branch', '-start_datetime']),
-            models.Index(fields=['ministry', '-start_datetime']),
-            models.Index(fields=['activity_type']),
-            models.Index(fields=['start_datetime']),
-            models.Index(fields=['is_recurring']),
         ]
     
     def __str__(self):

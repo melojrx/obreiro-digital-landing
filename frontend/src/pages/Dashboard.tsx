@@ -1,98 +1,127 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/config/api';
 import AppLayout from '@/components/layout/AppLayout';
-import StatsCard from '@/components/dashboard/StatsCard';
-import RecentActivities from '@/components/dashboard/RecentActivities';
-import QuickActions from '@/components/dashboard/QuickActions';
-import EventsTable from '@/components/dashboard/EventsTable';
+import { StatsCard } from '@/components/dashboard/StatsCard';
+import { RecentActivities } from '@/components/dashboard/RecentActivities';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import { EventsTable } from '@/components/dashboard/EventsTable';
 import { Users, UserPlus, Calendar, DollarSign } from 'lucide-react';
 
+interface DashboardData {
+    members: { total: number; change: number };
+    visitors: { total: number; change: number };
+    events: { total: number; change: number };
+    tithes: { total: number; change: number };
+}
+
 const Dashboard = () => {
-  const { user } = useAuth();
-  const location = useLocation();
-  const { toast } = useToast();
+    const { user } = useAuth();
+    const location = useLocation();
+    const { toast } = useToast();
+    const [data, setData] = useState<DashboardData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-  // Mostrar mensagem de sucesso se vier do cadastro
-  useEffect(() => {
-    if (location.state?.successMessage) {
-      toast({
-        title: "Bem-vindo!",
-        description: location.state.successMessage,
-        duration: 5000,
-      });
-      // Limpar o state para não mostrar novamente
-      window.history.replaceState({}, document.title);
-    }
-  }, [location, toast]);
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                setIsLoading(true);
+                const response = await api.get('/churches/main-dashboard/');
+                setData(response.data);
+            } catch (error) {
+                console.error("Erro ao buscar dados do dashboard:", error);
+                toast({
+                    title: "Erro",
+                    description: "Não foi possível carregar os dados do dashboard.",
+                    variant: "destructive",
+                });
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-  return (
-    <AppLayout>
-      <div className="space-y-6">
-        {/* Welcome Section */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Bem-vindo, {user?.full_name?.split(' ')[0] || 'admin'}!
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Este é o seu painel de controle do Obreiro Virtual. Aqui você pode gerenciar todos os aspectos da sua igreja.
-          </p>
-        </div>
+        fetchDashboardData();
+    }, [toast]);
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatsCard
-            title="Membros"
-            value="42"
-            icon={Users}
-            iconColor="text-blue-600"
-            iconBg="bg-blue-100"
-            trend={{ value: 5, isPositive: true }}
-          />
-          <StatsCard
-            title="Visitantes (mês)"
-            value="12"
-            icon={UserPlus}
-            iconColor="text-green-600"
-            iconBg="bg-green-100"
-            trend={{ value: 20, isPositive: true }}
-          />
-          <StatsCard
-            title="Eventos Ativos"
-            value="3"
-            icon={Calendar}
-            iconColor="text-yellow-600"
-            iconBg="bg-yellow-100"
-          />
-          <StatsCard
-            title="Dízimos (mês)"
-            value="R$ 3.250"
-            icon={DollarSign}
-            iconColor="text-purple-600"
-            iconBg="bg-purple-100"
-            trend={{ value: 15, isPositive: true }}
-          />
-        </div>
+    useEffect(() => {
+        if (location.state?.successMessage) {
+            toast({
+                title: "Bem-vindo!",
+                description: location.state.successMessage,
+                duration: 5000,
+            });
+            window.history.replaceState({}, document.title);
+        }
+    }, [location, toast]);
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Activities - 2 columns */}
-          <div className="lg:col-span-2">
-            <RecentActivities />
-          </div>
-          
-          {/* Quick Actions - 1 column */}
-          <div>
-            <QuickActions />
-          </div>
-        </div>
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        }).format(value);
+    };
 
-        {/* Events Table */}
-        <EventsTable />
-      </div>
-    </AppLayout>
-  );
+    return (
+        <AppLayout>
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">
+                        Dashboard
+                    </h1>
+                    <p className="text-gray-600 mt-1">
+                        Bem-vindo, {user?.full_name?.split(' ')[0] || 'admin'}! Aqui está o resumo da sua igreja.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatsCard
+                        title="Membros"
+                        value={data?.members.total ?? 0}
+                        change={data?.members.change}
+                        icon={<Users className="h-5 w-5" />}
+                        isLoading={isLoading}
+                        color="bg-gradient-to-r from-blue-500 to-cyan-400"
+                    />
+                    <StatsCard
+                        title="Visitantes (mês)"
+                        value={data?.visitors.total ?? 0}
+                        change={data?.visitors.change}
+                        icon={<UserPlus className="h-5 w-5" />}
+                        isLoading={isLoading}
+                        color="bg-gradient-to-r from-green-500 to-emerald-400"
+                    />
+                    <StatsCard
+                        title="Eventos Ativos"
+                        value={data?.events.total ?? 0}
+                        change={data?.events.change}
+                        icon={<Calendar className="h-5 w-5" />}
+                        isLoading={isLoading}
+                        color="bg-gradient-to-r from-yellow-500 to-amber-400"
+                    />
+                    <StatsCard
+                        title="Dízimos (mês)"
+                        value={formatCurrency(data?.tithes.total ?? 0)}
+                        change={data?.tithes.change}
+                        icon={<DollarSign className="h-5 w-5" />}
+                        isLoading={isLoading}
+                        color="bg-gradient-to-r from-purple-500 to-fuchsia-400"
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    <div className="lg:col-span-2">
+                        <EventsTable />
+                    </div>
+                    <div className="lg:col-span-1 space-y-8">
+                        <QuickActions />
+                        <RecentActivities />
+                    </div>
+                </div>
+            </div>
+        </AppLayout>
+    );
 };
 
 export default Dashboard; 

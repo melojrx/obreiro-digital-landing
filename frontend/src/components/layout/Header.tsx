@@ -10,23 +10,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
-  // Pegar as iniciais do nome do usuário
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
 
   // Função para fazer logout
   const handleLogout = async () => {
@@ -68,12 +58,7 @@ const Header: React.FC = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center space-x-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-fuchsia-500 text-white">
-                    {user?.full_name ? getInitials(user.full_name) : 'U'}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar size="sm" />
                 <div className="hidden md:flex items-center space-x-1">
                   <span className="text-sm font-medium text-gray-700">
                     {user?.full_name || 'Usuário'}

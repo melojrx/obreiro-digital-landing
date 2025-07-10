@@ -1,70 +1,50 @@
-import React from 'react';
-import { UserPlus, Calendar, MessageSquare, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PlusCircle, CalendarPlus, DollarSign, MessageSquare } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-interface QuickAction {
-  id: number;
-  title: string;
-  icon: React.ElementType;
-  color: string;
-  onClick: () => void;
-}
+const actions = [
+  {
+    label: 'Adicionar novo membro',
+    icon: PlusCircle,
+    color: 'from-blue-500 to-cyan-500',
+    link: '/members/new'
+  },
+  {
+    label: 'Criar novo evento',
+    icon: CalendarPlus,
+    color: 'from-green-500 to-emerald-500',
+    link: '/events/new'
+  },
+  {
+    label: 'Registrar entrada financeira',
+    icon: DollarSign,
+    color: 'from-yellow-500 to-amber-500',
+    link: '/finance/new'
+  },
+  {
+    label: 'Enviar mensagem aos membros',
+    icon: MessageSquare,
+    color: 'from-purple-500 to-fuchsia-500',
+    link: '/messages/new'
+  },
+];
 
-const QuickActions: React.FC = () => {
-  const actions: QuickAction[] = [
-    {
-      id: 1,
-      title: 'Adicionar novo membro',
-      icon: UserPlus,
-      color: 'bg-blue-500 hover:bg-blue-600',
-      onClick: () => console.log('Adicionar membro')
-    },
-    {
-      id: 2,
-      title: 'Criar novo evento',
-      icon: Calendar,
-      color: 'bg-green-500 hover:bg-green-600',
-      onClick: () => console.log('Criar evento')
-    },
-    {
-      id: 3,
-      title: 'Registrar entrada financeira',
-      icon: DollarSign,
-      color: 'bg-yellow-500 hover:bg-yellow-600',
-      onClick: () => console.log('Registrar entrada')
-    },
-    {
-      id: 4,
-      title: 'Enviar mensagem aos membros',
-      icon: MessageSquare,
-      color: 'bg-purple-500 hover:bg-purple-600',
-      onClick: () => console.log('Enviar mensagem')
-    }
-  ];
-
+export const QuickActions = () => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Ações Rápidas</h3>
-      
-      <div className="grid grid-cols-1 gap-3">
-        {actions.map((action) => {
-          const Icon = action.icon;
-          
-          return (
-            <Button
-              key={action.id}
-              onClick={action.onClick}
-              className={`w-full justify-start text-white ${action.color} border-0`}
-              variant="default"
-            >
-              <Icon className="h-4 w-4 mr-2" />
-              {action.title}
-            </Button>
-          );
-        })}
-      </div>
+    <div className="space-y-3">
+      <h3 className="text-lg font-semibold text-slate-800 mb-4">Ações Rápidas</h3>
+      {actions.map((action) => (
+        <Button
+          key={action.label}
+          asChild
+          className={`w-full justify-start text-white font-bold py-6 text-left bg-gradient-to-r ${action.color} transition-all duration-300 transform hover:scale-105 hover:shadow-lg`}
+        >
+          <Link to={action.link}>
+            <action.icon className="h-5 w-5 mr-4" />
+            {action.label}
+          </Link>
+        </Button>
+      ))}
     </div>
   );
-};
-
-export default QuickActions; 
+}; 
