@@ -1,194 +1,210 @@
 """
-Permissões customizadas para o sistema multi-tenant ObreiroVirtual
+Custom permissions for the Obreiro Virtual API.
+
+These classes control access to different parts of the API based on the
+user's role within their church or denomination. This ensures that users
+can only perform actions they are authorized for.
 """
 
-from rest_framework import permissions
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, SAFE_METHODS
+from apps.accounts.models import RoleChoices
 
-
-class IsChurchMember(BasePermission):
+class IsSuperUser(BasePermission):
     """
-    Permissão que permite acesso apenas a membros da igreja
+    Allows access only to Django superusers.
     """
-    
     def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-        
-        # Superuser sempre tem acesso
-        if request.user.is_superuser:
-            return True
-        
-        # Verificar se usuário tem vínculo com alguma igreja
-        return request.user.church_users.filter(is_active=True).exists()
+        return request.user and request.user.is_superuser
 
-
-class IsChurchAdmin(BasePermission):
+class IsPlatformAdmin(BasePermission):
     """
-    Permissão que permite acesso apenas a administradores da igreja
+    Allows access only to platform administrators (SUPER_ADMIN role).
+    This is for managing the SaaS platform itself, not individual churches.
     """
-    
     def has_permission(self, request, view):
-        if not request.user.is_authenticated:
+        if not request.user or not request.user.is_authenticated:
             return False
         
-        # Superuser sempre tem acesso
-        if request.user.is_superuser:
-            return True
-        
-        # Verificar se usuário é admin de alguma igreja
-        return request.user.church_users.filter(
-            is_active=True,
-            role__in=['church_admin', 'pastor']
-        ).exists()
-
-
-class IsChurchOwnerOrReadOnly(BasePermission):
-    """
-    Permissão que permite edição apenas para donos da igreja
-    e leitura para membros
-    """
-    
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-        
-        # Superuser sempre tem acesso
-        if request.user.is_superuser:
-            return True
-        
-        # Verificar se usuário tem vínculo com alguma igreja
-        return request.user.church_users.filter(is_active=True).exists()
-    
-    def has_object_permission(self, request, view, obj):
-        # Superuser sempre tem acesso
-        if request.user.is_superuser:
-            return True
-        
-        # Leitura permitida para membros da mesma igreja
-        if request.method in permissions.SAFE_METHODS:
-            return self._user_belongs_to_church(request.user, obj)
-        
-        # Escrita apenas para admins da igreja
-        return self._user_is_church_admin(request.user, obj)
-    
-    def _user_belongs_to_church(self, user, obj):
-        """Verifica se usuário pertence à mesma igreja do objeto"""
-        church = getattr(obj, 'church', None)
-        if not church:
-            return False
-        
-        return user.church_users.filter(
-            church=church,
-            is_active=True
-        ).exists()
-    
-    def _user_is_church_admin(self, user, obj):
-        """Verifica se usuário é admin da igreja do objeto"""
-        church = getattr(obj, 'church', None)
-        if not church:
-            return False
-        
-        return user.church_users.filter(
-            church=church,
-            is_active=True,
-            role__in=['church_admin', 'pastor']
-        ).exists()
-
-
-class CanManageMembers(BasePermission):
-    """
-    Permissão para gerenciar membros
-    """
-    
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-        
-        if request.user.is_superuser:
-            return True
-        
-        return request.user.church_users.filter(
-            is_active=True,
-            can_manage_members=True
-        ).exists()
-
-
-class CanManageVisitors(BasePermission):
-    """
-    Permissão para gerenciar visitantes
-    """
-    
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-        
-        if request.user.is_superuser:
-            return True
-        
-        return request.user.church_users.filter(
-            is_active=True,
-            can_manage_visitors=True
-        ).exists()
-
-
-class CanManageActivities(BasePermission):
-    """
-    Permissão para gerenciar atividades
-    """
-    
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-        
-        if request.user.is_superuser:
-            return True
-        
-        return request.user.church_users.filter(
-            is_active=True,
-            can_manage_activities=True
-        ).exists()
-
-
-class CanViewReports(BasePermission):
-    """
-    Permissão para visualizar relatórios
-    """
-    
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-        
-        if request.user.is_superuser:
-            return True
-        
-        return request.user.church_users.filter(
-            is_active=True,
-            can_view_reports=True
-        ).exists()
-
+        # Check if user is Django superuser OR has SUPER_ADMIN role
+        return (
+            request.user.is_superuser or
+            request.user.church_users.filter(
+                role=RoleChoices.SUPER_ADMIN, 
+                is_active=True
+            ).exists()
+        )
 
 class IsDenominationAdmin(BasePermission):
     """
-    Permissão para administradores de denominação
+    Allows access to users who are denomination administrators.
+    This is determined by their role in any of their associated churches.
     """
-    
     def has_permission(self, request, view):
-        if not request.user.is_authenticated:
+        if not request.user or not request.user.is_authenticated:
+            return False
+        # Check if the user has the 'denomination_admin' role in any of their ChurchUser links
+        return request.user.church_users.filter(role=RoleChoices.DENOMINATION_ADMIN, is_active=True).exists()
+
+class IsChurchAdmin(BasePermission):
+    """
+    Allows access to users who are administrators of a specific church.
+    This includes denomination admins and church admins.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
             return False
         
-        if request.user.is_superuser:
-            return True
-        
-        # Verificar se é administrador de alguma denominação
-        return request.user.administered_denominations.filter(
+        # Verifica se o usuário tem papel de admin em qualquer igreja
+        return request.user.church_users.filter(
+            role__in=[RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN],
             is_active=True
         ).exists()
     
     def has_object_permission(self, request, view, obj):
-        if request.user.is_superuser:
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Get the church from the object being accessed
+        church = None
+        if hasattr(obj, 'church'):
+            church = obj.church
+        elif isinstance(obj, __import__('apps.churches.models', fromlist=['Church']).Church):
+            church = obj
+        else:
+            return False # Cannot determine the church from the object
+
+        return request.user.church_users.filter(
+            church=church,
+            role__in=[RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN],
+            is_active=True
+        ).exists()
+
+class IsBranchManager(BasePermission):
+    """
+    Allows access to users who can manage a specific branch.
+    This includes church admins (who can manage all branches) or users
+    specifically assigned to manage a branch.
+    The view must implement `get_branch()` or the object must have a `branch` attribute.
+    """
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Determine the branch and church from the object
+        branch = None
+        if hasattr(obj, 'branch'):
+            branch = obj.branch
+        elif isinstance(obj, __import__('apps.branches.models', fromlist=['Branch']).Branch):
+            branch = obj
+        
+        if not branch:
+            return False
+
+        church = branch.church
+
+        # Check for user's ChurchUser link for the relevant church
+        try:
+            church_user = request.user.church_users.get(church=church, is_active=True)
+        except request.user.church_users.model.DoesNotExist:
+            return False
+
+        # Church admins and higher can manage any branch in their church
+        if church_user.role in [RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN]:
+            return True
+
+        # Check if the user has specific permission and is assigned to the branch
+        if church_user.can_manage_branches and church_user.managed_branches.filter(pk=branch.pk).exists():
+            return True
+
+        return False
+
+class IsMemberUser(BasePermission):
+    """
+    Allows access if the user is at least a member of the church associated with the request.
+    This is a baseline permission for authenticated users to see content within their own church.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.church_users.exists()
+
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        church = None
+        if hasattr(obj, 'church'):
+            church = obj.church
+        elif isinstance(obj, __import__('apps.churches.models', fromlist=['Church']).Church):
+            church = obj
+        
+        if not church:
+            return False # Cannot determine church context
+
+        # Checks if user belongs to the church of the object they are trying to access
+        return request.user.church_users.filter(church=church, is_active=True).exists()
+
+class IsReadOnly(BasePermission):
+    """
+    Allows read-only access to any authenticated user.
+    """
+    def has_permission(self, request, view):
+        return request.method in SAFE_METHODS
+
+class CanManageMembers(BasePermission):
+    """
+    Checks if the user has the 'can_manage_members' permission flag
+    for the relevant church.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Try to get church from view method or user's church
+        church = None
+        if hasattr(view, 'get_user_church'):
+            church = view.get_user_church()
+        
+        if not church:
+            # Fallback: get first church from user
+            church_user = request.user.church_users.filter(is_active=True).first()
+            if church_user:
+                church = church_user.church
+        
+        if not church:
+            return False
+
+        try:
+            church_user = request.user.church_users.get(church=church, is_active=True)
+            return church_user.can_manage_members
+        except request.user.church_users.model.DoesNotExist:
+            return False
+
+
+class IsChurchAdminOrCanManageMembers(BasePermission):
+    """
+    Permite acesso para administradores de igreja OU usuários com permissão de gerenciar membros
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # Primeiro verifica se é admin da igreja
+        church_admin_permission = IsChurchAdmin()
+        if church_admin_permission.has_permission(request, view):
             return True
         
-        # Verificar se é administrador desta denominação específica
-        denomination = getattr(obj, 'denomination', obj)
-        return denomination.administrator == request.user 
+        # Se não for admin, verifica se pode gerenciar membros
+        manage_members_permission = CanManageMembers()
+        return manage_members_permission.has_permission(request, view)
+    
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # Primeiro verifica se é admin da igreja
+        church_admin_permission = IsChurchAdmin()
+        if church_admin_permission.has_object_permission(request, view, obj):
+            return True
+        
+        # Se não for admin, verifica se pode gerenciar membros
+        manage_members_permission = CanManageMembers()
+        return manage_members_permission.has_permission(request, view) 

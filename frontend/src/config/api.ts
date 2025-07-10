@@ -8,6 +8,9 @@ import axios from 'axios';
 // URL base da API Django
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
+// URL base do servidor (sem /api/v1)
+export const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8000';
+
 // Criação da instância do Axios
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -32,6 +35,18 @@ api.interceptors.request.use(
 );
 
 export { api };
+
+// Helper para construir URLs completas
+export const buildApiUrl = (endpoint: string): string => {
+  return `${API_BASE_URL}${endpoint}`;
+};
+
+// Helper para construir URLs de arquivos de media
+export const buildMediaUrl = (mediaPath: string): string => {
+  if (!mediaPath) return '';
+  if (mediaPath.startsWith('http')) return mediaPath; // URL já completa
+  return `${SERVER_BASE_URL}${mediaPath}`;
+};
 
 // Endpoints da API
 export const API_ENDPOINTS = {
@@ -68,6 +83,14 @@ export const API_ENDPOINTS = {
   members: {
     list: '/members/',
     detail: (id: number) => `/members/${id}/`,
+    create: '/members/',
+    update: (id: number) => `/members/${id}/`,
+    delete: (id: number) => `/members/${id}/`,
+    dashboard: '/members/dashboard/',
+    statistics: '/members/statistics/',
+    profile: (id: number) => `/members/${id}/profile/`,
+    updateStatus: (id: number) => `/members/${id}/update_status/`,
+    export: '/members/export/',
   },
   
   // Visitantes
@@ -87,9 +110,4 @@ export const API_ENDPOINTS = {
     list: '/ministries/',
     detail: (id: number) => `/ministries/${id}/`,
   },
-} as const;
-
-// Helper para construir URLs completas
-export const buildApiUrl = (endpoint: string): string => {
-  return `${API_BASE_URL}${endpoint}`;
-}; 
+} as const; 

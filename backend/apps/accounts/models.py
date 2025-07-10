@@ -387,6 +387,16 @@ class ChurchUser(BaseModel):
     
     def save(self, *args, **kwargs):
         """Override save para configurar permissões automáticas baseadas no papel"""
+        # Validar que SUPER_ADMIN não pode ser atribuído via aplicação
+        if self.role == RoleChoices.SUPER_ADMIN:
+            # Permitir apenas se for um superuser do Django fazendo a operação
+            # ou se o registro já existia com esse papel
+            if not self.pk:  # Novo registro
+                raise ValidationError(
+                    "O papel de Super Administrador não pode ser atribuído via aplicação. "
+                    "Este papel é reservado apenas para desenvolvedores da plataforma."
+                )
+        
         if not self.pk:  # Novo registro
             self.set_permissions_by_role()
         
@@ -407,8 +417,8 @@ class ChurchUser(BaseModel):
         self.can_manage_branches = False
         
         # Set permissions based on role
-        if self.role == RoleChoices.SUPER_ADMIN:
-            # Super admin tem todas as permissões
+        if self.role == RoleChoices.SUPER_ADMIN or self.role == RoleChoices.DENOMINATION_ADMIN:
+            # Super admin e Admin de Denominação têm todas as permissões
             self.can_access_admin = True
             self.can_manage_members = True
             self.can_manage_visitors = True

@@ -245,6 +245,16 @@ class UserCompleteRegistrationSerializer(serializers.Serializer):
         help_text="Papel na igreja (pastor, admin, etc.)"
     )
     
+    def validate_role(self, value):
+        """Validar que SUPER_ADMIN não pode ser atribuído via cadastro"""
+        from apps.core.models import RoleChoices
+        if value == RoleChoices.SUPER_ADMIN:
+            raise serializers.ValidationError(
+                "O papel de Super Administrador não pode ser atribuído via cadastro. "
+                "Este papel é reservado apenas para desenvolvedores da plataforma."
+            )
+        return value
+    
     # Plano de assinatura
     subscription_plan = serializers.CharField(
         required=False,
@@ -412,6 +422,16 @@ class ChurchUserCreateSerializer(serializers.ModelSerializer):
                 message="Este usuário já está associado a esta igreja."
             )
         ]
+    
+    def validate_role(self, value):
+        """Validar que SUPER_ADMIN não pode ser atribuído via cadastro"""
+        from apps.core.models import RoleChoices
+        if value == RoleChoices.SUPER_ADMIN:
+            raise serializers.ValidationError(
+                "O papel de Super Administrador não pode ser atribuído via cadastro. "
+                "Este papel é reservado apenas para desenvolvedores da plataforma."
+            )
+        return value
     
     def create(self, validated_data):
         """Cria um novo usuário e o associa a uma igreja."""

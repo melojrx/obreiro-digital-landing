@@ -51,6 +51,7 @@ interface AuthContextType {
     zipcode?: string;
   }) => Promise<void>;
   uploadAvatar: (file: File) => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -68,20 +69,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 AuthProvider useEffect - Verificando localStorage...');
       setIsInitializing(true);
       const token = authService.getToken();
-      const savedUser = authService.getCurrentUserFromStorage();
       
-      if (token && savedUser && authService.isAuthenticated()) {
-        console.log('✅ Restaurando sessão do localStorage no AuthProvider');
-        setUser(savedUser);
+      if (token && authService.isAuthenticated()) {
+        console.log('✅ Token válido encontrado, buscando dados atualizados do backend...');
         
-        // Carregar dados da igreja se o perfil estiver completo
-        if (savedUser.is_profile_complete) {
-          try {
-            const churchData = await authService.getUserChurch();
-            setUserChurch(churchData);
-          } catch (error) {
-            console.log('❌ Erro ao carregar dados da igreja');
+        try {
+          // Sempre buscar dados atualizados do backend em vez de usar localStorage
+          const currentUser = await authService.getCurrentUser();
+          setUser(currentUser);
+          console.log('✅ Dados do usuário carregados do backend:', currentUser);
+          
+          // Carregar dados da igreja se o perfil estiver completo
+          if (currentUser.is_profile_complete) {
+            try {
+              const churchData = await authService.getUserChurch();
+              setUserChurch(churchData);
+            } catch (error) {
+              console.log('❌ Erro ao carregar dados da igreja');
+            }
           }
+        } catch (error) {
+          console.log('❌ Erro ao carregar dados do backend, limpando sessão');
+          authService.logout();
+          setUser(null);
+          setUserChurch(null);
         }
       } else {
         console.log('❌ Sessão inválida no AuthProvider, limpando localStorage');
@@ -106,7 +117,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsLoading(true);
       setError(null);
       const response = await authService.login(credentials);
-      setUser(response.user);
+      
+      // Após login bem-sucedido, buscar dados completos do usuário
+      try {
+        const fullUserData = await authService.getCurrentUser();
+        setUser(fullUserData);
+        console.log('✅ Dados completos do usuário carregados após login:', fullUserData);
+      } catch (error) {
+        // Se falhar ao buscar dados completos, usar dados básicos do login
+        console.log('⚠️ Falha ao carregar dados completos, usando dados básicos');
+        setUser(response.user);
+      }
     } catch (err) {
       if (err instanceof AuthError) {
         setError(err.message);
@@ -283,20 +304,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsLoading(true);
       const response = await authService.uploadAvatar(file);
       
-      // Forçar atualização do estado
-      setUser(prevUser => ({
-        ...response.user,
-        // Garantir que o profile seja atualizado corretamente
-        profile: response.user.profile || prevUser?.profile || null
-      }));
+      // Atualizar o estado do usuário com a nova URL do avatar
+      setUser(prevUser => {
+        const updatedUser = {
+          ...response.user,
+          profile: {
+            ...response.user.profile,
+            avatar: response.avatar_url
+          }
+        };
+        
+        // Também atualizar o localStorage
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        console.log('✅ Avatar atualizado no contexto:', response.avatar_url);
+        console.log('✅ Usuário atualizado:', updatedUser);
+        
+        return updatedUser;
+      });
       
-      console.log('✅ Avatar atualizado no contexto:', response.avatar_url);
-      console.log('✅ Usuário atualizado:', response.user);
     } catch (err) {
       if (err instanceof AuthError) {
         setError(err.message);
       } else {
         setError('Erro ao fazer upload do avatar.');
+      }
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const deleteAccount = useCallback(async (password: string): Promise<void> => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await authService.deleteAccount(password);
+      
+      // Limpar estado local após deletar conta
+      setUser(null);
+      setUserChurch(null);
+      
+    } catch (err) {
+      if (err instanceof AuthError) {
+        setError(err.message);
+      } else {
+        setError('Erro ao deletar conta.');
       }
       throw err;
     } finally {
@@ -323,7 +376,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updatePersonalData,
     updateChurchData,
     uploadAvatar,
-  }), [user, userChurch, isAuthenticated, isInitializing, isLoading, error, login, register, completeProfile, logout, clearError, getAvailableChurches, getAvailableDenominations, getUserChurch, updateUser, updatePersonalData, updateChurchData, uploadAvatar]);
+    deleteAccount,
+  }), [user, userChurch, isAuthenticated, isInitializing, isLoading, error, login, register, completeProfile, logout, clearError, getAvailableChurches, getAvailableDenominations, getUserChurch, updateUser, updatePersonalData, updateChurchData, uploadAvatar, deleteAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

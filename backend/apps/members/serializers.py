@@ -102,4 +102,17 @@ class MemberBulkCreateSerializer(serializers.Serializer):
             member = Member.objects.create(**member_data)
             members.append(member)
         
-        return {'members': members, 'count': len(members)} 
+        return {'members': members, 'count': len(members)}
+
+
+class MemberDashboardSerializer(serializers.Serializer):
+    """Serializer para dados do dashboard"""
+    
+    total_members = serializers.IntegerField()
+    active_members = serializers.IntegerField()
+    inactive_members = serializers.IntegerField()
+    new_members_month = serializers.IntegerField()
+    growth_rate = serializers.FloatField()
+    status_distribution = serializers.ListField()
+    gender_distribution = serializers.ListField()
+    age_distribution = serializers.DictField() 
