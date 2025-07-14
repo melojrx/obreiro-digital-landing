@@ -1,18 +1,35 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 const Pagamento = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { plan, churchData } = location.state || {};
+  const { isAuthenticated } = useAuth();
+
+  const handleGoBack = () => {
+    if (isAuthenticated) {
+      // Se o usuário está logado, volta para o dashboard
+      navigate('/dashboard');
+    } else {
+      // Se não está logado, vai para a landing page
+      navigate('/');
+    }
+  };
+
+  const handleGoBackHistory = () => {
+    // Tenta voltar na história do navegador
+    window.history.length > 1 ? navigate(-1) : handleGoBack();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="relative sm:mx-auto sm:w-full sm:max-w-md">
         {/* Back Button */}
         <button 
-          onClick={() => navigate(-1)}
+          onClick={handleGoBackHistory}
           className="inline-flex items-center text-slate-600 hover:text-blue-800 transition-colors mb-8 group"
         >
           <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
@@ -69,6 +86,22 @@ const Pagamento = () => {
 
 const NotFound = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const handleGoBack = () => {
+    if (isAuthenticated) {
+      // Se o usuário está logado, volta para o dashboard
+      navigate('/dashboard');
+    } else {
+      // Se não está logado, vai para a landing page
+      navigate('/');
+    }
+  };
+
+  const handleGoBackHistory = () => {
+    // Tenta voltar na história do navegador
+    window.history.length > 1 ? navigate(-1) : handleGoBack();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -79,14 +112,25 @@ const NotFound = () => {
             Página não encontrada
           </h2>
           <p className="text-slate-600 mb-6">
-            A página que você está procurando não existe ou foi movida.
+            A página que você está procurando não existe ou ainda não foi implementada.
           </p>
-          <button
-            onClick={() => navigate('/')}
-            className="w-full py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-          >
-            Voltar ao Início
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={handleGoBackHistory}
+              className="w-full py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2 inline" />
+              Voltar
+            </button>
+            {isAuthenticated && (
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="w-full py-3 px-4 border border-gray-300 text-sm font-semibold rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-200"
+              >
+                Ir para Dashboard
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

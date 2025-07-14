@@ -1,0 +1,175 @@
+# =================================
+# OBREIRO DIGITAL - PRODUÇÃO
+# =================================
+
+services:
+  # =================================
+  # NGINX - Proxy reverso e SSL
+  # =================================
+  nginx:
+    image: nginx:alpine
+    container_name: obreiro_nginx_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/prod.conf:/etc/nginx/conf.d/default.conf
+      - staticfiles_prod:/var/www/html/static
+      - media_prod:/var/www/html/media
+      - frontend_build:/var/www/html
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/log/nginx:/var/log/nginx
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =================================
+  # PostgreSQL Database
+  # =================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: obreiro_postgres_prod
+    environment:
+      POSTGRES_DB: obreiro_prod
+      POSTGRES_USER: obreiro_prod
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_THIS_PASSWORD}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U obreiro_prod -d obreiro_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # =================================
+  # Redis Cache & Celery Broker
+  # =================================
+  redis:
+    image: redis:7-alpine
+    container_name: obreiro_redis_prod
+    volumes:
+      - redis_prod_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # =================================
+  # Django Backend
+  # =================================
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: production
+    container_name: obreiro_backend_prod
+    env_file: .env_prod
+    volumes:
+      - media_prod:/app/media
+      - staticfiles_prod:/app/staticfiles
+      - /var/log/obreiro:/var/log/obreiro
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =================================
+  # Celery Worker
+  # =================================
+  celery:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: production
+    container_name: obreiro_celery_prod
+    env_file: .env_prod
+    volumes:
+      - media_prod:/app/media
+      - /var/log/obreiro:/var/log/obreiro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A config worker -l info --concurrency=2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "celery", "-A", "config", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =================================
+  # Celery Beat (Tarefas agendadas)
+  # =================================
+  celery-beat:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: production
+    container_name: obreiro_celery_beat_prod
+    env_file: .env_prod
+    volumes:
+      - media_prod:/app/media
+      - /var/log/obreiro:/var/log/obreiro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    restart: unless-stopped
+
+  # =================================
+  # Frontend Build (executado uma vez)
+  # =================================
+  frontend-build:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      target: build
+    container_name: obreiro_frontend_build
+    volumes:
+      - frontend_build:/app/dist
+    command: ["sh", "-c", "cp -r /app/dist/* /app/dist/"]
+
+# =================================
+# Volumes Persistentes
+# =================================
+volumes:
+  postgres_prod_data:
+    driver: local
+  redis_prod_data:
+    driver: local
+  media_prod:
+    driver: local
+  staticfiles_prod:
+    driver: local
+  frontend_build:
+    driver: local
+
+# =================================
+# Networks
+# =================================
+networks:
+  default:
+    name: obreiro_prod_network
+    driver: bridge
