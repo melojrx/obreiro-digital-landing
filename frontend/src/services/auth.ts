@@ -3,7 +3,7 @@
  * Gerencia login, registro e autenticação com a API Django
  */
 
-import { api } from '@/config/api';
+import { api, API_ENDPOINTS } from '@/config/api';
 import { AxiosError } from 'axios';
 
 // Tipos TypeScript
@@ -149,7 +149,7 @@ export const authService = {
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await api.post<AuthResponse>('/auth/login/', credentials);
+      const response = await api.post<AuthResponse>(API_ENDPOINTS.auth.login, credentials);
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
