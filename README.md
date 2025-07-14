@@ -1,27 +1,16 @@
-# 🏛️ Obreiro Virtual - Sistema de Gestão Eclesiástica
+# 🏛️ Obreiro Digital - Sistema de Gestão Eclesiástica
 
 > **Plataforma completa e profissional para gestão moderna de igrejas e instituições religiosas**
 
 [![Django](https://img.shields.io/badge/Django-5.2.3-green)](https://djangoproject.com/)
 [![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-24.0-blue)](https://docker.com/)
 [![Status](https://img.shields.io/badge/Status-Produção-success)](https://github.com/melojrx/obreiro-digital-landing)
 
 ## 📖 Sobre o Projeto
 
-O **Obreiro Virtual** é uma plataforma SaaS completa de gestão eclesiástica desenvolvida para modernizar a administração de igrejas brasileiras. Combina uma API robusta em Django com uma interface React moderna, oferecendo ferramentas profissionais para gestão completa de membros, visitantes, finanças, atividades e muito mais.
-
-### 🖼️ Preview da Landing Page
-
-![Landing Page - Hero Section](https://github.com/user-attachments/assets/landing-hero-preview.png)
-
-*Landing page moderna e responsiva com design profissional*
-
-### 💰 Planos de Assinatura
-
-![Planos de Preços](https://github.com/user-attachments/assets/pricing-plans-preview.png)
-
-*Três planos flexíveis: Gratuito, Crescimento e Ministério*
+O **Obreiro Digital** é uma plataforma SaaS completa de gestão eclesiástica desenvolvida para modernizar a administração de igrejas brasileiras. Combina uma API robusta em Django com uma interface React moderna, oferecendo ferramentas profissionais para gestão completa de membros, visitantes, finanças, atividades e muito mais.
 
 ### ✨ Principais Diferenciais
 
@@ -33,11 +22,12 @@ O **Obreiro Virtual** é uma plataforma SaaS completa de gestão eclesiástica d
 - 🌐 **API REST Completa**: Integração com qualquer sistema externo
 - ☁️ **100% Cloud**: Acesso de qualquer lugar, sempre atualizado
 - 🎨 **Interface Moderna**: UI/UX profissional com componentes shadcn/ui
+- 🐳 **Containerizado**: Deploy com Docker Compose para dev/prod
 
 ## 🏗️ Arquitetura Técnica
 
 ```
-ObreiroVirtual/
+ObreiroDigital/
 ├── 🔧 backend/                    # Django REST API
 │   ├── apps/
 │   │   ├── accounts/             # Sistema de autenticação e perfil
@@ -50,19 +40,24 @@ ObreiroVirtual/
 │   │   └── core/                 # Configurações centrais
 │   ├── config/                   # Configurações Django
 │   ├── docs/                     # Documentação completa da API
-│   └── media/                    # Upload de arquivos (avatars, fotos)
+│   └── management/               # Comandos Django customizados
 ├── 🎨 frontend/                   # React + TypeScript
 │   ├── src/
 │   │   ├── components/           # Componentes reutilizáveis
-│   │   │   ├── dashboard/        # Componentes do dashboard
-│   │   │   ├── layout/           # Layout e navegação
-│   │   │   ├── profile/          # Gestão de perfil
-│   │   │   └── ui/               # Componentes UI (shadcn/ui)
 │   │   ├── pages/                # Páginas da aplicação
 │   │   ├── services/             # Integração com API
 │   │   ├── hooks/                # Hooks customizados
 │   │   └── lib/                  # Utilitários
 │   └── public/                   # Arquivos estáticos
+├── 🐳 docker/                     # Configurações Docker
+│   ├── backend/                  # Dockerfile e scripts backend
+│   ├── frontend/                 # Dockerfile frontend
+│   └── nginx/                    # Configurações NGINX
+├── 📜 scripts/                    # Scripts de automação
+│   ├── deploy-prod.sh            # Deploy em produção
+│   ├── backup.sh                 # Backup automatizado
+│   ├── monitoring.sh             # Monitoramento do sistema
+│   └── validate-gitignore.sh     # Validação de segurança
 └── 📁 docs/                      # Documentação do projeto
 ```
 
@@ -70,72 +65,55 @@ ObreiroVirtual/
 
 ### 📋 Pré-requisitos
 
-- **Python 3.12+** - Linguagem backend
-- **Node.js 18+** - Runtime JavaScript
+- **Docker** - Containerização
+- **Docker Compose** - Orquestração de containers
 - **Git** - Controle de versão
-- **PostgreSQL** - Banco de dados (produção)
-- **SQLite** - Banco de dados (desenvolvimento)
 
-### ⚙️ Instalação e Configuração
+### 🐳 Método Recomendado: Docker Compose
 
-#### 1️⃣ Clone e Configure o Ambiente
+#### 1️⃣ Clone e Configure
 
 ```bash
 # Clone o repositório
 git clone https://github.com/melojrx/obreiro-digital-landing.git
-cd ObreiroVirtual
+cd obreiro-digital-landing
 
-# Configure o ambiente virtual Python
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# OU
-venv\Scripts\activate     # Windows
+# Configure o ambiente de desenvolvimento
+cp .env_dev.example .env_dev
 ```
 
-#### 2️⃣ Configure o Backend Django
+#### 2️⃣ Inicie o Ambiente de Desenvolvimento
 
 ```bash
-# Navegue para o backend
-cd backend
+# Inicie todos os serviços
+docker-compose -f docker-compose.dev.yml up -d
 
-# Instale as dependências
-pip install -r requirements.txt
-
-# Configure o banco de dados
-python manage.py migrate
-
-# Popule denominações iniciais
-python manage.py shell -c "exec(open('populate_denominations.py').read())"
-
-# Crie um superusuário
-python manage.py createsuperuser
-
-# Inicie o servidor de desenvolvimento
-python manage.py runserver
+# Acompanhe os logs
+docker-compose -f docker-compose.dev.yml logs -f
 ```
 
-#### 3️⃣ Configure o Frontend React
-
-```bash
-# Em outro terminal, navegue para o frontend
-cd frontend
-
-# Instale as dependências
-npm install
-
-# Inicie o servidor de desenvolvimento
-npm run dev
-```
-
-### 🌐 URLs de Desenvolvimento
+#### 3️⃣ Acesse o Sistema
 
 | Serviço | URL | Descrição |
 |---------|-----|-----------|
 | 🎨 **Frontend** | <http://localhost:5173> | Interface principal |
 | 🔧 **Backend API** | <http://localhost:8000/api/v1/> | API REST |
 | ⚙️ **Admin Django** | <http://localhost:8000/admin/> | Painel administrativo |
-| 📚 **Swagger Docs** | <http://localhost:8000/api/docs/> | Documentação da API |
-| 📖 **ReDoc** | <http://localhost:8000/api/redoc/> | Documentação alternativa |
+| 📚 **Swagger Docs** | <http://localhost:8000/api/schema/swagger-ui/> | Documentação da API |
+
+### 🔐 Usuários de Teste
+
+O sistema cria automaticamente usuários de teste para desenvolvimento:
+
+| Papel | Email | Senha | Permissões |
+|-------|-------|-------|------------|
+| **Denominação Admin** | `denominacao.admin@teste.com` | `teste123` | Pode gerenciar todas as igrejas |
+| **Igreja Admin** | `igreja.admin@teste.com` | `teste123` | Pode gerenciar a igreja sede |
+| **Pastor** | `pastor@teste.com` | `teste123` | Pode gerenciar membros e atividades |
+| **Secretário** | `secretario@teste.com` | `teste123` | Pode gerenciar cadastros |
+| **Membro** | `membro@teste.com` | `teste123` | Visualização básica |
+
+📋 **Documentação completa**: [`USUARIOS_TESTE.md`](USUARIOS_TESTE.md)
 
 ## 🔐 Sistema de Autenticação e Permissões
 
