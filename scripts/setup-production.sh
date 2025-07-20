@@ -35,22 +35,14 @@ fi
 
 log "Criando diretórios necessários..."
 
-# Criar diretórios de logs
-mkdir -p /var/log/obreiro
-mkdir -p /var/log/nginx
+# Criar diretórios no projeto
+mkdir -p static_prod media_prod frontend_build logs/backend logs/nginx
 
 # Criar diretórios para backups
-mkdir -p /opt/obreiro/backups
+mkdir -p backups
 
 # Definir permissões corretas
-chown -R 1000:1000 /var/log/obreiro
-chmod -R 755 /var/log/obreiro
-
-chown -R 101:101 /var/log/nginx
-chmod -R 755 /var/log/nginx
-
-chown -R 1000:1000 /opt/obreiro/backups
-chmod -R 755 /opt/obreiro/backups
+chmod -R 755 static_prod media_prod frontend_build logs backups
 
 log "Verificando certificados SSL..."
 
@@ -71,8 +63,8 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Verificar se Docker Compose está instalado
-if ! command -v docker-compose &> /dev/null; then
+# Verificar se Docker Compose está instalado (v2 plugin)
+if ! docker compose version &> /dev/null; then
     error "Docker Compose não está instalado!"
     error "Instale o Docker Compose primeiro"
     exit 1
@@ -108,9 +100,9 @@ After=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/obreiro
-ExecStart=/usr/bin/docker-compose -f docker-compose.prod.yml up -d
-ExecStop=/usr/bin/docker-compose -f docker-compose.prod.yml down
+WorkingDirectory=$(pwd)
+ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
 TimeoutStartSec=0
 
 [Install]
@@ -121,7 +113,7 @@ log "Configurando logrotate..."
 
 # Configurar logrotate para os logs
 cat > /etc/logrotate.d/obreiro-digital << EOF
-/var/log/obreiro/*.log {
+$(pwd)/logs/backend/*.log {
     daily
     missingok
     rotate 14
@@ -131,7 +123,7 @@ cat > /etc/logrotate.d/obreiro-digital << EOF
     create 644 1000 1000
 }
 
-/var/log/nginx/*.log {
+$(pwd)/logs/nginx/*.log {
     daily
     missingok
     rotate 14
@@ -150,7 +142,7 @@ echo ""
 log "Próximos passos:"
 echo "1. Configure o .env_prod com valores reais"
 echo "2. Se não tiver SSL: sudo certbot --nginx -d obreirovirtual.com -d www.obreirovirtual.com"
-echo "3. Execute: docker-compose -f docker-compose.prod.yml up -d"
+echo "3. Execute: docker compose -f docker-compose.prod.yml up -d"
 echo "4. Para auto-start: sudo systemctl enable obreiro-digital"
 echo ""
 warn "Lembre-se de configurar firewall se necessário:"

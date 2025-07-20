@@ -148,8 +148,8 @@ LOGGING = {
 # =================================
 
 # Static files (CSS, JavaScript, Images)
-STATIC_ROOT = '/var/www/html/static/'
-MEDIA_ROOT = '/var/www/html/media/'
+STATIC_ROOT = '/app/staticfiles/'
+MEDIA_ROOT = '/app/media/'
 
 # =================================
 # SPECTACULAR - Produção
