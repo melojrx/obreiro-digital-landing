@@ -11,7 +11,7 @@ from .base import *
 DEBUG = False
 
 # Hosts permitidos - MUST BE CONFIGURED FOR PRODUCTION
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['obreiro.digital', 'www.obreiro.digital'])
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['obreirovirtual.com', 'www.obreirovirtual.com'])
 
 # =================================
 # DATABASE - PostgreSQL
@@ -52,8 +52,8 @@ CSRF_COOKIE_HTTPONLY = True
 
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
-    'https://obreiro.digital',
-    'https://www.obreiro.digital'
+    'https://obreirovirtual.com',
+    'https://www.obreirovirtual.com'
 ])
 
 CORS_ALLOW_CREDENTIALS = True

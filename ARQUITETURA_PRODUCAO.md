@@ -182,6 +182,9 @@ REDIS_URL=redis://redis:6379/0
 CELERY_BROKER_URL=redis://redis:6379/2
 CELERY_RESULT_BACKEND=redis://redis:6379/3
 
+# Frontend URL para QR Codes
+FRONTEND_URL=https://obreirovirtual.com
+
 # CORS Production
 CORS_ALLOW_ALL_ORIGINS=False
 CORS_ALLOWED_ORIGINS=https://obreirovirtual.com,https://www.obreirovirtual.com
@@ -306,6 +309,9 @@ docker compose -f docker-compose.prod.yml down
 # Rebuild e iniciar
 docker compose -f docker-compose.prod.yml up -d --build
 
+# Executar script pós-deploy automatizado
+./scripts/post-deploy.sh
+
 # Verificar status
 docker compose -f docker-compose.prod.yml ps
 ```
@@ -324,6 +330,12 @@ docker exec obreiro_backend_prod python manage.py create_test_users
 
 # Limpar usuários de teste
 docker exec obreiro_backend_prod python manage.py create_test_users --clean
+
+# Regenerar QR codes (se necessário)
+docker exec obreiro_backend_prod python manage.py regenerate_qr_codes --force
+
+# Validar sistema de QR codes
+docker exec obreiro_backend_prod python manage.py validate_qr_system
 
 # Restart de serviços específicos
 docker compose -f docker-compose.prod.yml restart backend

@@ -166,11 +166,6 @@ class Branch(BaseModel):
         help_text="Se o QR code está ativo para registro de visitantes"
     )
     
-    visitor_registration_url = models.URLField(
-        "URL de Registro",
-        blank=True,
-        help_text="URL completa para registro de visitantes"
-    )
     
     # Configurações da filial
     allows_visitor_registration = models.BooleanField(
@@ -273,8 +268,7 @@ class Branch(BaseModel):
             save=False
         )
         
-        # Atualizar URL de registro
-        self.visitor_registration_url = url
+        # URL de registro é gerada automaticamente via property
     
     def get_visitor_registration_url(self):
         """Retorna URL para registro de visitantes"""
@@ -312,7 +306,8 @@ class Branch(BaseModel):
     @property
     def visitor_registration_url(self):
         """URL para registro de visitantes via QR code"""
-        return f"https://app.obreirovirtual.com.br/visitor/register/{self.qr_code_uuid}/"
+        from django.conf import settings
+        return f"{settings.FRONTEND_URL}/visit/{self.qr_code_uuid}"
     
     @property
     def coordinates(self):

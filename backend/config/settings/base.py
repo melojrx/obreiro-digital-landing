@@ -16,7 +16,12 @@ env = environ.Env(
     DJANGO_ALLOWED_HOSTS=(list, []),
     CORS_ALLOW_ALL_ORIGINS=(bool, True),
 )
-environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
+# Carregar arquivo de ambiente baseado no DJANGO_SETTINGS_MODULE
+env_file = '.env_prod'  # Padrão para produção
+if 'dev' in os.environ.get('DJANGO_SETTINGS_MODULE', ''):
+    env_file = '.env_dev'
+
+environ.Env.read_env(os.path.join(BASE_DIR, env_file))
 
 # =================================
 # CORE DJANGO SETTINGS
@@ -276,3 +281,9 @@ LOGGING = {
 # =================================
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# =================================
+# FRONTEND CONFIGURATION
+# =================================
+
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
