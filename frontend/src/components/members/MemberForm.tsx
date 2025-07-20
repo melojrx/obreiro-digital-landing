@@ -49,7 +49,7 @@ const memberSchema = z.object({
   cpf: z.string().optional(),
   rg: z.string().optional(),
   birth_date: z.string().min(1, 'Data de nascimento é obrigatória'),
-  gender: z.enum(['M', 'F', 'N'], { required_error: 'Selecione o gênero' }),
+  gender: z.enum(['M', 'F'], { required_error: 'Selecione o gênero' }),
   marital_status: z.string().optional(),
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   phone: z.string().optional().refine(
@@ -420,7 +420,6 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                             <SelectContent>
                               <SelectItem value="M">Masculino</SelectItem>
                               <SelectItem value="F">Feminino</SelectItem>
-                              <SelectItem value="N">Não informado</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />

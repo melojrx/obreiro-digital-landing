@@ -197,7 +197,7 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                   <div>
                     <label className="text-sm font-medium text-gray-500">Gênero</label>
                     <p className="text-gray-900">
-                      {member.gender === 'M' ? 'Masculino' : member.gender === 'F' ? 'Feminino' : 'Não informado'}
+                      {member.gender === 'M' ? 'Masculino' : 'Feminino'}
                     </p>
                   </div>
                 </div>

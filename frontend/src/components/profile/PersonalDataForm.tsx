@@ -24,7 +24,7 @@ const personalDataSchema = z.object({
     .optional()
     .or(z.literal('')),
   birth_date: z.string().optional(),
-  gender: z.enum(['M', 'F', 'O', 'N', '']).optional(),
+  gender: z.enum(['M', 'F', '']).optional(),
   bio: z.string().max(500, 'Biografia deve ter no máximo 500 caracteres').optional(),
 });
 
@@ -270,8 +270,6 @@ export const PersonalDataForm = () => {
                                 <SelectContent>
                                     <SelectItem value="M">Masculino</SelectItem>
                                     <SelectItem value="F">Feminino</SelectItem>
-                                    <SelectItem value="O">Outro</SelectItem>
-                                    <SelectItem value="N">Não informar</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

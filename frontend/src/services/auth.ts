@@ -82,7 +82,9 @@ export interface UserChurch {
   state: string;
   zipcode: string;
   subscription_plan: string;
-  user_role: string;
+  role: string;
+  role_label: string;
+  user_role: string; // backward compatibility
 }
 
 export interface Denomination {

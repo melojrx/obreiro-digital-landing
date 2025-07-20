@@ -121,7 +121,8 @@ class Member(BaseModel):
         "Gênero",
         max_length=1,
         choices=GenderChoices.choices,
-        default=GenderChoices.NOT_INFORMED,
+        blank=True,
+        null=True,
         help_text="Gênero do membro"
     )
     

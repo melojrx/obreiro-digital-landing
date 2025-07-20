@@ -124,7 +124,7 @@ const Perfil: React.FC = () => {
                   <p className="text-sm text-gray-600">{user?.email}</p>
                   {userChurch && (
                     <Badge variant="secondary" className="mt-2">
-                      {userChurch.user_role}
+                      {userChurch.role_label || userChurch.user_role}
                     </Badge>
                   )}
                 </div>

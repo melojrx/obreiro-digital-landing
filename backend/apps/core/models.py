@@ -205,8 +205,6 @@ class GenderChoices(models.TextChoices):
     """Choices para gênero"""
     MALE = 'M', 'Masculino'
     FEMALE = 'F', 'Feminino'
-    OTHER = 'O', 'Outro'
-    NOT_INFORMED = 'N', 'Não informado'
 
 
 class MembershipStatusChoices(models.TextChoices):

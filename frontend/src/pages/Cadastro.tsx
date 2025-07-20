@@ -361,8 +361,6 @@ const Cadastro = () => {
                   <option value="">Selecione</option>
                   <option value="M">Masculino</option>
                   <option value="F">Feminino</option>
-                  <option value="O">Outro</option>
-                  <option value="N">Não informar</option>
                 </select>
                 {errors.gender && (
                   <p className="mt-1 text-sm text-red-600">{errors.gender}</p>
