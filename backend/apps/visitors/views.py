@@ -1,84 +1,416 @@
 """
 Views para o app Visitors
-Gerencia endpoints de visitantes
+Sistema de QR Code para registro de visitantes
 """
 
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.db.models import Count, Q
+from datetime import timedelta
 
 from .models import Visitor
-from .serializers import VisitorSerializer, VisitorCreateSerializer, VisitorSummarySerializer
+from .serializers import (
+    VisitorPublicRegistrationSerializer, VisitorSerializer, VisitorListSerializer,
+    VisitorStatsSerializer, VisitorFollowUpSerializer, VisitorConversionSerializer,
+    BranchVisitorStatsSerializer, VisitorBulkActionSerializer, QRCodeValidationSerializer
+)
+from apps.branches.models import Branch
+from apps.core.permissions import IsMemberUser
 
+
+# =====================================
+# ENDPOINTS PÚBLICOS (Sem autenticação)
+# =====================================
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def validate_qr_code(request, qr_code_uuid):
+    """
+    Valida se o QR Code é válido e retorna informações da filial
+    Endpoint público para validação antes do registro
+    """
+    try:
+        branch = Branch.objects.get(
+            qr_code_uuid=qr_code_uuid,
+            qr_code_active=True,
+            allows_visitor_registration=True,
+            is_active=True
+        )
+        
+        return Response({
+            'valid': True,
+            'branch': {
+                'id': branch.id,
+                'name': branch.name,
+                'church_name': branch.church.name,
+                'address': branch.full_address,
+                'allows_registration': branch.allows_visitor_registration
+            }
+        })
+        
+    except Branch.DoesNotExist:
+        return Response({
+            'valid': False,
+            'error': 'QR Code inválido ou inativo'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_visitor(request, qr_code_uuid):
+    """
+    Registra um novo visitante via QR Code
+    Endpoint público para registro de visitantes
+    """
+    # Validar QR Code
+    try:
+        branch = Branch.objects.get(
+            qr_code_uuid=qr_code_uuid,
+            qr_code_active=True,
+            allows_visitor_registration=True,
+            is_active=True
+        )
+    except Branch.DoesNotExist:
+        return Response({
+            'error': 'QR Code inválido ou inativo'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    # Serializar dados do visitante
+    serializer = VisitorPublicRegistrationSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        # Criar visitante
+        visitor = serializer.save(
+            church=branch.church,
+            branch=branch,
+            qr_code_used=qr_code_uuid,
+            registration_source='qr_code',
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        # Incrementar contador da filial
+        branch.total_visitors_registered += 1
+        branch.save(update_fields=['total_visitors_registered'])
+        
+        return Response({
+            'success': True,
+            'message': 'Visitante registrado com sucesso!',
+            'visitor': {
+                'id': visitor.id,
+                'full_name': visitor.full_name,
+                'branch_name': branch.name,
+                'church_name': branch.church.name
+            }
+        }, status=status.HTTP_201_CREATED)
+    
+    return Response({
+        'error': 'Dados inválidos',
+        'details': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# =====================================
+# ENDPOINTS ADMINISTRATIVOS (Com autenticação)
+# =====================================
 
 class VisitorViewSet(viewsets.ModelViewSet):
     """
-    ViewSet para visitantes
+    ViewSet para administração de visitantes
+    Requer autenticação e permissões de igreja
     """
     
-    queryset = Visitor.objects.all()
     serializer_class = VisitorSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsMemberUser]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ['full_name', 'email', 'phone']
-    filterset_fields = ['church', 'branch', 'is_active', 'status', 'gender', 'converted_to_member']
-    ordering_fields = ['full_name', 'last_visit_date', 'created_at']
-    ordering = ['-last_visit_date']
+    search_fields = ['full_name', 'email', 'phone', 'city']
+    filterset_fields = [
+        'branch', 'gender', 'marital_status', 'first_visit',
+        'converted_to_member', 'follow_up_status', 'wants_prayer',
+        'wants_growth_group'
+    ]
+    ordering_fields = ['full_name', 'created_at', 'last_contact_date']
+    ordering = ['-created_at']
     
     def get_queryset(self):
         """
-        Filtra o queryset de visitantes.
-        - O TenantManager já filtra por `church`.
-        - Adiciona filtro por `branch` se o usuário não for admin/pastor.
+        Filtra visitantes pela igreja do usuário
         """
         user = self.request.user
         
         if user.is_superuser:
-            return Visitor.objects.all_for_church(self.request.church)
-
-        queryset = Visitor.objects.all() 
-
-        church_user = user.church_users.filter(church=self.request.church).first()
-
-        if church_user and church_user.branch and church_user.role not in ['church_admin', 'pastor']:
-            queryset = queryset.filter(branch=church_user.branch)
-            
-        return queryset
+            return Visitor.objects.all()
+        
+        # Usar o TenantManager para filtrar por igreja automaticamente
+        return Visitor.objects.filter(is_active=True)
     
     def get_serializer_class(self):
-        if self.action == 'create':
-            return VisitorCreateSerializer
-        elif self.action == 'list':
-            return VisitorSummarySerializer
+        """Retorna o serializer apropriado para cada ação"""
+        if self.action == 'list':
+            return VisitorListSerializer
         return VisitorSerializer
     
+    def perform_create(self, serializer):
+        """Associa igreja e filial automaticamente ao criar visitante"""
+        user = self.request.user
+        
+        # Buscar dados da igreja do usuário
+        try:
+            from apps.accounts.models import ChurchUser
+            church_user = ChurchUser.objects.filter(user=user, is_active=True).first()
+            
+            if church_user and church_user.church:
+                church = church_user.church
+                # Priorizar branch específica do usuário, senão primeira branch da igreja
+                branch = church_user.branch or church.branches.filter(is_active=True).first()
+                
+                print(f"💾 Criando visitante para igreja: {church.name} (ID: {church.id})")
+                if branch:
+                    print(f"💾 Branch: {branch.name} (ID: {branch.id})")
+                
+                serializer.save(
+                    church=church,
+                    branch=branch,
+                    registration_source='admin_manual',
+                    user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+                    ip_address=self.request.META.get('REMOTE_ADDR')
+                )
+            else:
+                print(f"⚠️ Usuário {user.email} não tem igreja associada")
+                # Se não tem igreja associada, salvar apenas com campos obrigatórios
+                serializer.save(
+                    registration_source='admin_manual',
+                    user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+                    ip_address=self.request.META.get('REMOTE_ADDR')
+                )
+        except Exception as e:
+            print(f"❌ Erro ao buscar igreja do usuário: {e}")
+            # Em caso de erro, salvar apenas com campos obrigatórios
+            serializer.save(
+                registration_source='admin_manual',
+                user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+                ip_address=self.request.META.get('REMOTE_ADDR')
+            )
+    
     @action(detail=False, methods=['get'])
-    def recent_visitors(self, request):
-        """Visitantes recentes"""
-        visitors = Visitor.objects.filter(is_active=True).order_by('-last_visit_date')[:10]
-        serializer = VisitorSummarySerializer(visitors, many=True)
+    def stats(self, request):
+        """Estatísticas gerais de visitantes"""
+        queryset = self.get_queryset()
+        now = timezone.now()
+        last_30_days = now - timedelta(days=30)
+        last_7_days = now - timedelta(days=7)
+        
+        stats = {
+            'total': queryset.count(),
+            'last_30_days': queryset.filter(created_at__gte=last_30_days).count(),
+            'last_7_days': queryset.filter(created_at__gte=last_7_days).count(),
+            'pending_conversion': queryset.filter(converted_to_member=False).count(),
+            'converted_to_members': queryset.filter(converted_to_member=True).count(),
+            'follow_up_needed': queryset.filter(follow_up_status='pending').count(),
+            'first_time_visitors': queryset.filter(first_visit=True).count(),
+        }
+        
+        # Calcular taxa de conversão
+        total = stats['total']
+        converted = stats['converted_to_members']
+        stats['conversion_rate'] = round((converted / total) * 100, 2) if total > 0 else 0.0
+        
+        serializer = VisitorStatsSerializer(data=stats)
+        serializer.is_valid()
         return Response(serializer.data)
     
-    @action(detail=True, methods=['post'])
+    @action(detail=False, methods=['get'])
+    def by_branch(self, request):
+        """Estatísticas de visitantes por filial"""
+        queryset = self.get_queryset()
+        
+        # Agrupar por filial
+        branch_stats = []
+        branches = Branch.objects.filter(church=request.church, is_active=True)
+        
+        for branch in branches:
+            branch_visitors = queryset.filter(branch=branch)
+            total = branch_visitors.count()
+            converted = branch_visitors.filter(converted_to_member=True).count()
+            
+            last_30_days = branch_visitors.filter(
+                created_at__gte=timezone.now() - timedelta(days=30)
+            ).count()
+            
+            pending_follow_up = branch_visitors.filter(
+                follow_up_status='pending'
+            ).count()
+            
+            conversion_rate = round((converted / total) * 100, 2) if total > 0 else 0.0
+            
+            branch_stats.append({
+                'branch_id': branch.id,
+                'branch_name': branch.name,
+                'total_visitors': total,
+                'last_30_days': last_30_days,
+                'conversion_rate': conversion_rate,
+                'pending_follow_up': pending_follow_up
+            })
+        
+        serializer = BranchVisitorStatsSerializer(branch_stats, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def pending_follow_up(self, request):
+        """Lista visitantes que precisam de follow-up"""
+        queryset = self.get_queryset().filter(
+            follow_up_status='pending',
+            converted_to_member=False
+        ).order_by('created_at')
+        
+        serializer = VisitorFollowUpSerializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['patch'])
     def convert_to_member(self, request, pk=None):
-        """Converter visitante em membro"""
+        """Converte visitante em membro"""
         visitor = self.get_object()
         
-        # Aqui seria implementada a lógica de conversão
-        # Por enquanto, apenas retorna uma mensagem
+        if visitor.converted_to_member:
+            return Response({
+                'error': 'Visitante já foi convertido em membro'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = VisitorConversionSerializer(visitor, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'success': True,
+                'message': f'Visitante {visitor.full_name} convertido em membro com sucesso',
+                'member_id': visitor.converted_member.id if visitor.converted_member else None
+            })
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['patch'])
+    def update_follow_up(self, request, pk=None):
+        """Atualiza status de follow-up de um visitante"""
+        visitor = self.get_object()
+        
+        follow_up_status = request.data.get('follow_up_status')
+        conversion_notes = request.data.get('conversion_notes', '')
+        
+        if follow_up_status:
+            visitor.follow_up_status = follow_up_status
+            visitor.last_contact_date = timezone.now()
+            visitor.contact_attempts += 1
+            
+            if conversion_notes:
+                visitor.conversion_notes = conversion_notes
+            
+            visitor.save()
+            
+            serializer = VisitorFollowUpSerializer(visitor)
+            return Response(serializer.data)
+        
         return Response({
-            'message': f'Visitante {visitor.full_name} marcado para conversão em membro',
-            'visitor_id': visitor.id
+            'error': 'Status de follow-up é obrigatório'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'])
+    def bulk_action(self, request):
+        """Executa ações em lote com visitantes"""
+        serializer = VisitorBulkActionSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            visitor_ids = serializer.validated_data['visitor_ids']
+            action = serializer.validated_data['action']
+            
+            visitors = self.get_queryset().filter(id__in=visitor_ids)
+            
+            if action == 'update_status':
+                follow_up_status = serializer.validated_data.get('follow_up_status')
+                if follow_up_status:
+                    visitors.update(
+                        follow_up_status=follow_up_status,
+                        last_contact_date=timezone.now()
+                    )
+                    return Response({
+                        'success': True,
+                        'message': f'Status atualizado para {visitors.count()} visitantes'
+                    })
+            
+            elif action == 'bulk_follow_up':
+                notes = serializer.validated_data.get('notes', '')
+                visitors.update(
+                    follow_up_status='contacted',
+                    last_contact_date=timezone.now(),
+                    conversion_notes=notes
+                )
+                return Response({
+                    'success': True,
+                    'message': f'Follow-up realizado para {visitors.count()} visitantes'
+                })
+            
+            elif action == 'export':
+                # Aqui seria implementada a exportação
+                return Response({
+                    'success': True,
+                    'message': f'Exportação de {visitors.count()} visitantes iniciada'
+                })
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# =====================================
+# ENDPOINTS ESPECÍFICOS
+# =====================================
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated, IsMemberUser])
+def recent_visitors(request):
+    """Lista dos visitantes mais recentes"""
+    visitors = Visitor.objects.filter(
+        is_active=True
+    ).order_by('-created_at')[:10]
+    
+    serializer = VisitorListSerializer(visitors, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated, IsMemberUser])
+def dashboard_stats(request):
+    """Estatísticas para dashboard"""
+    queryset = Visitor.objects.filter(is_active=True)
+    now = timezone.now()
+    
+    # Estatísticas básicas
+    total_visitors = queryset.count()
+    this_month = queryset.filter(created_at__month=now.month, created_at__year=now.year).count()
+    pending_follow_up = queryset.filter(follow_up_status='pending').count()
+    converted = queryset.filter(converted_to_member=True).count()
+    
+    # Visitantes por mês (últimos 6 meses)
+    monthly_data = []
+    for i in range(6):
+        month_date = now - timedelta(days=30 * i)
+        month_visitors = queryset.filter(
+            created_at__month=month_date.month,
+            created_at__year=month_date.year
+        ).count()
+        monthly_data.append({
+            'month': month_date.strftime('%Y-%m'),
+            'visitors': month_visitors
         })
     
-    @action(detail=True, methods=['post'])
-    def mark_follow_up(self, request, pk=None):
-        """Marcar para follow-up"""
-        visitor = self.get_object()
-        
-        return Response({
-            'message': f'Follow-up marcado para {visitor.full_name}',
-            'visitor_id': visitor.id
-        })
+    return Response({
+        'total_visitors': total_visitors,
+        'this_month': this_month,
+        'pending_follow_up': pending_follow_up,
+        'converted_to_members': converted,
+        'conversion_rate': round((converted / total_visitors) * 100, 2) if total_visitors > 0 else 0,
+        'monthly_data': monthly_data[::-1]  # Ordem cronológica
+    })

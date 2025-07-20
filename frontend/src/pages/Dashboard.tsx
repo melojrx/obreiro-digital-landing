@@ -8,6 +8,8 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { RecentActivities } from '@/components/dashboard/RecentActivities';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { EventsTable } from '@/components/dashboard/EventsTable';
+import { VisitorStats } from '@/components/dashboard/VisitorStats';
+import { RecentVisitors } from '@/components/dashboard/RecentVisitors';
 import { Users, UserPlus, Calendar, DollarSign } from 'lucide-react';
 
 interface DashboardData {
@@ -111,11 +113,13 @@ const Dashboard = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                    <div className="lg:col-span-2">
+                    <div className="lg:col-span-2 space-y-8">
                         <EventsTable />
+                        <VisitorStats />
                     </div>
                     <div className="lg:col-span-1 space-y-8">
                         <QuickActions />
+                        <RecentVisitors />
                         <RecentActivities />
                     </div>
                 </div>

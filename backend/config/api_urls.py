@@ -48,6 +48,9 @@ urlpatterns = [
     # Core (health check, etc)
     path('core/', include('apps.core.urls')),
     
+    # Visitantes (inclui endpoints públicos e administrativos)
+    path('visitors/', include('apps.visitors.urls')),
+    
     # ViewSets registrados no router
     path('', include(router.urls)),
     

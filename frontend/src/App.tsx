@@ -18,6 +18,11 @@ import Membros from "./pages/Membros";
 import NovoMembro from "./pages/NovoMembro";
 import DetalhesMembro from "./pages/DetalhesMembro";
 import EditarMembro from "./pages/EditarMembro";
+import Visitantes from "./pages/Visitantes";
+import NovoVisitante from "./pages/NovoVisitante";
+import GerenciarQRCodes from "./pages/GerenciarQRCodes";
+import RegistroVisitante from "./pages/RegistroVisitante";
+import RegistroSucesso from "./pages/RegistroSucesso";
 import NotFound, { Pagamento } from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -114,6 +119,48 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="auth_complete">
             <EditarMembro />
+          </ProtectedRoute>
+        } 
+      />
+      {/* Rota para gestão de visitantes */}
+      <Route 
+        path="/visitantes" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <Visitantes />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/visitantes/novo" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <NovoVisitante />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/configuracoes/qr-codes" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <GerenciarQRCodes />
+          </ProtectedRoute>
+        } 
+      />
+      {/* Rotas públicas para visitantes via QR Code */}
+      <Route 
+        path="/visit/:uuid" 
+        element={
+          <ProtectedRoute level="public">
+            <RegistroVisitante />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/registro-sucesso" 
+        element={
+          <ProtectedRoute level="public">
+            <RegistroSucesso />
           </ProtectedRoute>
         } 
       />

@@ -166,6 +166,12 @@ class Branch(BaseModel):
         help_text="Se o QR code está ativo para registro de visitantes"
     )
     
+    visitor_registration_url = models.URLField(
+        "URL de Registro",
+        blank=True,
+        help_text="URL completa para registro de visitantes"
+    )
+    
     # Configurações da filial
     allows_visitor_registration = models.BooleanField(
         "Permite Registro de Visitantes",
@@ -180,6 +186,12 @@ class Branch(BaseModel):
     )
     
     # Estatísticas
+    total_visitors_registered = models.PositiveIntegerField(
+        "Total de Visitantes Registrados",
+        default=0,
+        help_text="Contador de visitantes registrados via QR code"
+    )
+    
     total_visitors = models.PositiveIntegerField(
         "Total de Visitantes",
         default=0,
@@ -224,37 +236,50 @@ class Branch(BaseModel):
         super().save(*args, **kwargs)
     
     def generate_qr_code(self):
-        """Gera imagem do QR code para registro de visitantes"""
-        # URL que o visitante acessará ao escanear
-        visitor_url = f"https://app.obreirovirtual.com.br/visitor/register/{self.qr_code_uuid}/"
+        """Gera QR Code para esta filial"""
+        from django.conf import settings
         
-        # Criar QR code
+        # URL do formulário React
+        url = f"{settings.FRONTEND_URL}/visit/{self.qr_code_uuid}"
+        
+        # Configurações do QR Code
         qr = qrcode.QRCode(
             version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
             box_size=10,
             border=4,
         )
-        qr.add_data(visitor_url)
+        
+        # Adicionar dados e otimizar
+        qr.add_data(url)
         qr.make(fit=True)
         
-        # Gerar imagem
-        qr_image = qr.make_image(fill_color="black", back_color="white")
+        # Criar imagem
+        img = qr.make_image(
+            fill_color="black",
+            back_color="white"
+        )
         
-        # Salvar no campo ImageField
+        # Converter para bytes
         buffer = BytesIO()
-        qr_image.save(buffer, format='PNG')
+        img.save(buffer, format='PNG')
         buffer.seek(0)
         
-        # Nome do arquivo
+        # Salvar no campo ImageField
         filename = f"qr_code_{self.qr_code_uuid}.png"
-        
-        # Salvar no campo
         self.qr_code_image.save(
             filename,
             File(buffer),
             save=False
         )
+        
+        # Atualizar URL de registro
+        self.visitor_registration_url = url
+    
+    def get_visitor_registration_url(self):
+        """Retorna URL para registro de visitantes"""
+        from django.conf import settings
+        return f"{settings.FRONTEND_URL}/visit/{self.qr_code_uuid}"
     
     def regenerate_qr_code(self):
         """Regenera QR code (para caso de comprometimento de segurança)"""

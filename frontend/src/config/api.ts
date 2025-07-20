@@ -95,8 +95,28 @@ export const API_ENDPOINTS = {
   
   // Visitantes
   visitors: {
-    list: '/visitors/',
-    detail: (id: number) => `/visitors/${id}/`,
+    // Endpoints públicos (sem autenticação)
+    validateQR: (uuid: string) => `/visitors/public/qr/${uuid}/validate/`,
+    registerPublic: (uuid: string) => `/visitors/public/qr/${uuid}/register/`,
+    
+    // Endpoints administrativos
+    list: '/visitors/admin/visitors/',
+    detail: (id: number) => `/visitors/admin/visitors/${id}/`,
+    create: '/visitors/admin/visitors/',
+    update: (id: number) => `/visitors/admin/visitors/${id}/`,
+    delete: (id: number) => `/visitors/admin/visitors/${id}/`,
+    
+    // Estatísticas e relatórios
+    stats: '/visitors/admin/visitors/stats/',
+    byBranch: '/visitors/admin/visitors/by_branch/',
+    pendingFollowUp: '/visitors/admin/visitors/pending_follow_up/',
+    recent: '/visitors/admin/recent/',
+    dashboardStats: '/visitors/admin/dashboard-stats/',
+    
+    // Ações específicas
+    convertToMember: (id: number) => `/visitors/admin/visitors/${id}/convert_to_member/`,
+    updateFollowUp: (id: number) => `/visitors/admin/visitors/${id}/update_follow_up/`,
+    bulkAction: '/visitors/admin/visitors/bulk_action/',
   },
   
   // Atividades
