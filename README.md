@@ -163,7 +163,7 @@ READ_ONLY (Nível 3)
 - 📄 **Exportação**: Relatórios em Excel/CSV
 - 🔒 **Soft Delete**: Exclusão segura com possibilidade de restauração
 
-**Documentação**: `backend/docs/Módulo de Membros - Guia Completo.md`
+**Documentação**: [`Docs/Módulo de Membros - Guia Completo.md`](./Docs/Módulo%20de%20Membros%20-%20Guia%20Completo.md)
 
 ### ✅ **Sistema de Permissões Completo**
 
@@ -177,7 +177,7 @@ READ_ONLY (Nível 3)
 - 🔍 **Preview de Permissões**: Interface mostra o que cada papel pode fazer
 - 📊 **Auditoria Completa**: Logs de todas as ações
 
-**Documentação**: `backend/docs/Sistema de Permissões e Papéis - Guia Completo.md`
+**Documentação**: [`Docs/Sistema de Permissões e Papéis - Guia Completo.md`](./Docs/Sistema%20de%20Permissões%20e%20Papéis%20-%20Guia%20Completo.md)
 
 ### ✅ **Gestão de Perfil Completa**
 
@@ -192,7 +192,46 @@ READ_ONLY (Nível 3)
 - ✅ **Validações Zod**: Feedback em tempo real
 - 📱 **Máscaras Automáticas**: Telefone, CPF, CNPJ, CEP
 
-**Documentação**: `backend/docs/Módulo de Gestão de Perfil.md`
+**Documentação**: [`Docs/Módulo de Gestão de Perfil.md`](./Docs/Módulo%20de%20Gestão%20de%20Perfil.md)
+
+### ✅ **Sistema QR Code para Visitantes**
+
+**Status**: **🟢 CONCLUÍDO**
+
+- 📱 **QR Codes Automáticos**: Geração única por filial/igreja
+- 📝 **Registro Público**: Formulário otimizado para visitantes (sem login)
+- 👥 **Gestão Administrativa**: CRUD completo de visitantes
+- 📊 **Dashboard Estatísticas**: Métricas em tempo real e conversão
+- 🔄 **Sistema Follow-up**: Acompanhamento e conversão para membros
+- 🎨 **Gestão de QR Codes**: Ativar/desativar, download, regeneração
+- 🔐 **Multi-tenant**: Isolamento automático por igreja
+- 📱 **Validações Avançadas**: Máscaras telefone e validação campos
+
+**Documentação**: [`Docs/MODULO_QR_CODE_VISITANTES.md`](./Docs/MODULO_QR_CODE_VISITANTES.md)
+
+### ✅ **Deploy e Containerização**
+
+**Status**: **🟢 CONCLUÍDO**
+
+- 🐳 **Docker Compose**: Ambiente completo dev/prod
+- 🔧 **Multi-ambiente**: Configurações separadas
+- 📊 **Monitoramento**: Logs e health checks
+- 🔒 **Segurança**: Isolamento e configurações seguras
+- 🚀 **CI/CD Ready**: Preparado para automação
+- 📚 **Documentação**: Guias completos de setup
+
+**Documentação**: [`Docs/Deploy e Containerização - Guia Completo.md`](./Docs/Deploy%20e%20Containerização%20-%20Guia%20Completo.md)
+
+### ✅ **Usuários de Teste**
+
+**Status**: **🟢 CONCLUÍDO**
+
+- 👥 **Usuários Hierárquicos**: 5 níveis de permissão diferentes
+- 🔑 **Acesso Facilitado**: Credenciais documentadas
+- 🧪 **Ambiente Teste**: Dados de exemplo para desenvolvimento
+- 📋 **Documentação**: Guia completo de uso
+
+**Documentação**: [`Docs/Usuários de Teste - Guia Completo.md`](./Docs/Usuários%20de%20Teste%20-%20Guia%20Completo.md)
 
 ### 🔄 **Em Desenvolvimento**
 
@@ -206,17 +245,6 @@ READ_ONLY (Nível 3)
 - 📈 **Relatórios Consolidados**: Visão geral da denominação
 - 🔗 **Transferência de Membros**: Entre igrejas e filiais
 - 💰 **Gestão Financeira**: Orçamentos e transferências
-
-#### 📱 **On-Boarding de Visitantes com QR Code**
-
-**Status**: **🟡 EM DESENVOLVIMENTO**
-
-- 📱 **QR Code Único**: Geração automática por igreja
-- 📝 **Cadastro Simplificado**: Formulário otimizado para mobile
-- 🔔 **Notificações**: Alertas em tempo real para líderes
-- 📊 **Dashboard de Visitantes**: Métricas de conversão
-- 🎯 **Follow-up Automático**: Sistema de acompanhamento
-- 📧 **Email Marketing**: Campanhas automatizadas
 
 #### 💰 **Módulo Financeiro**
 
@@ -349,9 +377,9 @@ READ_ONLY (Nível 3)
 
 | Status | Quantidade | Percentual |
 |--------|------------|------------|
-| ✅ **Concluído** | 3 módulos | 25% |
-| 🟡 **Em Desenvolvimento** | 2 módulos | 17% |
-| 🔴 **Planejado** | 7 módulos | 58% |
+| ✅ **Concluído** | 6 módulos | 55% |
+| 🟡 **Em Desenvolvimento** | 1 módulo | 9% |
+| 🔴 **Planejado** | 4 módulos | 36% |
 
 ## 🔄 Roadmap de Desenvolvimento
 
@@ -360,8 +388,10 @@ READ_ONLY (Nível 3)
 - ✅ ~~Gestão Completa de Membros~~
 - ✅ ~~Sistema de Permissões~~
 - ✅ ~~Gestão de Perfil~~
+- ✅ ~~Sistema QR Code para Visitantes~~
+- ✅ ~~Deploy e Containerização~~
+- ✅ ~~Usuários de Teste~~
 - 🔄 **Gestão de Igrejas e Filiais**
-- 🔄 **On-Boarding com QR Code**
 
 ### 📅 Q2 2025 (Abril - Junho)
 
@@ -414,13 +444,24 @@ npm run lint                     # Verificar código
 npm run type-check              # Verificar tipos
 ```
 
-### 📁 Documentação Técnica
+### 📁 Documentação Técnica Completa
 
-- **📋 Módulo de Membros**: `backend/docs/Módulo de Membros - Guia Completo.md`
-- **🔐 Sistema de Permissões**: `backend/docs/Sistema de Permissões e Papéis - Guia Completo.md`
-- **👤 Gestão de Perfil**: `backend/docs/Módulo de Gestão de Perfil.md`
-- **🏗️ Bootstrap do Projeto**: `backend/docs/Bootstrap do projeto Django.md`
-- **📊 Análise Técnica**: `backend/docs/ANÁLISE TÉCNICA - PLATAFORMA SAAS - OBREIRO DIGITAL.md`
+#### 📖 **Módulos Implementados (Documentação Completa)**
+- **📋 Gestão de Membros**: [`Docs/Módulo de Membros - Guia Completo.md`](./Docs/Módulo%20de%20Membros%20-%20Guia%20Completo.md)
+- **🔐 Sistema de Permissões**: [`Docs/Sistema de Permissões e Papéis - Guia Completo.md`](./Docs/Sistema%20de%20Permissões%20e%20Papéis%20-%20Guia%20Completo.md)
+- **👤 Gestão de Perfil**: [`Docs/Módulo de Gestão de Perfil.md`](./Docs/Módulo%20de%20Gestão%20de%20Perfil.md)
+- **📱 QR Code Visitantes**: [`Docs/MODULO_QR_CODE_VISITANTES.md`](./Docs/MODULO_QR_CODE_VISITANTES.md)
+- **👥 Usuários de Teste**: [`Docs/Usuários de Teste - Guia Completo.md`](./Docs/Usuários%20de%20Teste%20-%20Guia%20Completo.md)
+- **🐳 Deploy e Containerização**: [`Docs/Deploy e Containerização - Guia Completo.md`](./Docs/Deploy%20e%20Containerização%20-%20Guia%20Completo.md)
+
+#### 🛠️ **Documentação de Configuração**
+- **📚 Índice Geral**: [`Docs/README.md`](./Docs/README.md)
+- **🔧 Configuração .gitignore**: [`Docs/GITIGNORE_COMPLETE.md`](./Docs/GITIGNORE_COMPLETE.md)
+
+#### 📊 **Análises e Planejamento**
+- **📈 Análise Técnica**: [`Docs/ANÁLISE TÉCNICA - PLATAFORMA SAAS - OBREIRO DIGITAL.md`](./Docs/ANÁLISE%20TÉCNICA%20-%20PLATAFORMA%20SAAS%20-%20OBREIRO%20DIGITAL.md)
+- **🏗️ Bootstrap Projeto**: [`Docs/1 │ Bootstrap do projeto Django.md`](./Docs/1%20│%20Bootstrap%20do%20projeto%20Django.md)
+- **📋 Modelo Conceitual**: [`Docs/Modelo Conceitual — Obreiro Virtual.md`](./Docs/Modelo%20Conceitual%20—%20Obreiro%20Virtual.md)
 
 ## 💰 Planos e Preços
 
