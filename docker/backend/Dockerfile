@@ -57,7 +57,12 @@ RUN chmod +x /entrypoint.sh
 
 # Criar usuário não-root para produção
 RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN chown -R appuser:appuser /app
+
+# Criar diretórios com permissões corretas antes de mudar usuário
+RUN mkdir -p /app/media /app/staticfiles /var/log/obreiro
+RUN chown -R appuser:appuser /app /var/log/obreiro
+RUN chmod -R 755 /app/media /app/staticfiles /var/log/obreiro
+
 USER appuser
 
 # Expor porta

@@ -20,7 +20,10 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/log/nginx:/var/log/nginx
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+      frontend-build:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
@@ -148,8 +151,8 @@ services:
       target: build
     container_name: obreiro_frontend_build
     volumes:
-      - frontend_build:/app/dist
-    command: ["sh", "-c", "cp -r /app/dist/* /app/dist/"]
+      - frontend_build:/shared/dist
+    command: ["sh", "-c", "cp -r /app/dist/* /shared/dist/ && echo 'Frontend build copiado com sucesso'"]
 
 # =================================
 # Volumes Persistentes
