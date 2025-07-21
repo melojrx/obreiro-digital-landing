@@ -1,4 +1,4 @@
-# 🏛️ Obreiro Digital - Sistema de Gestão Eclesiástica
+# 🏛️ Obreiro Virtual - Sistema de Gestão Eclesiástica
 
 > **Plataforma completa e profissional para gestão moderna de igrejas e instituições religiosas**
 
@@ -10,7 +10,7 @@
 
 ## 📖 Sobre o Projeto
 
-O **Obreiro Digital** é uma plataforma SaaS completa de gestão eclesiástica desenvolvida para modernizar a administração de igrejas brasileiras. Combina uma API robusta em Django com uma interface React moderna, oferecendo ferramentas profissionais para gestão completa de membros, visitantes, finanças, atividades e muito mais.
+O **Obreiro Virtual** é uma plataforma SaaS completa de gestão eclesiástica desenvolvida para modernizar a administração de igrejas brasileiras. Combina uma API robusta em Django com uma interface React moderna, oferecendo ferramentas profissionais para gestão completa de membros, visitantes, finanças, atividades e muito mais.
 
 ### ✨ Principais Diferenciais
 
@@ -27,7 +27,7 @@ O **Obreiro Digital** é uma plataforma SaaS completa de gestão eclesiástica d
 ## 🏗️ Arquitetura Técnica
 
 ```
-ObreiroDigital/
+ObreiroVirtual/
 ├── 🔧 backend/                    # Django REST API
 │   ├── apps/
 │   │   ├── accounts/             # Sistema de autenticação e perfil
@@ -113,7 +113,7 @@ O sistema cria automaticamente usuários de teste para desenvolvimento:
 | **Secretário** | `secretario@teste.com` | `teste123` | Pode gerenciar cadastros |
 | **Membro** | `membro@teste.com` | `teste123` | Visualização básica |
 
-📋 **Documentação completa**: [`USUARIOS_TESTE.md`](USUARIOS_TESTE.md)
+📋 **Documentação completa**: [`USUARIOS_TESTE.md`](Usuários de Teste - Guia Completo.md)
 
 ## 🔐 Sistema de Autenticação e Permissões
 
