@@ -3,7 +3,7 @@
  * Sistema de QR Code para registro de visitantes
  */
 
-import { api, API_ENDPOINTS } from '../config/api';
+import { api, API_ENDPOINTS, API_BASE_URL } from '../config/api';
 
 // =====================================
 // TIPOS E INTERFACES
@@ -23,6 +23,8 @@ export interface Visitor {
   age?: number;
   gender?: 'M' | 'F';
   cpf?: string;
+  zipcode: string;
+  address: string;
   city: string;
   state: string;
   neighborhood: string;
@@ -53,13 +55,15 @@ export interface Visitor {
 export interface VisitorPublicRegistration {
   full_name: string;
   email: string;
-  phone: string;
+  phone?: string;
   birth_date?: string;
   gender?: 'M' | 'F';
   cpf?: string;
+  zipcode?: string;
+  address?: string;
   city: string;
   state: string;
-  neighborhood: string;
+  neighborhood?: string;
   marital_status: 'single' | 'married' | 'divorced' | 'widowed' | 'other';
   ministry_interest?: string;
   first_visit: boolean;
@@ -141,7 +145,7 @@ export interface DashboardStats {
  */
 export const validateQRCode = async (uuid: string): Promise<QRCodeValidation> => {
   try {
-    const response = await fetch(API_ENDPOINTS.visitors.validateQR(uuid));
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.visitors.validateQR(uuid)}`);
     const data = await response.json();
     
     if (!response.ok) {
@@ -169,7 +173,10 @@ export const registerVisitorPublic = async (
   visitorData: VisitorPublicRegistration
 ): Promise<VisitorRegistrationResponse> => {
   try {
-    const response = await fetch(API_ENDPOINTS.visitors.registerPublic(uuid), {
+    console.log('[DEBUG] Sending visitor data:', visitorData);
+    console.log('[DEBUG] URL:', `${API_BASE_URL}${API_ENDPOINTS.visitors.registerPublic(uuid)}`);
+    
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.visitors.registerPublic(uuid)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

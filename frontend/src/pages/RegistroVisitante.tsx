@@ -30,13 +30,15 @@ import {
 const visitorSchema = z.object({
   full_name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   email: z.string().email('E-mail inválido'),
-  phone: z.string().min(10, 'Telefone é obrigatório').optional(),
+  phone: z.string().optional(),
   birth_date: z.string().optional(),
   gender: z.enum(['M', 'F']).optional(),
   cpf: z.string().optional(),
+  zipcode: z.string().optional(),
+  address: z.string().optional(),
   city: z.string().min(2, 'Cidade é obrigatória'),
   state: z.string().length(2, 'Estado deve ter 2 caracteres'),
-  neighborhood: z.string().min(2, 'Bairro é obrigatório'),
+  neighborhood: z.string().optional(),
   marital_status: z.enum(['single', 'married', 'divorced', 'widowed', 'other']),
   ministry_interest: z.string().optional(),
   first_visit: z.boolean(),
@@ -55,6 +57,8 @@ const RegistroVisitante: React.FC = () => {
   const [isValidating, setIsValidating] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
+  const [cepError, setCepError] = useState<string | null>(null);
 
   const {
     register,
@@ -105,14 +109,81 @@ const RegistroVisitante: React.FC = () => {
     validateQR();
   }, [uuid, navigate]);
 
+  // Função para buscar endereço pelo CEP
+  const fetchAddressByCep = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    
+    if (cleanCep.length !== 8) {
+      setCepError('CEP deve ter 8 dígitos');
+      return;
+    }
+
+    setIsFetchingCep(true);
+    setCepError(null);
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        setCepError('CEP não encontrado');
+        return;
+      }
+
+      // Preencher os campos automaticamente
+      setValue('address', data.logradouro || '');
+      setValue('city', data.localidade || '');
+      setValue('state', data.uf || '');
+      setValue('neighborhood', data.bairro || '');
+      
+      // Forçar update do Select de estado
+      const stateSelect = document.querySelector('[data-state-select]') as any;
+      if (stateSelect && data.uf) {
+        stateSelect.value = data.uf;
+        stateSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      
+      setCepError(null);
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      setCepError('Erro ao consultar CEP. Tente novamente.');
+    } finally {
+      setIsFetchingCep(false);
+    }
+  };
+
+  // Monitorar mudanças no CEP
+  const zipcode = watch('zipcode');
+  
+  React.useEffect(() => {
+    if (zipcode && zipcode.length >= 8) {
+      const timeoutId = setTimeout(() => {
+        fetchAddressByCep(zipcode);
+      }, 1000); // Debounce de 1 segundo
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [zipcode]);
+
   const onSubmit = async (data: VisitorFormData) => {
     if (!uuid || !qrValidation?.valid) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
 
+    // Limpar campos vazios antes de enviar
+    const cleanedData = Object.entries(data).reduce((acc, [key, value]) => {
+      if (value !== '' && value !== null && value !== undefined) {
+        acc[key as keyof VisitorFormData] = value;
+      }
+      return acc;
+    }, {} as any);
+
+    console.log('[DEBUG] Original form data:', data);
+    console.log('[DEBUG] Cleaned form data being sent:', cleanedData);
+
     try {
-      const response = await registerVisitorPublic(uuid, data);
+      const response = await registerVisitorPublic(uuid, cleanedData);
       
       if (response.success) {
         // Redirecionar para página de sucesso
@@ -255,6 +326,24 @@ const RegistroVisitante: React.FC = () => {
                       id="phone"
                       {...register('phone')}
                       placeholder="(11) 99999-9999"
+                      maxLength={15}
+                      onInput={(e) => {
+                        // Máscara de telefone
+                        const target = e.target as HTMLInputElement;
+                        let value = target.value.replace(/\D/g, '');
+                        
+                        if (value.length <= 11) {
+                          if (value.length > 6) {
+                            value = value.replace(/^(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+                          } else if (value.length > 2) {
+                            value = value.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+                          } else if (value.length > 0) {
+                            value = value.replace(/^(\d{0,2})/, '($1');
+                          }
+                        }
+                        
+                        target.value = value;
+                      }}
                     />
                     {errors.phone && (
                       <p className="text-sm text-red-600">{errors.phone.message}</p>
@@ -298,6 +387,71 @@ const RegistroVisitante: React.FC = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">Endereço</h3>
                 
+                {/* CEP e Bairro na mesma linha */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="zipcode">CEP</Label>
+                    <div className="relative">
+                      <Input
+                        id="zipcode"
+                        {...register('zipcode')}
+                        placeholder="00000-000"
+                        maxLength={9}
+                        onInput={(e) => {
+                          // Máscara de CEP
+                          const target = e.target as HTMLInputElement;
+                          let value = target.value.replace(/\D/g, '');
+                          if (value.length > 5) {
+                            value = value.replace(/^(\d{5})(\d)/, '$1-$2');
+                          }
+                          target.value = value;
+                        }}
+                      />
+                      {isFetchingCep && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                        </div>
+                      )}
+                    </div>
+                    {errors.zipcode && (
+                      <p className="text-sm text-red-600">{errors.zipcode.message}</p>
+                    )}
+                    {cepError && (
+                      <p className="text-sm text-red-600">{cepError}</p>
+                    )}
+                    <div className="text-xs text-gray-600">
+                      Digite o CEP para preencher automaticamente o endereço, cidade, estado e bairro
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="neighborhood">Bairro</Label>
+                    <Input
+                      id="neighborhood"
+                      {...register('neighborhood')}
+                      placeholder="Seu bairro"
+                      className={isFetchingCep ? 'bg-gray-50' : ''}
+                      readOnly={isFetchingCep}
+                    />
+                    {errors.neighborhood && (
+                      <p className="text-sm text-red-600">{errors.neighborhood.message}</p>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Campo de endereço */}
+                <div className="space-y-2">
+                  <Label htmlFor="address">Endereço</Label>
+                  <Input
+                    id="address"
+                    {...register('address')}
+                    placeholder="Rua, número, complemento"
+                  />
+                  {errors.address && (
+                    <p className="text-sm text-red-600">{errors.address.message}</p>
+                  )}
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="city">Cidade *</Label>
@@ -305,6 +459,8 @@ const RegistroVisitante: React.FC = () => {
                       id="city"
                       {...register('city')}
                       placeholder="Sua cidade"
+                      className={isFetchingCep ? 'bg-gray-50' : ''}
+                      readOnly={isFetchingCep}
                     />
                     {errors.city && (
                       <p className="text-sm text-red-600">{errors.city.message}</p>
@@ -313,8 +469,12 @@ const RegistroVisitante: React.FC = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="state">Estado *</Label>
-                    <Select onValueChange={(value) => setValue('state', value)}>
-                      <SelectTrigger>
+                    <Select 
+                      onValueChange={(value) => setValue('state', value)}
+                      disabled={isFetchingCep}
+                      value={watch('state')}
+                    >
+                      <SelectTrigger className={isFetchingCep ? 'bg-gray-50' : ''}>
                         <SelectValue placeholder="UF" />
                       </SelectTrigger>
                       <SelectContent>
@@ -330,17 +490,6 @@ const RegistroVisitante: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="space-y-2 md:col-span-3">
-                    <Label htmlFor="neighborhood">Bairro *</Label>
-                    <Input
-                      id="neighborhood"
-                      {...register('neighborhood')}
-                      placeholder="Seu bairro"
-                    />
-                    {errors.neighborhood && (
-                      <p className="text-sm text-red-600">{errors.neighborhood.message}</p>
-                    )}
-                  </div>
                 </div>
               </div>
 

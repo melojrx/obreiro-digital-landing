@@ -18,7 +18,7 @@ class VisitorPublicRegistrationSerializer(serializers.ModelSerializer):
         model = Visitor
         fields = [
             'full_name', 'email', 'phone', 'birth_date', 'gender', 'cpf',
-            'city', 'state', 'neighborhood', 'marital_status',
+            'zipcode', 'address', 'city', 'state', 'neighborhood', 'marital_status',
             'ministry_interest', 'first_visit', 'wants_prayer', 
             'wants_growth_group', 'observations'
         ]
@@ -60,7 +60,7 @@ class VisitorSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'uuid', 'church', 'church_name', 'branch', 'branch_name',
             'full_name', 'email', 'phone', 'birth_date', 'age', 'gender', 'cpf',
-            'city', 'state', 'neighborhood', 'marital_status', 'ministry_interest',
+            'zipcode', 'address', 'city', 'state', 'neighborhood', 'marital_status', 'ministry_interest',
             'first_visit', 'wants_prayer', 'wants_growth_group', 'observations',
             'qr_code_used', 'registration_source', 'user_agent', 'ip_address',
             'converted_to_member', 'converted_member', 'converted_member_name',

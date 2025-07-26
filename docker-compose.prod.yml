@@ -89,7 +89,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "-H", "Host: obreirovirtual.com", "http://localhost:8000/api/v1/"]
+      test: ["CMD", "curl", "-f", "-H", "Host: www.obreirovirtual.com", "http://localhost:8000/api/v1/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -149,6 +149,8 @@ services:
       context: ./frontend
       dockerfile: ../docker/frontend/Dockerfile
       target: build
+      args:
+        - VITE_API_URL=https://www.obreirovirtual.com/api/v1
     container_name: obreiro_frontend_build
     volumes:
       - ./frontend_build:/shared/dist

@@ -38,6 +38,10 @@ RUN npm ci
 # Copiar código fonte
 COPY . .
 
+# Aceitar ARGs para build
+ARG VITE_API_URL=http://localhost:8000/api/v1
+ENV VITE_API_URL=$VITE_API_URL
+
 # Build da aplicação
 RUN npm run build
 

@@ -124,6 +124,20 @@ class Visitor(BaseModel):
         default=""
     )
     
+    zipcode = models.CharField(
+        "CEP",
+        max_length=10,
+        default="",
+        help_text="CEP no formato XXXXX-XXX"
+    )
+    
+    address = models.CharField(
+        "Endereço",
+        max_length=200,
+        default="",
+        help_text="Rua, número, complemento"
+    )
+    
     # =====================================
     # DADOS ESPECÍFICOS DO FORMULÁRIO
     # =====================================
@@ -290,6 +304,7 @@ class Visitor(BaseModel):
             city=self.city,
             state=self.state,
             neighborhood=self.neighborhood,
+            address=self.address,
             marital_status=self.marital_status,
             origin='visitante',
             converted_from_visitor=True

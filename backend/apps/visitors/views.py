@@ -82,6 +82,8 @@ def register_visitor(request, qr_code_uuid):
         }, status=status.HTTP_404_NOT_FOUND)
     
     # Serializar dados do visitante
+    print(f"\n[DEBUG] Received data: {request.data}")
+    print(f"[DEBUG] Data type: {type(request.data)}")
     serializer = VisitorPublicRegistrationSerializer(data=request.data)
     
     if serializer.is_valid():
@@ -110,6 +112,7 @@ def register_visitor(request, qr_code_uuid):
             }
         }, status=status.HTTP_201_CREATED)
     
+    print(f"[DEBUG] Validation errors: {serializer.errors}")
     return Response({
         'error': 'Dados inválidos',
         'details': serializer.errors
