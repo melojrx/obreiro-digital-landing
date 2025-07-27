@@ -4,6 +4,10 @@
 
 Esta documentação descreve a arquitetura completa e funcional do sistema Obreiro Digital em produção, incluindo toda a configuração, containers, volumes, rede e procedimentos de deployment.
 
+**Última atualização**: Janeiro 2025  
+**Status**: ✅ PRODUÇÃO FUNCIONAL  
+**Arquivos relacionados**: `SYNC_DEV_PROD.md`, `DEPLOY_SAFE_GUIDE.md`
+
 ## 🌐 Informações do Ambiente
 
 ### Domínio e SSL
@@ -13,9 +17,11 @@ Esta documentação descreve a arquitetura completa e funcional do sistema Obrei
 - **Protocolo**: HTTPS obrigatório com redirect automático
 
 ### Servidor
-- **VPS**: Servidor Linux com Docker
+- **VPS**: Ubuntu Linux com Docker
 - **Localização**: `/root/obreiro-digital-landing/`
-- **Sistema**: Ubuntu/Debian com Docker Engine + Docker Compose v2
+- **Sistema**: Ubuntu com Docker Engine + Docker Compose v2
+- **Arquitetura**: Multi-container com Docker Compose
+- **Rede**: Bridge network `obreiro_prod_network`
 
 ## 🏛️ Arquitetura do Sistema
 
@@ -75,11 +81,13 @@ Container: obreiro_backend_prod
 Image: obreiro-digital-landing-backend
 Port: 8000 (interno)
 Command: gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 config.wsgi:application
+User: appuser (uid: 999)
 Volumes:
   - ./media_prod:/app/media
   - ./static_prod:/app/staticfiles
   - ./logs/backend:/var/log/obreiro
 Environment: .env_prod
+Health Check: curl -f http://localhost:8000/api/v1/ || exit 1
 ```
 
 ### 3. **postgres** - Banco de Dados
@@ -128,9 +136,14 @@ Volumes:
 ```
 /root/obreiro-digital-landing/
 ├── 📄 docker-compose.prod.yml          # Orquestração de produção
-├── 📄 .env_prod                        # Variáveis de ambiente
+├── 📄 .env_prod                        # Variáveis de ambiente (sensível)
+├── 📄 .env_prod.example                # Template de variáveis
 ├── 📄 ARQUITETURA_PRODUCAO.md          # Esta documentação
 ├── 📄 CLAUDE.md                        # Instruções para Claude Code
+├── 📄 SYNC_DEV_PROD.md                 # Guia de sincronização
+├── 📄 DEPLOY_SAFE_GUIDE.md             # Guia de deploy seguro
+├── 📄 safe-pull.sh                     # Script de deploy automático
+├── 📄 fix-media-permissions.sh         # Script correção de permissões
 │
 ├── 📂 backend/                         # Código Django
 │   ├── 📂 apps/                        # Apps Django
@@ -140,7 +153,9 @@ Volumes:
 ├── 📂 frontend/                        # Código React
 │   ├── 📂 src/                         # Código fonte
 │   ├── 📄 package.json                 # Dependências Node.js
-│   └── 📄 vite.config.ts               # Configuração Vite
+│   ├── 📄 vite.config.ts               # Configuração Vite
+│   ├── 📄 .env.prod                    # Variáveis do frontend
+│   └── 📄 .env.prod.example            # Template frontend
 │
 ├── 📂 docker/                          # Configurações Docker
 │   ├── 📂 backend/
@@ -151,8 +166,7 @@ Volumes:
 │   └── 📂 nginx/
 │       └── 📄 prod.conf                # Configuração Nginx
 │
-├── 📂 scripts/
-│   └── 📄 setup-production.sh          # Script de setup VPS
+├── 📂 scripts/                         # Scripts removidos - usar raiz
 │
 ├── 📂 static_prod/                     # Arquivos estáticos Django
 ├── 📂 media_prod/                      # Uploads de usuários
@@ -182,8 +196,8 @@ REDIS_URL=redis://redis:6379/0
 CELERY_BROKER_URL=redis://redis:6379/2
 CELERY_RESULT_BACKEND=redis://redis:6379/3
 
-# Frontend URL para QR Codes
-FRONTEND_URL=https://obreirovirtual.com
+# Frontend URL para QR Codes (SEM /api/v1 - apenas URL base)
+FRONTEND_URL=https://www.obreirovirtual.com
 
 # CORS Production
 CORS_ALLOW_ALL_ORIGINS=False
@@ -215,16 +229,42 @@ upstream backend {
     server backend:8000;
 }
 
-# Redirect HTTP to HTTPS
+# Server for internal health checks and API
+server {
+    listen 80;
+    server_name localhost 127.0.0.1;
+    
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+    
+    location /api/ {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Redirect HTTP to HTTPS for external requests
 server {
     listen 80;
     server_name obreirovirtual.com www.obreirovirtual.com;
-    return 301 https://$server_name$request_uri;
+    return 301 https://www.obreirovirtual.com$request_uri;
 }
 
+# Main HTTPS server
 server {
     listen 443 ssl http2;
     server_name obreirovirtual.com www.obreirovirtual.com;
+    
+    # Redirect non-www to www
+    if ($host = 'obreirovirtual.com') {
+        return 301 https://www.obreirovirtual.com$request_uri;
+    }
 
     # SSL Configuration
     ssl_certificate /etc/letsencrypt/live/obreirovirtual.com/fullchain.pem;
@@ -289,34 +329,51 @@ server {
 
 ## 🚀 Procedimentos de Deploy
 
-### 1. Setup Inicial da VPS
+### 1. Deploy Automatizado (RECOMENDADO)
 ```bash
-# Executar como root
-sudo ./scripts/setup-production.sh
-
-# O script configura:
-# - Diretórios necessários
-# - Permissões corretas
-# - Logrotate
-# - Systemd service (opcional)
+# Script completo que faz backup, pull, rebuild e corrige permissões
+./safe-pull.sh
 ```
 
-### 2. Deploy da Aplicação
+### 2. Deploy Manual
 ```bash
 # Parar containers existentes
 docker compose -f docker-compose.prod.yml down
 
+# Pull do código
+git pull origin main
+
 # Rebuild e iniciar
 docker compose -f docker-compose.prod.yml up -d --build
 
-# Executar script pós-deploy automatizado
-./scripts/post-deploy.sh
+# Executar migrações
+docker compose -f docker-compose.prod.yml run --rm backend python manage.py migrate
+
+# Coletar arquivos estáticos
+docker compose -f docker-compose.prod.yml run --rm backend python manage.py collectstatic --noinput
+
+# Corrigir permissões
+./fix-media-permissions.sh
 
 # Verificar status
 docker compose -f docker-compose.prod.yml ps
 ```
 
-### 3. Comandos de Manutenção
+### 3. Procedimentos de Correção
+
+#### Corrigir Permissões de Mídia
+```bash
+# Quando houver erro "Permission Denied" ao salvar arquivos
+./fix-media-permissions.sh
+```
+
+#### Verificar Variáveis de Ambiente
+```bash
+# FRONTEND_URL deve ser https://www.obreirovirtual.com (sem /api/v1)
+grep FRONTEND_URL .env_prod
+```
+
+### 4. Comandos de Manutenção
 ```bash
 # Ver logs
 docker compose -f docker-compose.prod.yml logs -f backend
@@ -396,9 +453,58 @@ docker compose -f docker-compose.prod.yml restart nginx
 
 ## 🛠️ Troubleshooting
 
-### Problemas Comuns
+### Problemas Comuns e Soluções
 
-#### 1. Backend não inicia
+#### 1. "Sem resposta do servidor" no Login
+```bash
+# CAUSA: Redirect loop no nginx para requests internos
+# SOLUÇÃO: Nginx config já corrigida com server block para localhost
+
+# Verificar logs
+docker compose -f docker-compose.prod.yml logs -f nginx backend
+
+# Testar health check interno
+docker exec obreiro_backend_prod curl http://localhost:8000/api/v1/
+```
+
+#### 2. Permission Denied ao Salvar Arquivos (QR Codes, Uploads)
+```bash
+# CAUSA: Container roda como uid 999 mas diretório pertence a root
+# SOLUÇÃO:
+./fix-media-permissions.sh
+
+# Verificar proprietário
+ls -la media_prod/
+# Deve mostrar: 999:999
+```
+
+#### 3. QR Codes Gerando URLs Incorretas
+```bash
+# CAUSA: FRONTEND_URL com /api/v1 no final
+# SOLUÇÃO: Corrigir no .env_prod
+# Deve ser: FRONTEND_URL=https://www.obreirovirtual.com
+
+# Verificar atual
+grep FRONTEND_URL .env_prod
+
+# Após corrigir, reiniciar backend
+docker compose -f docker-compose.prod.yml restart backend
+```
+
+#### 4. Frontend Mostra obreirovirtual.com mas API Espera www
+```bash
+# CAUSA: Inconsistência de URLs entre frontend e nginx
+# SOLUÇÃO: Sempre usar www.obreirovirtual.com
+
+# Verificar frontend/.env.prod
+cat frontend/.env.prod
+# Deve ter: VITE_API_URL=https://www.obreirovirtual.com/api/v1
+
+# Rebuild frontend se necessário
+docker compose -f docker-compose.prod.yml up frontend-build
+```
+
+#### 5. Backend não inicia
 ```bash
 # Verificar logs
 docker compose -f docker-compose.prod.yml logs backend
@@ -407,34 +513,19 @@ docker compose -f docker-compose.prod.yml logs backend
 # - Permissões dos volumes (logs, media, static)
 # - ALLOWED_HOSTS incorreto
 # - Conexão com PostgreSQL
-# - Gunicorn não instalado
+# - Variáveis de ambiente faltando
 ```
 
-#### 2. API retorna 400/500
-```bash
-# Verificar ALLOWED_HOSTS no .env_prod
-# Deve incluir: obreirovirtual.com,www.obreirovirtual.com,backend
-
-# Verificar se Django aceita o hostname
-docker exec obreiro_backend_prod curl -H "Host: obreirovirtual.com" http://localhost:8000/api/v1/
-```
-
-#### 3. Frontend não carrega
-```bash
-# Verificar se build foi criado
-ls -la frontend_build/
-
-# Recriar build
-docker compose -f docker-compose.prod.yml up frontend-build
-```
-
-#### 4. SSL não funciona
+#### 6. SSL/HTTPS não funciona
 ```bash
 # Verificar certificados
 sudo certbot certificates
 
 # Renovar se necessário
 sudo certbot renew
+
+# Verificar nginx config
+docker compose -f docker-compose.prod.yml exec nginx nginx -t
 ```
 
 ## 📈 Performance
@@ -458,29 +549,60 @@ du -sh ./media_prod ./static_prod ./logs
 ## 🔄 Atualizações
 
 ### Deploy de Novas Versões
-1. **Pull do código**: `git pull origin main`
-2. **Rebuild containers**: `docker compose -f docker-compose.prod.yml up -d --build`
-3. **Verificar saúde**: `docker compose -f docker-compose.prod.yml ps`
-4. **Testar funcionalidade**: Acessar `https://obreirovirtual.com`
+
+#### Método Recomendado - Script Automatizado
+```bash
+# Script que faz backup, pull, rebuild e corrige tudo automaticamente
+./safe-pull.sh
+```
+
+#### Método Manual
+1. **Backup**: `cp .env_prod backups/.env_prod.$(date +%Y%m%d_%H%M%S)`
+2. **Pull do código**: `git pull origin main`
+3. **Rebuild containers**: `docker compose -f docker-compose.prod.yml up -d --build`
+4. **Aplicar migrações**: `docker compose -f docker-compose.prod.yml run --rm backend python manage.py migrate`
+5. **Corrigir permissões**: `./fix-media-permissions.sh`
+6. **Verificar saúde**: `docker compose -f docker-compose.prod.yml ps`
+7. **Testar funcionalidade**: Acessar `https://www.obreirovirtual.com`
 
 ### Rollback
 ```bash
 # Em caso de problemas, voltar para última versão funcionando
 git checkout <commit-anterior>
 docker compose -f docker-compose.prod.yml up -d --build
+
+# Restaurar backup de configuração se necessário
+cp backups/.env_prod.backup .env_prod
 ```
+
+### Arquivos Críticos para Deploy
+- `.env_prod` - Variáveis de ambiente (não versionado)
+- `.env_prod.example` - Template de variáveis
+- `frontend/.env.prod` - Configuração do frontend
+- `safe-pull.sh` - Script de deploy automático
+- `fix-media-permissions.sh` - Correção de permissões
+- `docker/nginx/prod.conf` - Configuração nginx
 
 ---
 
 ## 📞 Contatos e Suporte
 
-Esta arquitetura foi configurada e testada em **Julho de 2025** e está totalmente funcional.
+Esta arquitetura foi configurada e testada em **Janeiro de 2025** e está totalmente funcional.
 
 Para questões técnicas, consulte:
-- Este documento para arquitetura
+- Este documento para arquitetura completa
+- `SYNC_DEV_PROD.md` para sincronização entre ambientes  
+- `DEPLOY_SAFE_GUIDE.md` para procedimentos de deploy
 - `CLAUDE.md` para comandos de desenvolvimento
 - Logs do sistema em `./logs/`
 
-**Status**: ✅ **PRODUÇÃO FUNCIONAL**
-**URL**: https://obreirovirtual.com
-**Última atualização**: Julho 2025
+### Problemas Resolvidos em Produção
+1. ✅ Redirect loops no nginx para health checks internos
+2. ✅ Permissões de escrita para QR codes e uploads
+3. ✅ URLs incorretas nos QR codes (FRONTEND_URL)
+4. ✅ Inconsistência entre www e não-www
+5. ✅ Deploy seguro com backup automático
+
+**Status**: ✅ **PRODUÇÃO FUNCIONAL**  
+**URL**: https://www.obreirovirtual.com  
+**Última atualização**: Janeiro 2025
