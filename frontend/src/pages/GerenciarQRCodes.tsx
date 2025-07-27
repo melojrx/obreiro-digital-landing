@@ -9,70 +9,46 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { branchService, BranchQRCode } from '@/services/branchService';
 
-interface Branch {
-  id: number;
-  name: string;
-  qr_code_uuid: string;
-  qr_code_active: boolean;
-  qr_code_image?: string;
-  visitor_registration_url: string;
-  total_visitors_registered: number;
-}
 
 const GerenciarQRCodes: React.FC = () => {
   const { userChurch } = useAuth();
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branches, setBranches] = useState<BranchQRCode[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simular dados das branches (substituir por chamada à API real)
-    const mockBranches: Branch[] = [
-      {
-        id: 1,
-        name: 'Sede Principal',
-        qr_code_uuid: 'c647ef08-8340-43da-930c-9ab4db2f3a11',
-        qr_code_active: true,
-        visitor_registration_url: `${window.location.origin}/visit/c647ef08-8340-43da-930c-9ab4db2f3a11`,
-        total_visitors_registered: 45
-      },
-      {
-        id: 2,
-        name: 'Filial Norte',
-        qr_code_uuid: 'b2709083-f47d-4684-b84d-18fae50bcf80',
-        qr_code_active: true,
-        visitor_registration_url: `${window.location.origin}/visit/b2709083-f47d-4684-b84d-18fae50bcf80`,
-        total_visitors_registered: 23
-      },
-      {
-        id: 3,
-        name: 'Filial Sul',
-        qr_code_uuid: 'd7a47f26-7b90-4c0e-bf03-716b95eb314b',
-        qr_code_active: false,
-        visitor_registration_url: `${window.location.origin}/visit/d7a47f26-7b90-4c0e-bf03-716b95eb314b`,
-        total_visitors_registered: 12
-      }
-    ];
-
-    setTimeout(() => {
-      setBranches(mockBranches);
-      setLoading(false);
-    }, 1000);
+    loadBranches();
   }, []);
+
+  const loadBranches = async () => {
+    try {
+      setLoading(true);
+      const data = await branchService.getBranchesQRCodes();
+      setBranches(data);
+    } catch (error: any) {
+      console.error('Erro ao carregar filiais:', error);
+      toast.error(error.message || 'Erro ao carregar filiais');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggleQRCode = async (branchId: number, active: boolean) => {
     try {
-      // Aqui faria a chamada para a API para ativar/desativar o QR code
+      const result = await branchService.toggleQRCode(branchId);
+      
+      // Atualizar o estado local com os novos dados
       setBranches(prev => 
         prev.map(branch => 
-          branch.id === branchId 
-            ? { ...branch, qr_code_active: active }
-            : branch
+          branch.id === branchId ? result.data : branch
         )
       );
-      toast.success(`QR Code ${active ? 'ativado' : 'desativado'} com sucesso`);
-    } catch (error) {
-      toast.error('Erro ao alterar status do QR Code');
+      
+      toast.success(result.message);
+    } catch (error: any) {
+      console.error('Erro ao alterar status do QR Code:', error);
+      toast.error(error.message || 'Erro ao alterar status do QR Code');
     }
   };
 
@@ -83,28 +59,26 @@ const GerenciarQRCodes: React.FC = () => {
 
   const handleRegenerateQRCode = async (branchId: number) => {
     try {
-      // Aqui faria a chamada para a API para regenerar o QR code
-      const newUuid = crypto.randomUUID();
+      const result = await branchService.regenerateQRCode(branchId);
+      
+      // Atualizar o estado local com os novos dados
       setBranches(prev => 
         prev.map(branch => 
-          branch.id === branchId 
-            ? { 
-                ...branch, 
-                qr_code_uuid: newUuid,
-                visitor_registration_url: `${window.location.origin}/visit/${newUuid}`
-              }
-            : branch
+          branch.id === branchId ? result.data : branch
         )
       );
-      toast.success('QR Code regenerado com sucesso');
-    } catch (error) {
-      toast.error('Erro ao regenerar QR Code');
+      
+      toast.success(result.message);
+    } catch (error: any) {
+      console.error('Erro ao regenerar QR Code:', error);
+      toast.error(error.message || 'Erro ao regenerar QR Code');
     }
   };
 
-  const handleDownloadQRCode = (branch: Branch) => {
-    // Gerar QR code e fazer download
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(branch.visitor_registration_url)}`;
+  const handleDownloadQRCode = (branch: BranchQRCode) => {
+    // Usar a imagem do QR Code do backend se disponível, senão gerar via API externa
+    const qrCodeUrl = branch.qr_code_url || 
+      `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(branch.visitor_registration_url)}`;
     
     const link = document.createElement('a');
     link.href = qrCodeUrl;
@@ -168,9 +142,16 @@ const GerenciarQRCodes: React.FC = () => {
                 <div className="flex justify-center">
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(branch.visitor_registration_url)}`}
+                      src={branch.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(branch.visitor_registration_url)}`}
                       alt={`QR Code ${branch.name}`}
                       className="w-32 h-32"
+                      onError={(e) => {
+                        // Fallback para API externa se a imagem do backend falhar
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.includes('api.qrserver.com')) {
+                          target.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(branch.visitor_registration_url)}`;
+                        }
+                      }}
                     />
                   </div>
                 </div>

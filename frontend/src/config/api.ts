@@ -93,6 +93,21 @@ export const API_ENDPOINTS = {
     export: '/members/export/',
   },
   
+  // Branches (Filiais)
+  branches: {
+    list: '/branches/',
+    detail: (id: number) => `/branches/${id}/`,
+    create: '/branches/',
+    update: (id: number) => `/branches/${id}/`,
+    delete: (id: number) => `/branches/${id}/`,
+    
+    // QR Code endpoints
+    qrCodes: '/branches/qr_codes/',
+    regenerateQRCode: (id: number) => `/branches/${id}/regenerate_qr_code/`,
+    toggleQRCode: (id: number) => `/branches/${id}/toggle_qr_code/`,
+    visitorStats: (id: number) => `/branches/${id}/visitor_stats/`,
+  },
+  
   // Visitantes
   visitors: {
     // Endpoints públicos (sem autenticação)
