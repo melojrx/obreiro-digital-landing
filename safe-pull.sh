@@ -53,14 +53,14 @@ if [ ! -f ".env_prod" ]; then
 fi
 
 # Garantir que FRONTEND_URL está correto no .env_prod
-if ! grep -q "FRONTEND_URL=https://www.obreirovirtual.com/api/v1" .env_prod; then
+if ! grep -q "FRONTEND_URL=https://www.obreirovirtual.com" .env_prod; then
     warning "FRONTEND_URL incorreto ou ausente no .env_prod"
     
     # Remover linha antiga se existir
     sed -i '/^FRONTEND_URL=/d' .env_prod
     
     # Adicionar linha correta
-    echo "FRONTEND_URL=https://www.obreirovirtual.com/api/v1" >> .env_prod
+    echo "FRONTEND_URL=https://www.obreirovirtual.com" >> .env_prod
     success "FRONTEND_URL corrigido no .env_prod"
 fi
 
@@ -148,6 +148,12 @@ fi
 # 18. Limpar imagens antigas do Docker
 log "🧹 Limpando imagens Docker antigas..."
 docker image prune -f
+
+# 19. Corrigir permissões do diretório media
+log "🔧 Corrigindo permissões do diretório media..."
+chown -R 999:999 media_prod/
+chmod -R 755 media_prod/
+success "Permissões do diretório media corrigidas"
 
 success "✅ Atualização concluída com sucesso!"
 echo ""
