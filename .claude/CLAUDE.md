@@ -1,7 +1,25 @@
 # CLAUDE.md
 
 Este arquivo fornece orientações para o Claude Code (claude.ai/code) ao trabalhar com código neste repositório.
+# Ambiente de Desenvolvimento
+- Sistema: WSL2 Ubuntu no Windows
+- GitHub CLI (gh) instalado e configurado
+- Autenticação via HTTPS
 
+# Comandos GitHub Disponíveis
+## Issues
+- `gh issue create --title "título" --body "descrição"`
+- `gh issue list --state open`
+- `gh issue view <número>`
+
+## Pull Requests
+- `gh pr create` - Criar PR interativamente
+- `gh pr list` - Listar PRs
+- `gh pr checkout <número>` - Fazer checkout de um PR
+
+## Repositório
+- `gh repo view` - Ver informações do repo atual
+- `gh repo clone <owner/repo>` - Clonar repositório
 ## Comandos de Desenvolvimento
 
 ### Configuração Inicial
