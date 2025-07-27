@@ -461,3 +461,17 @@ sensitive_data/
 # Scripts de deploy específicos do servidor
 deploy_production.sh
 server_config.sh
+
+# =================================
+# DIRETÓRIOS ESPECÍFICOS DE PRODUÇÃO
+# =================================
+
+# Diretórios criados em produção
+static_prod/
+media_prod/
+frontend_build/
+logs/
+
+# Arquivos de ambiente específicos
+.env_dev
+.env_prod
