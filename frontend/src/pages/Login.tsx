@@ -225,7 +225,7 @@ const Login = () => {
         <div className="mt-8 text-center text-sm text-slate-500">
           <p>
             Protegido por criptografia de ponta.{' '}
-            <a href="#" className="text-blue-600 hover:text-blue-500">
+            <a href="/politica-privacidade" className="text-blue-600 hover:text-blue-500">
               Política de Privacidade
             </a>
           </p>

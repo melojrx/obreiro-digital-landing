@@ -502,7 +502,7 @@ const Cadastro = () => {
                   Termos de Serviço
                 </a>{' '}
                 e{' '}
-                <a href="#" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+                <a href="/politica-privacidade" target="_blank" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
                   Política de Privacidade
                 </a>
               </label>
