@@ -196,7 +196,7 @@ READ_ONLY (Nível 3)
 
 ### ✅ **Sistema QR Code para Visitantes**
 
-**Status**: **🟢 CONCLUÍDO**
+**Status**: **🟢 CONCLUÍDO E APRIMORADO**
 
 - 📱 **QR Codes Automáticos**: Geração única por filial/igreja
 - 📝 **Registro Público**: Formulário otimizado para visitantes (sem login)
@@ -206,8 +206,14 @@ READ_ONLY (Nível 3)
 - 🎨 **Gestão de QR Codes**: Ativar/desativar, download, regeneração
 - 🔐 **Multi-tenant**: Isolamento automático por igreja
 - 📱 **Validações Avançadas**: Máscaras telefone e validação campos
+- ✨ **Página de Detalhes**: Visualização completa com timeline e ações
+- ✏️ **Edição de Visitantes**: Formulário reutilizável com pré-preenchimento
+- 📱 **Design Responsivo**: Mobile-first em todas as páginas
+- 🏠 **Política de Privacidade**: Página completa com compliance LGPD
+- 🔗 **Integração ViaCEP**: Preenchimento automático de endereços
+- 🎯 **UX Otimizada**: Áreas de toque adequadas e tipografia responsiva
 
-**Documentação**: [`Docs/MODULO_QR_CODE_VISITANTES.md`](./Docs/MODULO_QR_CODE_VISITANTES.md)
+**Documentação**: [`Docs/MODULO_VISITANTES_COMPLETO.md`](./Docs/MODULO_VISITANTES_COMPLETO.md)
 
 ### ✅ **Deploy e Containerização**
 
@@ -366,11 +372,11 @@ READ_ONLY (Nível 3)
 
 ### 📈 Estatísticas de Desenvolvimento
 
-- **📁 Arquivos**: 200+ arquivos de código
-- **📝 Linhas de Código**: 50.000+ linhas
-- **🔧 Endpoints API**: 40+ endpoints
-- **🎨 Componentes React**: 80+ componentes
-- **📚 Documentação**: 15+ documentos técnicos
+- **📁 Arquivos**: 220+ arquivos de código
+- **📝 Linhas de Código**: 55.000+ linhas
+- **🔧 Endpoints API**: 45+ endpoints
+- **🎨 Componentes React**: 85+ componentes
+- **📚 Documentação**: 16+ documentos técnicos
 - **🧪 Cobertura de Testes**: 85%+ (meta)
 
 ### 🎯 Funcionalidades por Status
@@ -388,9 +394,11 @@ READ_ONLY (Nível 3)
 - ✅ ~~Gestão Completa de Membros~~
 - ✅ ~~Sistema de Permissões~~
 - ✅ ~~Gestão de Perfil~~
-- ✅ ~~Sistema QR Code para Visitantes~~
+- ✅ ~~Sistema QR Code para Visitantes (Aprimorado)~~
 - ✅ ~~Deploy e Containerização~~
 - ✅ ~~Usuários de Teste~~
+- ✅ ~~Melhorias de Responsividade~~
+- ✅ ~~Política de Privacidade~~
 - 🔄 **Gestão de Igrejas e Filiais**
 
 ### 📅 Q2 2025 (Abril - Junho)
@@ -450,7 +458,7 @@ npm run type-check              # Verificar tipos
 - **📋 Gestão de Membros**: [`Docs/Módulo de Membros - Guia Completo.md`](./Docs/Módulo%20de%20Membros%20-%20Guia%20Completo.md)
 - **🔐 Sistema de Permissões**: [`Docs/Sistema de Permissões e Papéis - Guia Completo.md`](./Docs/Sistema%20de%20Permissões%20e%20Papéis%20-%20Guia%20Completo.md)
 - **👤 Gestão de Perfil**: [`Docs/Módulo de Gestão de Perfil.md`](./Docs/Módulo%20de%20Gestão%20de%20Perfil.md)
-- **📱 QR Code Visitantes**: [`Docs/MODULO_QR_CODE_VISITANTES.md`](./Docs/MODULO_QR_CODE_VISITANTES.md)
+- **📱 Sistema QR Code Visitantes**: [`Docs/MODULO_VISITANTES_COMPLETO.md`](./Docs/MODULO_VISITANTES_COMPLETO.md)
 - **👥 Usuários de Teste**: [`Docs/Usuários de Teste - Guia Completo.md`](./Docs/Usuários%20de%20Teste%20-%20Guia%20Completo.md)
 - **🐳 Deploy e Containerização**: [`Docs/Deploy e Containerização - Guia Completo.md`](./Docs/Deploy%20e%20Containerização%20-%20Guia%20Completo.md)
 
@@ -563,6 +571,6 @@ Este projeto está protegido por direitos autorais e pode estar sujeito a patent
 
 ### 📈 Status Atual: **Versão 1.3.0** - **Produção Estável**
 
-**Última atualização**: Janeiro 2025  
-**Próxima release**: Fevereiro 2025 (Gestão de Igrejas)  
+**Última atualização**: Agosto 2025  
+**Próxima release**: Setembro 2025 (Gestão de Igrejas)  
 **Contribuidores**: 3 desenvolvedores ativos
