@@ -248,15 +248,15 @@ const RegistroVisitante: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-4 sm:py-8 px-4">
+      <div className="max-w-2xl lg:max-w-4xl mx-auto">
         {/* Header com informações da igreja */}
         <Card className="mb-6">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
               <QrCode className="h-12 w-12 text-blue-600" />
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">
+            <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900">
               Bem-vindo à {qrValidation?.branch?.church_name}
             </CardTitle>
             <CardDescription className="text-lg">
@@ -282,7 +282,7 @@ const RegistroVisitante: React.FC = () => {
           </CardHeader>
           
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
               {/* Erro de submissão */}
               {submitError && (
                 <Alert variant="destructive">
@@ -291,16 +291,17 @@ const RegistroVisitante: React.FC = () => {
               )}
 
               {/* Dados pessoais */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Dados Pessoais</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Dados Pessoais</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="full_name">Nome Completo *</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="full_name" className="text-sm sm:text-base font-medium">Nome Completo *</Label>
                     <Input
                       id="full_name"
                       {...register('full_name')}
                       placeholder="Seu nome completo"
+                      className="h-11 text-base"
                     />
                     {errors.full_name && (
                       <p className="text-sm text-red-600">{errors.full_name.message}</p>
@@ -308,12 +309,13 @@ const RegistroVisitante: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">E-mail *</Label>
+                    <Label htmlFor="email" className="text-sm sm:text-base font-medium">E-mail *</Label>
                     <Input
                       id="email"
                       type="email"
                       {...register('email')}
                       placeholder="seu@email.com"
+                      className="h-11 text-base"
                     />
                     {errors.email && (
                       <p className="text-sm text-red-600">{errors.email.message}</p>
@@ -321,12 +323,13 @@ const RegistroVisitante: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone</Label>
+                    <Label htmlFor="phone" className="text-sm sm:text-base font-medium">Telefone</Label>
                     <Input
                       id="phone"
                       {...register('phone')}
                       placeholder="(11) 99999-9999"
                       maxLength={15}
+                      className="h-11 text-base"
                       onInput={(e) => {
                         // Máscara de telefone
                         const target = e.target as HTMLInputElement;
@@ -351,18 +354,19 @@ const RegistroVisitante: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="birth_date">Data de Nascimento</Label>
+                    <Label htmlFor="birth_date" className="text-sm sm:text-base font-medium">Data de Nascimento</Label>
                     <Input
                       id="birth_date"
                       type="date"
                       {...register('birth_date')}
+                      className="h-11 text-base"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="gender">Gênero</Label>
+                    <Label htmlFor="gender" className="text-sm sm:text-base font-medium">Gênero</Label>
                     <Select onValueChange={(value) => setValue('gender', value as 'M' | 'F')}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-11">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
@@ -373,30 +377,32 @@ const RegistroVisitante: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="cpf">CPF</Label>
+                    <Label htmlFor="cpf" className="text-sm sm:text-base font-medium">CPF</Label>
                     <Input
                       id="cpf"
                       {...register('cpf')}
                       placeholder="000.000.000-00"
+                      className="h-11 text-base"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Endereço */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Endereço</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Endereço</h3>
                 
                 {/* CEP e Bairro na mesma linha */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="zipcode">CEP</Label>
+                    <Label htmlFor="zipcode" className="text-sm sm:text-base font-medium">CEP</Label>
                     <div className="relative">
                       <Input
                         id="zipcode"
                         {...register('zipcode')}
                         placeholder="00000-000"
                         maxLength={9}
+                        className="h-11 text-base"
                         onInput={(e) => {
                           // Máscara de CEP
                           const target = e.target as HTMLInputElement;
@@ -425,12 +431,12 @@ const RegistroVisitante: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="neighborhood">Bairro</Label>
+                    <Label htmlFor="neighborhood" className="text-sm sm:text-base font-medium">Bairro</Label>
                     <Input
                       id="neighborhood"
                       {...register('neighborhood')}
                       placeholder="Seu bairro"
-                      className={isFetchingCep ? 'bg-gray-50' : ''}
+                      className={`h-11 text-base ${isFetchingCep ? 'bg-gray-50' : ''}`}
                       readOnly={isFetchingCep}
                     />
                     {errors.neighborhood && (
@@ -441,25 +447,26 @@ const RegistroVisitante: React.FC = () => {
                 
                 {/* Campo de endereço */}
                 <div className="space-y-2">
-                  <Label htmlFor="address">Endereço</Label>
+                  <Label htmlFor="address" className="text-sm sm:text-base font-medium">Endereço</Label>
                   <Input
                     id="address"
                     {...register('address')}
                     placeholder="Rua, número, complemento"
+                    className="h-11 text-base"
                   />
                   {errors.address && (
                     <p className="text-sm text-red-600">{errors.address.message}</p>
                   )}
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="city">Cidade *</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="city" className="text-sm sm:text-base font-medium">Cidade *</Label>
                     <Input
                       id="city"
                       {...register('city')}
                       placeholder="Sua cidade"
-                      className={isFetchingCep ? 'bg-gray-50' : ''}
+                      className={`h-11 text-base ${isFetchingCep ? 'bg-gray-50' : ''}`}
                       readOnly={isFetchingCep}
                     />
                     {errors.city && (
@@ -468,13 +475,13 @@ const RegistroVisitante: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="state">Estado *</Label>
+                    <Label htmlFor="state" className="text-sm sm:text-base font-medium">Estado *</Label>
                     <Select 
                       onValueChange={(value) => setValue('state', value)}
                       disabled={isFetchingCep}
                       value={watch('state')}
                     >
-                      <SelectTrigger className={isFetchingCep ? 'bg-gray-50' : ''}>
+                      <SelectTrigger className={`h-11 ${isFetchingCep ? 'bg-gray-50' : ''}`}>
                         <SelectValue placeholder="UF" />
                       </SelectTrigger>
                       <SelectContent>
@@ -494,14 +501,14 @@ const RegistroVisitante: React.FC = () => {
               </div>
 
               {/* Informações eclesiásticas */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Informações Eclesiásticas</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Informações Eclesiásticas</h3>
                 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="marital_status">Estado Civil</Label>
+                    <Label htmlFor="marital_status" className="text-sm sm:text-base font-medium">Estado Civil</Label>
                     <Select onValueChange={(value) => setValue('marital_status', value as any)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-11">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
@@ -515,61 +522,66 @@ const RegistroVisitante: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ministry_interest">Interesse em Ministérios</Label>
+                    <Label htmlFor="ministry_interest" className="text-sm sm:text-base font-medium">Interesse em Ministérios</Label>
                     <Textarea
                       id="ministry_interest"
                       {...register('ministry_interest')}
                       placeholder="Quais ministérios ou atividades despertam seu interesse?"
                       rows={3}
+                      className="text-base resize-none"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="observations">Observações</Label>
+                    <Label htmlFor="observations" className="text-sm sm:text-base font-medium">Observações</Label>
                     <Textarea
                       id="observations"
                       {...register('observations')}
                       placeholder="Algo mais que gostaria de compartilhar conosco?"
                       rows={3}
+                      className="text-base resize-none"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Checkboxes */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Preferências</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Preferências</h3>
                 
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3 py-2">
                     <Checkbox
                       id="first_visit"
                       {...register('first_visit')}
                       defaultChecked={true}
+                      className="mt-0.5"
                     />
-                    <Label htmlFor="first_visit" className="text-sm font-medium">
+                    <Label htmlFor="first_visit" className="text-sm sm:text-base font-medium leading-relaxed cursor-pointer">
                       Esta é minha primeira visita a esta igreja
                     </Label>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-start space-x-3 py-2">
                     <Checkbox
                       id="wants_prayer"
                       {...register('wants_prayer')}
+                      className="mt-0.5"
                     />
-                    <Label htmlFor="wants_prayer" className="text-sm font-medium flex items-center space-x-1">
-                      <Heart className="h-4 w-4" />
+                    <Label htmlFor="wants_prayer" className="text-sm sm:text-base font-medium leading-relaxed cursor-pointer flex items-center space-x-2">
+                      <Heart className="h-4 w-4 flex-shrink-0" />
                       <span>Gostaria de receber oração</span>
                     </Label>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-start space-x-3 py-2">
                     <Checkbox
                       id="wants_growth_group"
                       {...register('wants_growth_group')}
+                      className="mt-0.5"
                     />
-                    <Label htmlFor="wants_growth_group" className="text-sm font-medium flex items-center space-x-1">
-                      <BookOpen className="h-4 w-4" />
+                    <Label htmlFor="wants_growth_group" className="text-sm sm:text-base font-medium leading-relaxed cursor-pointer flex items-center space-x-2">
+                      <BookOpen className="h-4 w-4 flex-shrink-0" />
                       <span>Tenho interesse em participar de um grupo de crescimento</span>
                     </Label>
                   </div>
@@ -577,10 +589,10 @@ const RegistroVisitante: React.FC = () => {
               </div>
 
               {/* Botão de submissão */}
-              <div className="pt-4">
+              <div className="pt-6">
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full h-12 text-base font-medium"
                   size="lg"
                   disabled={isSubmitting}
                 >
