@@ -20,9 +20,12 @@ import DetalhesMembro from "./pages/DetalhesMembro";
 import EditarMembro from "./pages/EditarMembro";
 import Visitantes from "./pages/Visitantes";
 import NovoVisitante from "./pages/NovoVisitante";
+import DetalhesVisitante from "./pages/DetalhesVisitante";
+import EditarVisitante from "./pages/EditarVisitante";
 import GerenciarQRCodes from "./pages/GerenciarQRCodes";
 import RegistroVisitante from "./pages/RegistroVisitante";
 import RegistroSucesso from "./pages/RegistroSucesso";
+import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import NotFound, { Pagamento } from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -140,6 +143,22 @@ const AppContent = () => {
         } 
       />
       <Route 
+        path="/visitantes/:id" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <DetalhesVisitante />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/visitantes/:id/editar" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <EditarVisitante />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
         path="/configuracoes/qr-codes" 
         element={
           <ProtectedRoute level="auth_complete">
@@ -161,6 +180,14 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="public">
             <RegistroSucesso />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/politica-privacidade" 
+        element={
+          <ProtectedRoute level="public">
+            <PoliticaPrivacidade />
           </ProtectedRoute>
         } 
       />
