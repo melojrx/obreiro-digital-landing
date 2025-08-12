@@ -80,9 +80,15 @@ const DetalhesVisitante: React.FC = () => {
       // Recarregar dados do visitante
       const updatedVisitor = await getVisitor(Number(id));
       setVisitor(updatedVisitor);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao converter visitante:', error);
-      toast.error('Erro ao converter visitante em membro');
+      
+      // Verificar se há mensagem de erro específica da API
+      const errorMessage = error?.response?.data?.error || 
+                          error?.response?.data?.message || 
+                          'Erro ao converter visitante em membro';
+      
+      toast.error(errorMessage);
     }
   };
 

@@ -284,38 +284,105 @@ class Visitor(BaseModel):
         )
     
     def convert_to_member(self, notes=""):
-        """Converte visitante em membro"""
+        """Converte visitante em membro com validações completas e tratamento de erros"""
         if self.converted_to_member:
             return self.converted_member
         
         from apps.members.models import Member
         from django.utils import timezone
+        from django.db import transaction, IntegrityError
+        from django.core.exceptions import ValidationError
+        import logging
         
-        # Criar membro baseado no visitante
-        member = Member.objects.create(
-            church=self.church,
-            branch=self.branch,
-            full_name=self.full_name,
-            email=self.email,
-            phone=self.phone,
-            birth_date=self.birth_date,
-            gender=self.gender,
-            cpf=self.cpf,
-            city=self.city,
-            state=self.state,
-            neighborhood=self.neighborhood,
-            address=self.address,
-            marital_status=self.marital_status,
-            origin='visitante',
-            converted_from_visitor=True
-        )
+        logger = logging.getLogger(__name__)
         
-        # Marcar conversão
-        self.converted_to_member = True
-        self.converted_member = member
-        self.conversion_date = timezone.now()
-        self.conversion_notes = notes
-        self.follow_up_status = 'converted'
-        self.save()
+        # VALIDAÇÕES OBRIGATÓRIAS
+        if not self.church:
+            raise ValueError("Visitante precisa ter igreja associada para ser convertido em membro")
         
-        return member
+        if not self.birth_date:
+            raise ValueError("Visitante precisa ter data de nascimento para ser convertido em membro")
+        
+        if not self.full_name or not self.full_name.strip():
+            raise ValueError("Visitante precisa ter nome completo para ser convertido em membro")
+        
+        # PREPARAR DADOS COM LIMPEZA ADEQUADA
+        member_data = {
+            'church': self.church,
+            'full_name': self.full_name.strip(),
+            'birth_date': self.birth_date,
+            'marital_status': self.marital_status or 'single',
+        }
+        
+        # CAMPOS OPCIONAIS COM TRATAMENTO ADEQUADO
+        # Converter strings vazias para None para campos com unique=True
+        optional_fields = {
+            'email': self.email,
+            'phone': self.phone,
+            'gender': self.gender,
+            'cpf': self.cpf,  # Campo único - será tratado especialmente
+            'city': self.city,
+            'state': self.state,
+            'neighborhood': self.neighborhood,
+            'address': self.address,
+        }
+        
+        for field, value in optional_fields.items():
+            if value and str(value).strip():
+                clean_value = str(value).strip()
+                # Para campo CPF, converter string vazia para None para evitar problema de unique constraint
+                if field == 'cpf' and clean_value == '':
+                    member_data[field] = None
+                else:
+                    member_data[field] = clean_value
+            else:
+                # Para campo CPF, sempre usar None em vez de string vazia
+                if field == 'cpf':
+                    member_data[field] = None
+        
+        # VALIDAÇÃO DE CPF DUPLICADO SE NÃO FOR VAZIO
+        if member_data.get('cpf'):
+            existing_member = Member.objects.filter(
+                cpf=member_data['cpf'],
+                church=self.church
+            ).exclude(pk=getattr(self.converted_member, 'pk', None)).first()
+            
+            if existing_member:
+                raise ValueError(f"Já existe um membro com o CPF {member_data['cpf']} nesta igreja: {existing_member.full_name}")
+        
+        # CONVERSÃO COM TRANSAÇÃO ATÔMICA
+        try:
+            with transaction.atomic():
+                logger.info(f"Iniciando conversão do visitante {self.id} ({self.full_name}) para membro")
+                
+                member = Member.objects.create(**member_data)
+                
+                # Marcar conversão
+                self.converted_to_member = True
+                self.converted_member = member
+                self.conversion_date = timezone.now()
+                self.conversion_notes = notes
+                self.follow_up_status = 'converted'
+                self.save()
+                
+                logger.info(f"Conversão concluída: Visitante {self.id} -> Membro {member.id}")
+                
+                return member
+                
+        except IntegrityError as e:
+            error_msg = str(e).lower()
+            if 'cpf' in error_msg and 'unique' in error_msg:
+                raise ValueError("CPF já cadastrado para outro membro")
+            elif 'unique' in error_msg:
+                raise ValueError("Dados duplicados encontrados. Verifique CPF e outras informações únicas")
+            else:
+                logger.error(f"IntegrityError ao converter visitante {self.id}: {e}")
+                raise ValueError(f"Erro de integridade nos dados: {str(e)}")
+        
+        except ValidationError as e:
+            logger.error(f"ValidationError ao converter visitante {self.id}: {e}")
+            raise ValueError(f"Dados inválidos: {str(e)}")
+        
+        except Exception as e:
+            logger.error(f"Erro inesperado ao converter visitante {self.id}: {e}", exc_info=True)
+            raise ValueError(f"Erro inesperado ao converter visitante: {str(e)}")

@@ -159,6 +159,26 @@ class VisitorViewSet(viewsets.ModelViewSet):
             return VisitorListSerializer
         return VisitorSerializer
     
+    def update(self, request, *args, **kwargs):
+        """Override do update para adicionar logging"""
+        print(f"[DEBUG] Update visitor - request.data: {request.data}")
+        print(f"[DEBUG] Update visitor - kwargs: {kwargs}")
+        
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        
+        if not serializer.is_valid():
+            print(f"[DEBUG] Validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        self.perform_update(serializer)
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+            
+        return Response(serializer.data)
+    
     def perform_create(self, serializer):
         """Associa igreja e filial automaticamente ao criar visitante"""
         user = self.request.user
@@ -277,25 +297,79 @@ class VisitorViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['patch'])
     def convert_to_member(self, request, pk=None):
-        """Converte visitante em membro"""
+        """Converte visitante em membro com validações melhoradas"""
+        import logging
+        from django.db import IntegrityError
+        from django.core.exceptions import ValidationError
+        
+        logger = logging.getLogger(__name__)
         visitor = self.get_object()
         
         if visitor.converted_to_member:
             return Response({
-                'error': 'Visitante já foi convertido em membro'
+                'error': 'Visitante já foi convertido em membro',
+                'converted_member_id': visitor.converted_member.id if visitor.converted_member else None
             }, status=status.HTTP_400_BAD_REQUEST)
         
         serializer = VisitorConversionSerializer(visitor, data=request.data, partial=True)
         
         if serializer.is_valid():
-            serializer.save()
-            return Response({
-                'success': True,
-                'message': f'Visitante {visitor.full_name} convertido em membro com sucesso',
-                'member_id': visitor.converted_member.id if visitor.converted_member else None
-            })
+            try:
+                logger.info(f"Tentando converter visitante {visitor.id} ({visitor.full_name}) em membro")
+                
+                updated_visitor = serializer.save()
+                visitor.refresh_from_db()
+                
+                return Response({
+                    'success': True,
+                    'message': f'Visitante {visitor.full_name} convertido em membro com sucesso',
+                    'member_id': visitor.converted_member.id if visitor.converted_member else None,
+                    'member_name': visitor.converted_member.full_name if visitor.converted_member else None
+                })
+                
+            except ValueError as e:
+                # Erros de validação de negócio
+                logger.warning(f"Erro de validação ao converter visitante {visitor.id}: {e}")
+                return Response({
+                    'error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+            except IntegrityError as e:
+                # Erros de integridade do banco
+                logger.error(f"IntegrityError ao converter visitante {visitor.id}: {e}")
+                error_msg = str(e).lower()
+                if 'cpf' in error_msg and 'unique' in error_msg:
+                    return Response({
+                        'error': 'CPF já cadastrado para outro membro. Verifique os dados do visitante.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif 'unique' in error_msg:
+                    return Response({
+                        'error': 'Dados duplicados encontrados. Verifique CPF e outras informações únicas.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({
+                        'error': 'Erro de integridade nos dados. Contate o suporte.'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    
+            except ValidationError as e:
+                # Erros de validação dos campos
+                logger.error(f"ValidationError ao converter visitante {visitor.id}: {e}")
+                return Response({
+                    'error': f'Dados inválidos: {str(e)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+            except Exception as e:
+                # Log completo do erro para debug
+                logger.error(f"Erro inesperado ao converter visitante {visitor.id}: {e}", exc_info=True)
+                return Response({
+                    'error': 'Erro interno do servidor. Contate o suporte técnico.',
+                    'details': 'Verifique se todos os dados obrigatórios estão preenchidos corretamente.'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'error': 'Dados inválidos fornecidos',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['patch'])
     def update_follow_up(self, request, pk=None):

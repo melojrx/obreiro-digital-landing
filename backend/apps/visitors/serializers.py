@@ -55,6 +55,26 @@ class VisitorSerializer(serializers.ModelSerializer):
         read_only=True
     )
     
+    # Campos opcionais que podem ser vazios
+    phone = serializers.CharField(required=False, allow_blank=True)
+    cpf = serializers.CharField(required=False, allow_blank=True)
+    zipcode = serializers.CharField(required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    neighborhood = serializers.CharField(required=False, allow_blank=True)
+    ministry_interest = serializers.CharField(required=False, allow_blank=True)
+    observations = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate(self, data):
+        """Validações customizadas para atualização"""
+        print(f"[DEBUG] VisitorSerializer - Data recebido: {data}")
+        print(f"[DEBUG] VisitorSerializer - Tipo dos dados: {type(data)}")
+        
+        # Se não há dados, retornar erro
+        if not data:
+            raise serializers.ValidationError("Nenhum dado foi enviado para atualização")
+        
+        return data
+    
     class Meta:
         model = Visitor
         fields = [
@@ -130,7 +150,7 @@ class VisitorFollowUpSerializer(serializers.ModelSerializer):
 
 class VisitorConversionSerializer(serializers.ModelSerializer):
     """
-    Serializer para conversão de visitante em membro
+    Serializer para conversão de visitante em membro com validações robustas
     """
     
     conversion_notes = serializers.CharField(required=False, allow_blank=True)
@@ -138,6 +158,38 @@ class VisitorConversionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Visitor
         fields = ['conversion_notes']
+        
+    def validate(self, attrs):
+        """Validações antes da conversão"""
+        instance = self.instance
+        
+        # Validações básicas
+        if not instance.church:
+            raise serializers.ValidationError("Visitante deve ter uma igreja associada para ser convertido")
+            
+        if not instance.birth_date:
+            raise serializers.ValidationError(
+                "Data de nascimento é obrigatória para conversão. "
+                "Por favor, edite o visitante e adicione a data de nascimento antes de converter."
+            )
+            
+        if not instance.full_name or not instance.full_name.strip():
+            raise serializers.ValidationError("Nome completo é obrigatório para conversão")
+        
+        # Verificar CPF duplicado se existir e não for vazio
+        if instance.cpf and instance.cpf.strip():
+            from apps.members.models import Member
+            existing = Member.objects.filter(
+                cpf=instance.cpf.strip(),
+                church=instance.church
+            ).first()
+            if existing:
+                raise serializers.ValidationError(
+                    f"CPF {instance.cpf} já está cadastrado para o membro: {existing.full_name}. "
+                    f"Remova ou corrija o CPF do visitante antes de converter."
+                )
+        
+        return attrs
         
     def update(self, instance, validated_data):
         """Converte visitante em membro"""
