@@ -93,6 +93,20 @@ export const API_ENDPOINTS = {
     export: '/members/export/',
   },
   
+  // Status de Membresia (Nova estrutura)
+  membershipStatus: {
+    list: '/membership-status/',
+    detail: (id: number) => `/membership-status/${id}/`,
+    create: '/membership-status/',
+    update: (id: number) => `/membership-status/${id}/`,
+    delete: (id: number) => `/membership-status/${id}/`,
+    
+    // Endpoints específicos para membros
+    memberHistory: (memberId: number) => `/members/${memberId}/status-history/`,
+    currentStatus: (memberId: number) => `/members/${memberId}/current-status/`,
+    changeStatus: (memberId: number) => `/members/${memberId}/change-status/`,
+  },
+  
   // Branches (Filiais)
   branches: {
     list: '/branches/',

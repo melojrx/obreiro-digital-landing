@@ -5,7 +5,6 @@ Sistema completo de membresia com dados eclesiásticos
 
 from django.db import models
 from django.conf import settings
-from django.conf import settings
 from django.utils import timezone
 from datetime import date, timedelta
 from apps.core.models import (
@@ -651,3 +650,90 @@ class MemberTransferLog(BaseModel):
     
     def __str__(self):
         return f"{self.member.full_name}: {self.from_church.short_name} → {self.to_church.short_name}"
+
+
+# =====================================
+# STATUS DE MEMBRESIA - NOVA ESTRUTURA
+# =====================================
+class MinisterialFunctionChoices(models.TextChoices):
+    """Choices padronizados para funções ministeriais"""
+    MEMBER = 'member', 'Membro'
+    DEACON = 'deacon', 'Diácono'
+    DEACONESS = 'deaconess', 'Diaconisa'
+    ELDER = 'elder', 'Presbítero'
+    EVANGELIST = 'evangelist', 'Evangelista'
+    PASTOR = 'pastor', 'Pastor'
+    FEMALE_PASTOR = 'female_pastor', 'Pastora'
+    MISSIONARY = 'missionary', 'Missionário'
+    FEMALE_MISSIONARY = 'female_missionary', 'Missionária'
+    LEADER = 'leader', 'Líder'
+    COOPERATOR = 'cooperator', 'Cooperador(a)'
+    AUXILIARY = 'auxiliary', 'Auxiliar'
+
+
+class MembershipStatus(models.Model):
+    """
+    Status de Membresia - Baseado na estrutura da tabela existente da branch dev/magnum
+    """
+    
+    # Relacionamento com membro (nome do campo da migration: id_member)
+    id_member = models.ForeignKey(
+        Member,
+        on_delete=models.PROTECT,
+        related_name='membership_statuses',
+        verbose_name="Membro"
+    )
+    
+    # Status ministerial
+    status = models.CharField(
+        max_length=20,
+        choices=MinisterialFunctionChoices.choices,
+        default=MinisterialFunctionChoices.MEMBER,
+        help_text="Função/cargo ministerial"
+    )
+    
+    # Flag ativo (nome do campo da migration: is_active)
+    is_active = models.BooleanField(
+        "Ativo/Inativo",
+        default=True,
+        help_text="Se o status está ativo/inativo"
+    )
+    
+    # Datas importantes
+    ordination_date = models.DateField(
+        "Data de Ordenação",
+        blank=True,
+        null=True,
+        help_text="Data de ordenação ministerial (se aplicável)"
+    )
+    
+    termination_date = models.DateField(
+        "Data de Término",
+        blank=True,
+        null=True,
+        help_text="Data de término do status (se aplicável)"
+    )
+    
+    # Observações
+    observation = models.TextField(
+        "Observação",
+        blank=True,
+        help_text="Observações sobre o status"
+    )
+    
+    # Timestamps (da migration original)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Status de Membresia"
+        verbose_name_plural = "Status de Membresia"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.id_member.full_name} - {self.get_status_display()}"
+    
+    @property
+    def member(self):
+        """Alias para compatibilidade"""
+        return self.id_member
