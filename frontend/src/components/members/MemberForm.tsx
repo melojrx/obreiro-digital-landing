@@ -37,7 +37,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { CreateMemberData, Member } from '@/services/membersService';
+import { CreateMemberData, Member, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoleHierarchy } from '@/hooks/useRoleHierarchy';
 
@@ -83,6 +83,10 @@ const memberSchema = z.object({
   system_role: z.string().optional(),
   user_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   user_password: z.string().optional(),
+  
+  // Novo campo para status ministerial inicial
+  initial_ministerial_status: z.string().optional(),
+  initial_status_reason: z.string().optional(),
 });
 
 type MemberFormData = z.infer<typeof memberSchema>;
@@ -142,6 +146,10 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       system_role: '',
       user_email: '',
       user_password: '',
+      
+      // Status ministerial inicial
+      initial_ministerial_status: '',
+      initial_status_reason: '',
     },
   });
 
@@ -190,6 +198,10 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         system_role: data.system_role,
         user_email: data.user_email,
         user_password: data.user_password,
+        
+        // Status ministerial inicial
+        initial_ministerial_status: data.initial_ministerial_status,
+        initial_status_reason: data.initial_status_reason,
       };
       
       console.log('📤 MemberForm - Dados finais enviados:', formData);
@@ -295,7 +307,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="personal" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
                 Dados Pessoais
@@ -307,6 +319,10 @@ export const MemberForm: React.FC<MemberFormProps> = ({
               <TabsTrigger value="church" className="flex items-center gap-2">
                 <Heart className="h-4 w-4" />
                 Dados Eclesiásticos
+              </TabsTrigger>
+              <TabsTrigger value="ministerial" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Status Ministerial
               </TabsTrigger>
               <TabsTrigger value="additional" className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4" />
@@ -946,6 +962,83 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                   </CardContent>
                 </Card>
               )}
+            </TabsContent>
+            
+            {/* Status Ministerial */}
+            <TabsContent value="ministerial" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Status Ministerial Inicial
+                  </CardTitle>
+                  <CardDescription>
+                    Define a função ministerial inicial do membro (pode ser alterada posteriormente)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="initial_ministerial_status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Função Ministerial Inicial</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a função" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {MINISTERIAL_FUNCTION_CHOICES.map((choice) => (
+                                <SelectItem key={choice.value} value={choice.value}>
+                                  {choice.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Se não selecionado, será definido como "Membro"
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="initial_status_reason"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Observações sobre o Status Inicial</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Adicione observações sobre a função ministerial inicial..."
+                            className="min-h-[100px]"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Informações sobre o motivo da atribuição desta função ministerial
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">ℹ️ Sobre o Status Ministerial</h4>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <p>• O status ministerial pode ser alterado posteriormente através do histórico</p>
+                      <p>• Cada mudança será registrada com data e motivo</p>
+                      <p>• Apenas usuários com permissão podem alterar status ministeriais</p>
+                      <p>• Funções como Pastor e Presbítero podem requerer ordenação</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Informações Adicionais */}

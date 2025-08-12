@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, Phone, Mail } from 'lucide-react';
+import { Eye, Edit, Trash2, Phone, Mail, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card';
 import { Member } from '@/services/membersService';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -147,9 +152,43 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                 </div>
               </TableCell>
               <TableCell>
-                <span className="text-sm text-gray-900 capitalize">
-                  {member.ministerial_function || 'Membro'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-900 capitalize">
+                    {member.current_ministerial_function?.status_display || member.ministerial_function || 'Membro'}
+                  </span>
+                  {member.membership_statuses && member.membership_statuses.length > 1 && (
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
+                          <Info className="h-3 w-3 text-gray-400" />
+                        </Button>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold">Histórico de Status Ministerial</h4>
+                          <div className="space-y-2">
+                            {member.membership_statuses.slice(0, 3).map((status, index) => (
+                              <div key={status.id} className="flex justify-between items-center text-xs">
+                                <span className={index === 0 ? 'font-medium' : 'text-gray-600'}>
+                                  {status.status_display}
+                                  {index === 0 && ' (Atual)'}
+                                </span>
+                                <span className="text-gray-500">
+                                  {new Date(status.effective_date).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                            ))}
+                            {member.membership_statuses.length > 3 && (
+                              <div className="text-xs text-gray-500 text-center">
+                                +{member.membership_statuses.length - 3} mais...
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 {getStatusBadge(member.membership_status)}

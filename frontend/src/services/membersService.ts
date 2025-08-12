@@ -1,5 +1,58 @@
 import { api, API_ENDPOINTS } from '@/config/api';
 
+// Novos tipos para MembershipStatus
+export interface MembershipStatus {
+  id: number;
+  member: number;
+  member_name: string;
+  status: string;
+  status_display: string;
+  effective_date: string;
+  end_date?: string;
+  reason?: string;
+  changed_by?: number;
+  changed_by_name?: string;
+  is_current: boolean;
+  migrated_from_member: boolean;
+  created_at: string;
+  updated_at: string;
+  // Campos de compatibilidade
+  ordination_date?: string;
+  termination_date?: string;
+  observation?: string;
+  is_active: boolean;
+}
+
+export interface MinisterialFunctionChoices {
+  MEMBER: 'member';
+  DEACON: 'deacon';
+  DEACONESS: 'deaconess';
+  ELDER: 'elder';
+  EVANGELIST: 'evangelist';
+  PASTOR: 'pastor';
+  FEMALE_PASTOR: 'female_pastor';
+  MISSIONARY: 'missionary';
+  FEMALE_MISSIONARY: 'female_missionary';
+  LEADER: 'leader';
+  COOPERATOR: 'cooperator';
+  AUXILIARY: 'auxiliary';
+}
+
+export const MINISTERIAL_FUNCTION_CHOICES: Array<{ value: string; label: string }> = [
+  { value: 'member', label: 'Membro' },
+  { value: 'deacon', label: 'Diácono' },
+  { value: 'deaconess', label: 'Diaconisa' },
+  { value: 'elder', label: 'Presbítero' },
+  { value: 'evangelist', label: 'Evangelista' },
+  { value: 'pastor', label: 'Pastor' },
+  { value: 'female_pastor', label: 'Pastora' },
+  { value: 'missionary', label: 'Missionário' },
+  { value: 'female_missionary', label: 'Missionária' },
+  { value: 'leader', label: 'Líder' },
+  { value: 'cooperator', label: 'Cooperador(a)' },
+  { value: 'auxiliary', label: 'Auxiliar' }
+];
+
 // Tipos para Membros
 export interface Member {
   id: number;
@@ -31,6 +84,17 @@ export interface Member {
   transfer_letter: boolean;
   ministerial_function: string;
   ordination_date?: string;
+  
+  // Novos campos da estrutura MembershipStatus
+  membership_statuses: MembershipStatus[];
+  current_ministerial_function?: {
+    status: string;
+    status_display: string;
+    effective_date?: string;
+    is_current: boolean;
+  };
+  current_status?: string;
+  current_status_display?: string;
   profession?: string;
   education_level?: string;
   photo?: string;
@@ -97,6 +161,18 @@ export interface MemberStatistics {
   }>;
 }
 
+export interface CreateMembershipStatusData {
+  member: number;
+  status: string;
+  effective_date?: string;
+  end_date?: string;
+  reason?: string;
+  // Campos de compatibilidade
+  ordination_date?: string;
+  termination_date?: string;
+  observation?: string;
+}
+
 export interface CreateMemberData {
   church: number;
   full_name: string;
@@ -132,6 +208,10 @@ export interface CreateMemberData {
   system_role?: string;
   user_email?: string;
   user_password?: string;
+  
+  // Novo campo para status ministerial inicial
+  initial_ministerial_status?: string;
+  initial_status_reason?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -287,5 +367,64 @@ export const membersService = {
   async exportMembers(): Promise<{ members: Member[]; total: number; exported_at: string }> {
     const response = await api.get(API_ENDPOINTS.members.export);
     return response.data;
+  },
+};
+
+// Serviço para MembershipStatus
+export const membershipStatusService = {
+  // Listar status de membresia
+  async getStatuses(params?: {
+    member?: number;
+    status?: string;
+    is_current?: boolean;
+    page?: number;
+  }): Promise<PaginatedResponse<MembershipStatus>> {
+    const response = await api.get(API_ENDPOINTS.membershipStatus.list, { params });
+    return response.data;
+  },
+
+  // Obter histórico de um membro específico
+  async getMemberHistory(memberId: number): Promise<MembershipStatus[]> {
+    const response = await api.get(API_ENDPOINTS.membershipStatus.memberHistory(memberId));
+    return response.data;
+  },
+
+  // Obter status atual de um membro
+  async getCurrentStatus(memberId: number): Promise<MembershipStatus | null> {
+    const response = await api.get(API_ENDPOINTS.membershipStatus.currentStatus(memberId));
+    return response.data;
+  },
+
+  // Criar novo status
+  async createStatus(data: CreateMembershipStatusData): Promise<MembershipStatus> {
+    console.log('🔍 membershipStatusService.createStatus - Dados enviados:', data);
+    const response = await api.post(API_ENDPOINTS.membershipStatus.create, data);
+    return response.data;
+  },
+
+  // Atualizar status existente
+  async updateStatus(id: number, data: Partial<CreateMembershipStatusData>): Promise<MembershipStatus> {
+    const response = await api.patch(API_ENDPOINTS.membershipStatus.update(id), data);
+    return response.data;
+  },
+
+  // Finalizar status atual e criar novo
+  async changeStatus(memberId: number, newStatus: string, reason?: string): Promise<MembershipStatus> {
+    console.log('🔍 membershipStatusService.changeStatus:', { memberId, newStatus, reason });
+    const response = await api.post(API_ENDPOINTS.membershipStatus.changeStatus(memberId), {
+      status: newStatus,
+      reason: reason || ''
+    });
+    return response.data;
+  },
+
+  // Deletar status
+  async deleteStatus(id: number): Promise<void> {
+    await api.delete(API_ENDPOINTS.membershipStatus.delete(id));
+  },
+
+  // Obter opções de funções ministeriais
+  getMinisterialFunctionChoices() {
+    return MINISTERIAL_FUNCTION_CHOICES;
   },
 }; 
