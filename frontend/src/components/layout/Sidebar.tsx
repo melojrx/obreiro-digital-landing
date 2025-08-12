@@ -95,12 +95,14 @@ const Sidebar: React.FC = () => {
               "flex items-center transition-all duration-300",
               isCollapsed ? "space-x-0" : "space-x-2"
             )}>
-              <Church className="h-8 w-8 text-white flex-shrink-0" />
               {!isCollapsed && (
-                <div className="transition-all duration-300 opacity-100">
-                  <h1 className="text-lg font-bold">Obreiro Virtual</h1>
-                  <p className="text-xs text-blue-200">Sistema de Gestão Eclesiástica</p>
-                </div>
+                <>
+                  <Church className="h-8 w-8 text-white flex-shrink-0" />
+                  <div className="transition-all duration-300 opacity-100">
+                    <h1 className="text-lg font-bold">Obreiro Virtual</h1>
+                    <p className="text-xs text-blue-200">Sistema de Gestão Eclesiástica</p>
+                  </div>
+                </>
               )}
             </div>
             
