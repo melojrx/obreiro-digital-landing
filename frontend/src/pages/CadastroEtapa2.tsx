@@ -29,7 +29,7 @@ const CadastroEtapa2 = () => {
   const [isCepLoading, setIsCepLoading] = useState(false);
   const [cepError, setCepError] = useState<string | null>(null);
 
-  const { completeProfile, getAvailableDenominations, isLoading, error, clearError } = useAuth();
+  const { savePartialProfile, getAvailableDenominations, isLoading, error, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { personalData, savedChurchData } = location.state || {};
@@ -242,7 +242,10 @@ const CadastroEtapa2 = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🔥 handleSubmit Etapa 2 iniciado');
+    
     if (!validateForm()) {
+      console.log('❌ Validação falhou');
       return;
     }
 
@@ -258,24 +261,83 @@ const CadastroEtapa2 = () => {
       role: 'pastor'
     };
 
-    // Passar ambos os conjuntos de dados para a Etapa 3
-    navigate('/cadastro/etapa-3', { 
-      state: { 
-        personalData: personalData, // Dados da Etapa 1
-        churchData: profileData,    // Dados da Etapa 2
-        rawFormData: formData
-      } 
-    });
+    try {
+      console.log('💾 Salvando dados parciais no backend...');
+      
+      // ✅ SALVAR dados no backend antes de navegar
+      await savePartialProfile(profileData);
+      
+      console.log('✅ Dados salvos com sucesso, navegando para Etapa 3');
+      
+      // Navegar apenas após sucesso no salvamento
+      navigate('/cadastro/etapa-3', { 
+        state: { 
+          personalData: personalData, // Dados da Etapa 1
+          churchData: profileData,    // Dados da Etapa 2
+          rawFormData: formData,
+          saved: true // Flag indicando que foi salvo
+        } 
+      });
+      
+    } catch (err) {
+      console.error('❌ Erro ao salvar dados parciais:', err);
+      // Erro já tratado pelo hook useAuth
+    }
   };
 
-  const handleContinueLater = () => {
-    // Por agora, apenas navegar para o dashboard
-    // Futuramente, salvar progresso e permitir continuar depois
+  const handleContinueLater = async () => {
+    // Salvar progresso antes de sair
+    if (Object.values(formData).some(value => value.trim() !== '')) {
+      const profileData = {
+        denomination_id: formData.denomination_id ? parseInt(formData.denomination_id) : undefined,
+        church_name: formData.church_name || undefined,
+        church_cnpj: formData.church_cnpj || undefined,
+        church_email: formData.church_email || undefined,
+        church_phone: formData.church_phone || undefined,
+        branch_name: formData.branch_name || undefined,
+        church_address: formData.church_address || undefined,
+        pastor_name: formData.pastor_name || undefined,
+      };
+      
+      try {
+        await savePartialProfile(profileData);
+        console.log('💾 Progresso salvo para continuar mais tarde');
+      } catch (err) {
+        console.warn('⚠️ Não foi possível salvar o progresso:', err);
+      }
+    }
+    
     navigate('/dashboard');
   };
 
-  const handleBack = () => {
-    navigate('/cadastro');
+  const handleBack = async () => {
+    // Salvar progresso atual antes de voltar
+    if (Object.values(formData).some(value => value.trim() !== '')) {
+      const profileData = {
+        denomination_id: formData.denomination_id ? parseInt(formData.denomination_id) : undefined,
+        church_name: formData.church_name || undefined,
+        church_cnpj: formData.church_cnpj || undefined,
+        church_email: formData.church_email || undefined,
+        church_phone: formData.church_phone || undefined,
+        branch_name: formData.branch_name || undefined,
+        church_address: formData.church_address || undefined,
+        pastor_name: formData.pastor_name || undefined,
+      };
+      
+      try {
+        await savePartialProfile(profileData);
+        console.log('💾 Progresso salvo antes de voltar');
+      } catch (err) {
+        console.warn('⚠️ Não foi possível salvar o progresso:', err);
+      }
+    }
+    
+    navigate('/cadastro', {
+      state: { 
+        prefill: personalData,
+        savedChurchData: formData // Passar dados atuais
+      }
+    });
   };
 
   // Se cadastro foi bem-sucedido, mostrar mensagem
@@ -459,7 +521,7 @@ const CadastroEtapa2 = () => {
               {/* E-mail da Igreja */}
               <div>
                 <label htmlFor="church_email" className="block text-sm font-semibold text-slate-700 mb-2">
-                  E-mail da Igreja
+                  E-mail da Igreja*
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -487,7 +549,7 @@ const CadastroEtapa2 = () => {
               {/* Telefone da Igreja */}
               <div>
                 <label htmlFor="church_phone" className="block text-sm font-semibold text-slate-700 mb-2">
-                  Telefone da Igreja
+                  Telefone da Igreja*
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -684,7 +746,7 @@ const CadastroEtapa2 = () => {
             {/* Pastor Responsável */}
             <div>
               <label htmlFor="pastor_name" className="block text-sm font-semibold text-slate-700 mb-2">
-                Pastor Responsável
+                Pastor Responsável*
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -717,7 +779,14 @@ const CadastroEtapa2 = () => {
                 disabled={isLoading}
                 className="flex-1 py-3 px-4 border border-gray-300 text-sm font-semibold rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                Voltar
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2 inline-block"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  'Voltar'
+                )}
               </button>
               
               <button
@@ -726,7 +795,14 @@ const CadastroEtapa2 = () => {
                 disabled={isLoading}
                 className="flex-1 py-3 px-4 border border-slate-300 text-sm font-semibold rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                Continuar mais tarde
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400 mr-2 inline-block"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  'Continuar mais tarde'
+                )}
               </button>
               
               <button
@@ -737,7 +813,7 @@ const CadastroEtapa2 = () => {
                 {isLoading ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2 inline-block"></div>
-                    Processando...
+                    Salvando e continuando...
                   </>
                 ) : (
                   'Continuar'

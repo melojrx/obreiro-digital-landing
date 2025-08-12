@@ -180,7 +180,21 @@ export const authService = {
   },
 
   /**
-   * Completar perfil do usuário (Etapa 2)
+   * Salvar dados parciais da igreja (Etapa 2)
+   */
+  async savePartialProfile(data: Partial<CompleteProfileData>): Promise<User> {
+    try {
+      // Salvar dados intermediários para permitir navegação segura
+      const response = await api.patch<User>('/users/save_partial_profile/', data);
+      localStorage.setItem('user', JSON.stringify(response.data));
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Completar perfil do usuário (Etapa 3 - Final)
    */
   async completeProfile(data: CompleteProfileData): Promise<User> {
     try {
