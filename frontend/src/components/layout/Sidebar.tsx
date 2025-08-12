@@ -57,7 +57,7 @@ const Sidebar: React.FC = () => {
       href: '#',
       children: [
         { title: 'Devocionais', icon: Heart, href: '/devocionais' },
-        { title: 'Mensagens', icon: MessageSquare, href: '/mensagens', badge: 5 },
+        { title: 'Mensagens', icon: MessageSquare, href: '/mensagens' },
       ]
     },
     {
