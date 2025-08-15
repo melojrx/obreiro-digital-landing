@@ -54,6 +54,9 @@ urlpatterns = [
     # Visitantes (inclui endpoints públicos e administrativos)
     path('visitors/', include('apps.visitors.urls')),
     
+    # Igrejas (endpoints específicos de denominação)
+    path('', include('apps.churches.urls')),
+    
     # ViewSets registrados no router
     path('', include(router.urls)),
     

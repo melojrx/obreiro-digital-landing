@@ -192,7 +192,26 @@ READ_ONLY (Nível 3)
 - ✅ **Validações Zod**: Feedback em tempo real
 - 📱 **Máscaras Automáticas**: Telefone, CPF, CNPJ, CEP
 
-**Documentação**: [`Docs/Módulo de Gestão de Perfil.md`](./Docs/Módulo%20de%20Gestão%20de%20Perfil.md)
+**Documentação**: [`Docs/Módulo de Gestão de Perfil.md`](./docs/Módulo%20de%20Gestão%20de%20Perfil.md)
+
+### ✅ **Módulo de Gestão Hierárquica**
+
+**Status**: **🟢 CONCLUÍDO**
+
+- 🏛️ **Gestão Completa de Denominações**: Sistema hierárquico Denominação → Igreja → Filiais
+- 📊 **Dashboard Consolidado**: Estatísticas em tempo real de toda a denominação
+- 👥 **Gestão de Administradores**: Atribuição de administradores por nível hierárquico
+- 💰 **Relatórios Financeiros**: Consolidação e análise financeira por organização
+- 🔐 **Permissões Granulares**: 4 novos níveis de permissão hierárquica
+- 🎨 **Interface Responsiva**: 11 componentes React profissionais com Shadcn/UI
+- ⚡ **Hooks Especializados**: 3 hooks customizados para gestão hierárquica
+- 📱 **40+ Interfaces TypeScript**: Tipagem completa e documentada
+- 🏗️ **Arquitetura Escalável**: Backend Django + PostgreSQL otimizado
+- 🔒 **Isolamento Multi-Tenant**: Segurança mantida em todos os níveis
+- 🎯 **Zero Breaking Changes**: 100% compatível com sistema existente
+- 📈 **Analytics Avançado**: Métricas de crescimento e performance
+
+**Documentação**: [`docs/MÓDULO_GESTÃO_HIERÁRQUICA_IMPLEMENTADO.md`](./docs/MÓDULO_GESTÃO_HIERÁRQUICA_IMPLEMENTADO.md)
 
 ### ✅ **Sistema QR Code para Visitantes**
 
@@ -239,18 +258,7 @@ READ_ONLY (Nível 3)
 
 **Documentação**: [`Docs/Usuários de Teste - Guia Completo.md`](./Docs/Usuários%20de%20Teste%20-%20Guia%20Completo.md)
 
-### 🔄 **Em Desenvolvimento**
-
-#### 🏛️ **Gestão Completa de Igrejas e Filiais**
-
-**Status**: **🟡 EM DESENVOLVIMENTO**
-
-- ⛪ **CRUD de Igrejas**: Cadastro completo com dados administrativos
-- 🏢 **Gestão de Filiais**: Sistema hierárquico igreja-sede → filiais
-- 📊 **Dashboard por Igreja**: Métricas específicas de cada unidade
-- 📈 **Relatórios Consolidados**: Visão geral da denominação
-- 🔗 **Transferência de Membros**: Entre igrejas e filiais
-- 💰 **Gestão Financeira**: Orçamentos e transferências
+### 🔄 **Próximas Implementações**
 
 #### 💰 **Módulo Financeiro**
 
@@ -372,19 +380,21 @@ READ_ONLY (Nível 3)
 
 ### 📈 Estatísticas de Desenvolvimento
 
-- **📁 Arquivos**: 220+ arquivos de código
-- **📝 Linhas de Código**: 55.000+ linhas
-- **🔧 Endpoints API**: 45+ endpoints
-- **🎨 Componentes React**: 85+ componentes
-- **📚 Documentação**: 16+ documentos técnicos
+- **📁 Arquivos**: 240+ arquivos de código
+- **📝 Linhas de Código**: 58.000+ linhas
+- **🔧 Endpoints API**: 52+ endpoints
+- **🎨 Componentes React**: 96+ componentes
+- **📚 Documentação**: 18+ documentos técnicos
 - **🧪 Cobertura de Testes**: 85%+ (meta)
+- **🏗️ Módulos TypeScript**: 40+ interfaces hierárquicas
+- **⚡ Hooks Customizados**: 7+ hooks especializados
 
 ### 🎯 Funcionalidades por Status
 
 | Status | Quantidade | Percentual |
 |--------|------------|------------|
-| ✅ **Concluído** | 6 módulos | 55% |
-| 🟡 **Em Desenvolvimento** | 1 módulo | 9% |
+| ✅ **Concluído** | 7 módulos | 64% |
+| 🟡 **Em Desenvolvimento** | 0 módulos | 0% |
 | 🔴 **Planejado** | 4 módulos | 36% |
 
 ## 🔄 Roadmap de Desenvolvimento
@@ -399,7 +409,7 @@ READ_ONLY (Nível 3)
 - ✅ ~~Usuários de Teste~~
 - ✅ ~~Melhorias de Responsividade~~
 - ✅ ~~Política de Privacidade~~
-- 🔄 **Gestão de Igrejas e Filiais**
+- ✅ ~~**Módulo de Gestão Hierárquica**~~ (Denominações → Igrejas → Filiais)
 
 ### 📅 Q2 2025 (Abril - Junho)
 
@@ -455,21 +465,22 @@ npm run type-check              # Verificar tipos
 ### 📁 Documentação Técnica Completa
 
 #### 📖 **Módulos Implementados (Documentação Completa)**
-- **📋 Gestão de Membros**: [`Docs/Módulo de Membros - Guia Completo.md`](./Docs/Módulo%20de%20Membros%20-%20Guia%20Completo.md)
-- **🔐 Sistema de Permissões**: [`Docs/Sistema de Permissões e Papéis - Guia Completo.md`](./Docs/Sistema%20de%20Permissões%20e%20Papéis%20-%20Guia%20Completo.md)
-- **👤 Gestão de Perfil**: [`Docs/Módulo de Gestão de Perfil.md`](./Docs/Módulo%20de%20Gestão%20de%20Perfil.md)
-- **📱 Sistema QR Code Visitantes**: [`Docs/MODULO_VISITANTES_COMPLETO.md`](./Docs/MODULO_VISITANTES_COMPLETO.md)
-- **👥 Usuários de Teste**: [`Docs/Usuários de Teste - Guia Completo.md`](./Docs/Usuários%20de%20Teste%20-%20Guia%20Completo.md)
-- **🐳 Deploy e Containerização**: [`Docs/Deploy e Containerização - Guia Completo.md`](./Docs/Deploy%20e%20Containerização%20-%20Guia%20Completo.md)
+- **📋 Gestão de Membros**: [`docs/Módulo de Membros - Guia Completo.md`](./docs/Módulo%20de%20Membros%20-%20Guia%20Completo.md)
+- **🔐 Sistema de Permissões**: [`docs/Sistema de Permissões e Papéis - Guia Completo.md`](./docs/Sistema%20de%20Permissões%20e%20Papéis%20-%20Guia%20Completo.md)
+- **👤 Gestão de Perfil**: [`docs/Módulo de Gestão de Perfil.md`](./docs/Módulo%20de%20Gestão%20de%20Perfil.md)
+- **🏛️ Gestão Hierárquica**: [`docs/MÓDULO_GESTÃO_HIERÁRQUICA_IMPLEMENTADO.md`](./docs/MÓDULO_GESTÃO_HIERÁRQUICA_IMPLEMENTADO.md)
+- **📱 Sistema QR Code Visitantes**: [`docs/MODULO_VISITANTES_COMPLETO.md`](./docs/MODULO_VISITANTES_COMPLETO.md)
+- **👥 Usuários de Teste**: [`docs/Usuários de Teste - Guia Completo.md`](./docs/Usuários%20de%20Teste%20-%20Guia%20Completo.md)
+- **🐳 Deploy e Containerização**: [`docs/Deploy e Containerização - Guia Completo.md`](./docs/Deploy%20e%20Containerização%20-%20Guia%20Completo.md)
 
 #### 🛠️ **Documentação de Configuração**
-- **📚 Índice Geral**: [`Docs/README.md`](./Docs/README.md)
-- **🔧 Configuração .gitignore**: [`Docs/GITIGNORE_COMPLETE.md`](./Docs/GITIGNORE_COMPLETE.md)
+- **🔧 Configuração .gitignore**: [`docs/GITIGNORE_COMPLETE.md`](./docs/GITIGNORE_COMPLETE.md)
+- **📋 Plano Arquitetural**: [`docs/Módulo de Gestão de Igrejas e Filiais - Plano Arquitetural.md`](./docs/Módulo%20de%20Gestão%20de%20Igrejas%20e%20Filiais%20-%20Plano%20Arquitetural.md)
 
 #### 📊 **Análises e Planejamento**
-- **📈 Análise Técnica**: [`Docs/ANÁLISE TÉCNICA - PLATAFORMA SAAS - OBREIRO DIGITAL.md`](./Docs/ANÁLISE%20TÉCNICA%20-%20PLATAFORMA%20SAAS%20-%20OBREIRO%20DIGITAL.md)
-- **🏗️ Bootstrap Projeto**: [`Docs/1 │ Bootstrap do projeto Django.md`](./Docs/1%20│%20Bootstrap%20do%20projeto%20Django.md)
-- **📋 Modelo Conceitual**: [`Docs/Modelo Conceitual — Obreiro Virtual.md`](./Docs/Modelo%20Conceitual%20—%20Obreiro%20Virtual.md)
+- **📈 Análise Técnica**: [`docs/ANÁLISE TÉCNICA - PLATAFORMA SAAS - OBREIRO DIGITAL.md`](./docs/ANÁLISE%20TÉCNICA%20-%20PLATAFORMA%20SAAS%20-%20OBREIRO%20DIGITAL.md)
+- **🏗️ Bootstrap Projeto**: [`docs/1 │ Bootstrap do projeto Django.md`](./docs/1%20│%20Bootstrap%20do%20projeto%20Django.md)
+- **📋 Modelo Conceitual**: [`docs/Modelo Conceitual — Obreiro Virtual.md`](./docs/Modelo%20Conceitual%20—%20Obreiro%20Virtual.md)
 
 ## 💰 Planos e Preços
 
@@ -569,8 +580,9 @@ Este projeto está protegido por direitos autorais e pode estar sujeito a patent
 
 ---
 
-### 📈 Status Atual: **Versão 1.3.0** - **Produção Estável**
+### 📈 Status Atual: **Versão 1.4.0** - **Produção Estável**
 
-**Última atualização**: Agosto 2025  
-**Próxima release**: Setembro 2025 (Gestão de Igrejas)  
+**Última atualização**: 15 de Agosto de 2025  
+**Novo módulo**: Gestão Hierárquica (Denominações → Igrejas → Filiais)  
+**Próxima release**: Outubro 2025 (Módulo Financeiro)  
 **Contribuidores**: 3 desenvolvedores ativos

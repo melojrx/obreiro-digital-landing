@@ -73,10 +73,24 @@ export const API_ENDPOINTS = {
     detail: (id: number) => `/churches/${id}/`,
   },
   
-  // Denominações
+  // Denominações e Hierarquia
   denominations: {
     list: '/denominations/',
     detail: (id: number) => `/denominations/${id}/`,
+    create: '/denominations/',
+    update: (id: number) => `/denominations/${id}/`,
+    delete: (id: number) => `/denominations/${id}/`,
+    stats: (id: number) => `/denominations/${id}/stats/`,
+    churches: (id: number) => `/denominations/${id}/churches/`,
+    dashboard: (id: number) => `/denominations/${id}/dashboard/`,
+  },
+  
+  // Hierarquia
+  hierarchy: {
+    tree: '/hierarchy/tree/',
+    denominationTree: (id: number) => `/hierarchy/denominations/${id}/tree/`,
+    churchTree: (id: number) => `/hierarchy/churches/${id}/tree/`,
+    navigation: '/hierarchy/navigation/',
   },
   
   // Membros

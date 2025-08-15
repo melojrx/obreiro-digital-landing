@@ -207,4 +207,92 @@ class IsChurchAdminOrCanManageMembers(BasePermission):
         
         # Se não for admin, verifica se pode gerenciar membros
         manage_members_permission = CanManageMembers()
-        return manage_members_permission.has_permission(request, view) 
+        return manage_members_permission.has_permission(request, view)
+
+
+# Permissões específicas para gestão de denominação
+class CanManageDenomination(BasePermission):
+    """
+    Verifica se o usuário pode gerenciar denominação
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        return request.user.church_users.filter(
+            can_manage_denomination=True,
+            is_active=True
+        ).exists()
+
+class CanCreateChurches(BasePermission):
+    """
+    Verifica se o usuário pode criar igrejas
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        return request.user.church_users.filter(
+            can_create_churches=True,
+            is_active=True
+        ).exists()
+
+class CanManageChurchAdmins(BasePermission):
+    """
+    Verifica se o usuário pode gerenciar administradores de igreja
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        return request.user.church_users.filter(
+            can_manage_church_admins=True,
+            is_active=True
+        ).exists()
+
+class CanViewFinancialReports(BasePermission):
+    """
+    Verifica se o usuário pode visualizar relatórios financeiros
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        return request.user.church_users.filter(
+            can_view_financial_reports=True,
+            is_active=True
+        ).exists()
+
+class IsHierarchicallyAuthorized(BasePermission):
+    """
+    Verifica se o usuário está autorizado hierarquicamente para acessar um recurso.
+    Usado para validar acesso a igrejas/denominações baseado na hierarquia.
+    """
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # Determinar o contexto do objeto (igreja, denominação, etc.)
+        church = None
+        denomination = None
+        
+        if hasattr(obj, 'church'):
+            church = obj.church
+        elif hasattr(obj, 'denomination'):
+            denomination = obj.denomination
+        elif isinstance(obj, __import__('apps.churches.models', fromlist=['Church']).Church):
+            church = obj
+        elif isinstance(obj, __import__('apps.denominations.models', fromlist=['Denomination']).Denomination):
+            denomination = obj
+        
+        # Verificar se o usuário pode gerenciar baseado na hierarquia
+        for church_user in request.user.church_users.filter(is_active=True):
+            # Verificar acesso à igreja específica
+            if church and church_user.can_manage_church(church):
+                return True
+                
+            # Verificar acesso à denominação específica
+            if denomination and church_user.can_access_denomination_dashboard(denomination):
+                return True
+        
+        return False

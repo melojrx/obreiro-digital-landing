@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider } from "./hooks/useAuth";
 import { SidebarProvider } from "./hooks/useSidebar";
@@ -28,6 +29,33 @@ import RegistroSucesso from "./pages/RegistroSucesso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import NotFound, { Pagamento } from "./pages/NotFound";
 
+// Lazy loading para componentes hierárquicos
+const DenominationDashboardPage = lazy(() => 
+  import("./pages/DenominationDashboardPage").then(module => ({
+    default: module.DenominationDashboardPage
+  }))
+);
+
+const ChurchManagementPage = lazy(() => 
+  import("./pages/ChurchManagementPage")
+);
+
+const CreateChurchPage = lazy(() => 
+  import("./pages/CreateChurchPage")
+);
+
+const EditChurchPage = lazy(() => 
+  import("./pages/EditChurchPage")
+);
+
+const ChurchDetailsPage = lazy(() => 
+  import("./pages/ChurchDetailsPage")
+);
+
+const HierarchyViewPage = lazy(() => 
+  import("./pages/HierarchyViewPage")
+);
+
 const queryClient = new QueryClient();
 
 const AppContent = () => {
@@ -35,7 +63,15 @@ const AppContent = () => {
   useInactivityLogout();
 
   return (
-    <Routes>
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    }>
+      <Routes>
       <Route path="/" element={<Index />} />
       <Route 
         path="/login" 
@@ -191,9 +227,71 @@ const AppContent = () => {
           </ProtectedRoute>
         } 
       />
+      
+      {/* Rotas do módulo hierárquico */}
+      <Route 
+        path="/denominacao/dashboard" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <DenominationDashboardPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/denominacao/:denominationId/dashboard" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <DenominationDashboardPage />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Rotas específicas de gestão hierárquica */}
+      <Route 
+        path="/denominacao/churches" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <ChurchManagementPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/denominacao/churches/create" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <CreateChurchPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/denominacao/churches/:id" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <ChurchDetailsPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/denominacao/churches/:id/edit" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <EditChurchPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/denominacao/hierarchy" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <HierarchyViewPage />
+          </ProtectedRoute>
+        } 
+      />
+      
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 };
 

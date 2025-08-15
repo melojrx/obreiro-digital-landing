@@ -362,6 +362,31 @@ class ChurchUser(BaseModel):
         help_text="Se pode gerenciar filiais"
     )
     
+    # Permissões específicas de denominação
+    can_manage_denomination = models.BooleanField(
+        "Gerenciar Denominação",
+        default=False,
+        help_text="Se pode gerenciar configurações da denominação"
+    )
+    
+    can_create_churches = models.BooleanField(
+        "Criar Igrejas",
+        default=False,
+        help_text="Se pode criar novas igrejas na denominação"
+    )
+    
+    can_manage_church_admins = models.BooleanField(
+        "Gerenciar Admins de Igreja",
+        default=False,
+        help_text="Se pode definir administradores de igrejas"
+    )
+    
+    can_view_financial_reports = models.BooleanField(
+        "Ver Relatórios Financeiros",
+        default=False,
+        help_text="Se pode ver relatórios financeiros consolidados"
+    )
+    
     # Filiais específicas que pode gerenciar
     managed_branches = models.ManyToManyField(
         'branches.Branch',
@@ -433,16 +458,37 @@ class ChurchUser(BaseModel):
         self.can_manage_activities = False
         self.can_view_reports = False
         self.can_manage_branches = False
+        self.can_manage_denomination = False
+        self.can_create_churches = False
+        self.can_manage_church_admins = False
+        self.can_view_financial_reports = False
         
         # Set permissions based on role
-        if self.role == RoleChoices.SUPER_ADMIN or self.role == RoleChoices.DENOMINATION_ADMIN:
-            # Super admin e Admin de Denominação têm todas as permissões
+        if self.role == RoleChoices.SUPER_ADMIN:
+            # Super admin têm todas as permissões
             self.can_access_admin = True
             self.can_manage_members = True
             self.can_manage_visitors = True
             self.can_manage_activities = True
             self.can_view_reports = True
             self.can_manage_branches = True
+            self.can_manage_denomination = True
+            self.can_create_churches = True
+            self.can_manage_church_admins = True
+            self.can_view_financial_reports = True
+            
+        elif self.role == RoleChoices.DENOMINATION_ADMIN:
+            # Admin de Denominação tem permissões específicas de denominação
+            self.can_access_admin = True
+            self.can_manage_members = True
+            self.can_manage_visitors = True
+            self.can_manage_activities = True
+            self.can_view_reports = True
+            self.can_manage_branches = True
+            self.can_manage_denomination = True
+            self.can_create_churches = True
+            self.can_manage_church_admins = True
+            self.can_view_financial_reports = True
             
         elif self.role == RoleChoices.CHURCH_ADMIN:
             # Admin da igreja tem quase todas as permissões
@@ -558,3 +604,110 @@ class ChurchUser(BaseModel):
             RoleChoices.MEMBER: '#6c757d',  # Cinza
         }
         return colors.get(self.role, '#6c757d')
+    
+    # Métodos específicos para gestão hierárquica de denominação
+    def can_manage_church(self, church):
+        """
+        Verifica se pode gerenciar uma igreja específica.
+        
+        Args:
+            church: Instância de Church
+            
+        Returns:
+            bool: True se pode gerenciar a igreja
+        """
+        if not self.is_active:
+            return False
+            
+        # Super Admin pode gerenciar qualquer igreja
+        if self.role == RoleChoices.SUPER_ADMIN:
+            return True
+            
+        # Denomination Admin pode gerenciar igrejas da sua denominação
+        if self.role == RoleChoices.DENOMINATION_ADMIN:
+            return (
+                self.church.denomination and 
+                church.denomination and
+                self.church.denomination == church.denomination
+            )
+            
+        # Church Admin só pode gerenciar sua própria igreja
+        if self.role == RoleChoices.CHURCH_ADMIN:
+            return self.church == church
+            
+        return False
+    
+    def can_access_denomination_dashboard(self, denomination):
+        """
+        Verifica se pode acessar dashboard da denominação.
+        
+        Args:
+            denomination: Instância de Denomination
+            
+        Returns:
+            bool: True se pode acessar
+        """
+        if not self.is_active or not self.can_manage_denomination:
+            return False
+            
+        # Super Admin pode acessar qualquer denominação
+        if self.role == RoleChoices.SUPER_ADMIN:
+            return True
+            
+        # Denomination Admin só pode acessar sua denominação
+        if self.role == RoleChoices.DENOMINATION_ADMIN:
+            return (
+                self.church.denomination and
+                self.church.denomination == denomination
+            )
+            
+        return False
+    
+    def get_manageable_churches(self):
+        """
+        Retorna as igrejas que o usuário pode gerenciar.
+        
+        Returns:
+            QuerySet: Igrejas que pode gerenciar
+        """
+        from apps.churches.models import Church
+        
+        if not self.is_active:
+            return Church.objects.none()
+            
+        # Super Admin pode gerenciar todas as igrejas
+        if self.role == RoleChoices.SUPER_ADMIN:
+            return Church.objects.filter(is_active=True)
+            
+        # Denomination Admin pode gerenciar igrejas da sua denominação
+        if self.role == RoleChoices.DENOMINATION_ADMIN and self.church.denomination:
+            return Church.objects.filter(
+                denomination=self.church.denomination,
+                is_active=True
+            )
+            
+        # Church Admin só pode gerenciar sua própria igreja
+        if self.role == RoleChoices.CHURCH_ADMIN:
+            return Church.objects.filter(id=self.church.id, is_active=True)
+            
+        return Church.objects.none()
+    
+    @property
+    def is_denomination_admin(self):
+        """Verifica se é administrador de denominação"""
+        return self.role in [RoleChoices.SUPER_ADMIN, RoleChoices.DENOMINATION_ADMIN]
+    
+    @property
+    def role_hierarchy_level(self):
+        """Retorna o nível hierárquico do papel (0 = mais alto)"""
+        hierarchy = {
+            RoleChoices.SUPER_ADMIN: 0,
+            RoleChoices.DENOMINATION_ADMIN: 1,
+            RoleChoices.CHURCH_ADMIN: 2,
+            RoleChoices.PASTOR: 3,
+            RoleChoices.SECRETARY: 4,
+            RoleChoices.LEADER: 5,
+            RoleChoices.MEMBER: 6,
+            RoleChoices.READ_ONLY: 7,
+        }
+        return hierarchy.get(self.role, 10)

@@ -14,10 +14,13 @@ import {
   Heart,
   BarChart3,
   Menu,
-  ChevronLeft
+  ChevronLeft,
+  Building2,
+  TreePine
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/hooks/useSidebar';
+import { usePermissions } from '@/hooks/usePermissions';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -38,6 +41,7 @@ const Sidebar: React.FC = () => {
   const location = useLocation();
   const { user, userChurch, logout } = useAuth();
   const { isCollapsed, toggleSidebar } = useSidebar();
+  const permissions = usePermissions();
 
   const navigation: NavItem[] = [
     {
@@ -51,6 +55,18 @@ const Sidebar: React.FC = () => {
         { title: 'Eventos', icon: Calendar, href: '/eventos' },
       ]
     },
+    // Seção hierárquica - APENAS para Denomination Admins (clientes premium)
+    // SUPER_ADMIN é apenas para desenvolvedores da plataforma
+    ...(permissions.canManageDenomination || permissions.canCreateChurches ? [{
+      title: 'GESTÃO HIERÁRQUICA',
+      icon: TreePine,
+      href: '#',
+      children: [
+        { title: 'Dashboard Denominação', icon: Building2, href: '/denominacao/dashboard' },
+        { title: 'Gerenciar Igrejas', icon: Church, href: '/denominacao/churches' },
+        { title: 'Visão Hierárquica', icon: TreePine, href: '/denominacao/hierarchy' },
+      ]
+    }] : []),
     {
       title: 'COMUNICAÇÃO',
       icon: MessageSquare,

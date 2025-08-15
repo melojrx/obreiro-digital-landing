@@ -504,4 +504,25 @@ class UserProfileCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # O usuário deve ser passado no contexto
         user = self.context['user']
-        return UserProfile.objects.create(user=user, **validated_data) 
+        return UserProfile.objects.create(user=user, **validated_data)
+
+
+class ChurchUserSummarySerializer(serializers.ModelSerializer):
+    """Serializer resumido para ChurchUser em listagens"""
+    
+    user_name = serializers.CharField(source='user.full_name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    church_name = serializers.CharField(source='church.short_name', read_only=True)
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    role_color = serializers.CharField(source='get_role_color', read_only=True)
+    is_denomination_admin = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = ChurchUser
+        fields = [
+            'id', 'user_name', 'user_email', 'church_name', 'role', 
+            'role_display', 'role_color', 'is_denomination_admin',
+            'can_manage_denomination', 'can_create_churches', 
+            'can_manage_church_admins', 'can_view_financial_reports',
+            'joined_at'
+        ] 

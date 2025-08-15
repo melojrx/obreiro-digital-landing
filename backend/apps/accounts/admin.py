@@ -66,7 +66,8 @@ class ChurchUserAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         'role', 'church', 'can_access_admin', 'can_manage_members', 
-        'can_manage_activities', 'joined_at'
+        'can_manage_activities', 'can_manage_denomination', 'can_create_churches', 
+        'can_view_financial_reports', 'joined_at'
     ]
     search_fields = [
         'user__email', 'user__full_name',
@@ -90,6 +91,14 @@ class ChurchUserAdmin(admin.ModelAdmin):
             ),
             'classes': ('collapse',)
         }),
+        ('Permissões de Denominação', {
+            'fields': (
+                'can_manage_denomination', 'can_create_churches', 
+                'can_manage_church_admins', 'can_view_financial_reports'
+            ),
+            'classes': ('collapse',),
+            'description': 'Permissões específicas para gestão hierárquica'
+        }),
         ('Filiais Acessíveis', {
             'fields': ('managed_branches',),
             'description': 'Filiais específicas que este usuário pode gerenciar'
@@ -112,6 +121,12 @@ class ChurchUserAdmin(admin.ModelAdmin):
         permissions = []
         if obj.can_access_admin:
             permissions.append('🔧 Admin')
+        if obj.can_manage_denomination:
+            permissions.append('⛪ Denominação')
+        if obj.can_create_churches:
+            permissions.append('🏛️ Criar Igrejas')
+        if obj.can_manage_church_admins:
+            permissions.append('👨‍💼 Admins')
         if obj.can_manage_members:
             permissions.append('👥 Membros')
         if obj.can_manage_visitors:
@@ -120,6 +135,8 @@ class ChurchUserAdmin(admin.ModelAdmin):
             permissions.append('📅 Atividades')
         if obj.can_view_reports:
             permissions.append('📊 Relatórios')
+        if obj.can_view_financial_reports:
+            permissions.append('💰 Financeiro')
         if obj.can_manage_branches:
             permissions.append('🏢 Filiais')
         
