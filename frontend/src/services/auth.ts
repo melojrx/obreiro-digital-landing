@@ -151,7 +151,20 @@ export const authService = {
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
+      console.log('🔐 Enviando login request:', {
+        url: API_ENDPOINTS.auth.login,
+        email: credentials.email,
+        password: '***'
+      });
+      
       const response = await api.post<AuthResponse>(API_ENDPOINTS.auth.login, credentials);
+      
+      console.log('✅ Login response:', {
+        status: response.status,
+        token: response.data.token ? '***' : 'null',
+        user: response.data.user
+      });
+      
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -159,6 +172,7 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
+      console.error('❌ Login error:', error);
       throw handleApiError(error);
     }
   },

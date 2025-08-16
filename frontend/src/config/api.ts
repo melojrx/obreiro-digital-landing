@@ -27,9 +27,53 @@ api.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Token ${token}`;
     }
+    
+    // Log da requisição para debug
+    console.log('🚀 API Request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      headers: {
+        'Content-Type': config.headers['Content-Type'],
+        'Authorization': config.headers['Authorization'] ? '***' : 'none'
+      },
+      data: config.data,
+      dataType: typeof config.data,
+      dataKeys: config.data ? Object.keys(config.data) : 'none',
+      rawData: config.url?.includes('login') ? JSON.stringify(config.data) : 'hidden'
+    });
+    
     return config;
   },
   (error) => {
+    console.error('❌ API Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor para respostas
+api.interceptors.response.use(
+  (response) => {
+    console.log('✅ API Response:', {
+      status: response.status,
+      url: response.config.url,
+      data: response.config.url?.includes('login') ? 'LOGIN_DATA_HIDDEN' : (typeof response.data === 'object' ? Object.keys(response.data) : response.data)
+    });
+    return response;
+  },
+  (error) => {
+    console.error('❌ API Response Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      method: error.config?.method?.toUpperCase(),
+      message: error.message,
+      responseData: error.response?.data,
+      responseHeaders: error.response?.headers,
+      requestData: error.config?.data,
+      fullError: error
+    });
     return Promise.reject(error);
   }
 );
@@ -54,10 +98,10 @@ export const API_ENDPOINTS = {
   auth: {
     login: '/auth/login/',
     token: '/auth/token/',
-    register: '/auth/register/register/',
-    completeProfile: '/auth/register/complete_profile/',
-    availableChurches: '/auth/register/available_churches/',
-    availableDenominations: '/auth/register/available_denominations/',
+    register: '/users/register/',
+    completeProfile: '/users/complete_profile/',
+    availableChurches: '/auth/available-churches/',
+    availableDenominations: '/auth/available-denominations/',
   },
   
   // Usuários

@@ -31,9 +31,7 @@ import NotFound, { Pagamento } from "./pages/NotFound";
 
 // Lazy loading para componentes hierárquicos
 const DenominationDashboardPage = lazy(() => 
-  import("./pages/DenominationDashboardPage").then(module => ({
-    default: module.DenominationDashboardPage
-  }))
+  import("./pages/DenominationDashboardPage")
 );
 
 const ChurchManagementPage = lazy(() => 

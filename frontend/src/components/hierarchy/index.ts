@@ -10,6 +10,7 @@ export { HierarchyView } from './HierarchyView';
 
 // Componentes de Dashboard
 export { DenominationDashboard } from './DenominationDashboard';
+export { DenominationDashboardProfessional } from './DenominationDashboardProfessional';
 export { ChurchesOverview } from './ChurchesOverview';
 
 // Componentes de Gestão

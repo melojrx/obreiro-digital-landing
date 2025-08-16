@@ -30,6 +30,7 @@ import {
 import { useDenominations } from '@/hooks/useDenominations';
 import { useDenominationStats } from '@/hooks/useDenominationStats';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useDenominationMockData } from '@/hooks/useDenominationMockData';
 
 // Componentes
 import { DenominationStatsCard } from './DenominationStatsCard';
