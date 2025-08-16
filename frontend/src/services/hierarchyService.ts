@@ -152,17 +152,53 @@ class HierarchyService {
   /**
    * Obtém estatísticas gerais da denominação
    */
-  async getDenominationStats(): Promise<HierarchyStats> {
-    const response = await api.get('/denominations/stats/');
+  async getDenominationStats(denominationId?: number): Promise<HierarchyStats> {
+    // Se não for passado um ID, usar o ID 1 como padrão (temporário)
+    const id = denominationId || 1;
+    const response = await api.get(`/denominations/${id}/stats/`);
     return response.data;
   }
 
   /**
    * Obtém dados hierárquicos completos
    */
-  async getHierarchyData(): Promise<HierarchyNode[]> {
-    const response = await api.get('/denominations/hierarchy/');
-    return response.data;
+  async getHierarchyData(denominationId?: number): Promise<HierarchyNode[]> {
+    // Por enquanto, vamos retornar dados mock já que a rota não existe no backend
+    // TODO: Implementar rota /denominations/{id}/hierarchy/ no backend
+    try {
+      const id = denominationId || 1;
+      const response = await api.get(`/denominations/${id}/`);
+      
+      // Transformar os dados da denominação em formato hierárquico
+      const denomination = response.data;
+      return [{
+        id: `denomination-${denomination.id}`,
+        name: denomination.name,
+        type: 'denomination',
+        level: 0,
+        data: denomination,
+        children: [],
+        expanded: false,
+        stats: {
+          members: denomination.total_members || 0,
+          visitors: 0,
+          activities: 0,
+          branches_count: denomination.total_churches || 0,
+          health_score: 85,
+          growth_rate: 12,
+          engagement_rate: 75
+        },
+        insights: {
+          trend: 'growing',
+          priority: 'medium',
+          recommendations: [],
+          alerts: []
+        }
+      }];
+    } catch (error) {
+      console.error('Erro ao buscar dados hierárquicos:', error);
+      return [];
+    }
   }
 
   /**
