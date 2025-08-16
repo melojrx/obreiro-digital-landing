@@ -590,7 +590,7 @@ const Index = () => {
               <ul className="space-y-2 text-slate-400">
                 <li><a href="#recursos" className="hover:text-white transition-colors">Recursos</a></li>
                 <li><a href="#precos" className="hover:text-white transition-colors">Preços</a></li>
-                <li><a href="#api" className="hover:text-white transition-colors">API Docs</a></li>
+                <li><a href="http://localhost:8000/api/docs/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">API Docs</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Integrações</a></li>
               </ul>
             </div>
@@ -607,7 +607,7 @@ const Index = () => {
               <h4 className="font-bold mb-4">Legal</h4>
               <ul className="space-y-2 text-slate-400">
                 <li><a href="#" className="hover:text-white transition-colors">Termos de Uso</a></li>
-                <li><a href="/politica-privacidade" className="hover:text-white transition-colors">Privacidade</a></li>
+                <li><Link to="/politica-privacidade" className="hover:text-white transition-colors">Privacidade</Link></li>
                 <li><a href="#" className="hover:text-white transition-colors">LGPD</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Segurança</a></li>
               </ul>

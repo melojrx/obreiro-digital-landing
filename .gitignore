@@ -8,13 +8,14 @@
 
 # Arquivos de ambiente (SEMPRE ignorar)
 .env
+.env*
 .env.local
 .env.*.local
 .env.development
 .env.test
 .env.production
 
-# Arquivos de configuração sensíveis
+# Arquivos de configuração sensíveis do projeto
 .env_dev
 .env_prod
 config/local_settings.py
@@ -120,8 +121,7 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
-.env
+# Environments (duplicação parcial removida)
 .venv
 env/
 venv/
@@ -212,12 +212,8 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# dotenv environment variables file (duplicação removida)
+# Já coberto na seção ARQUIVOS DE AMBIENTE
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -273,10 +269,14 @@ dist-ssr/
 docker-compose.override.yml
 docker-compose.override.yaml
 
-# Docker volumes data
+# Docker volumes data  
 postgres_data/
 redis_data/
 media_data/
+
+# Volumes específicos do Docker Compose do projeto
+*_prod_data/
+*_dev_data/
 
 # =================================
 # BACKUPS E DADOS
@@ -290,9 +290,14 @@ backups/
 *.sql.bz2
 *-backup/
 
-# Logs de aplicação
+# Logs de aplicação  
 logs/
 *.log
+
+# Logs específicos do projeto Django
+gunicorn.log
+celery.log
+django.log
 
 # =================================
 # EDITORES E IDEs
@@ -472,6 +477,5 @@ media_prod/
 frontend_build/
 logs/
 
-# Arquivos de ambiente específicos
-.env_dev
-.env_prod
+# Arquivos de ambiente específicos (já cobertos acima)
+# .env_dev e .env_prod já estão na seção ARQUIVOS DE AMBIENTE
