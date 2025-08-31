@@ -9,6 +9,7 @@ import {
   LoginCredentials, 
   RegisterData, 
   CompleteProfileData,
+  FinalizeRegistrationData,
   User, 
   AuthError,
   Church,
@@ -27,6 +28,7 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<void>;
   savePartialProfile: (data: Partial<CompleteProfileData>) => Promise<void>;
   completeProfile: (data: CompleteProfileData) => Promise<void>;
+  finalizeRegistration: (data: FinalizeRegistrationData) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
   getAvailableChurches: () => Promise<Church[]>;
@@ -190,6 +192,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(userWithCompleteProfile);
       // Atualizar também o localStorage para persistir o estado
       localStorage.setItem('user', JSON.stringify(userWithCompleteProfile));
+    } catch (err) {
+      if (err instanceof AuthError) {
+        setError(err.message);
+      } else {
+        setError('Erro inesperado. Tente novamente.');
+      }
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const finalizeRegistration = useCallback(async (data: FinalizeRegistrationData) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await authService.finalizeRegistration(data);
+      
+      // Configurar usuário autenticado
+      setUser(result.user);
+      localStorage.setItem('user', JSON.stringify(result.user));
+      localStorage.setItem('auth_token', result.token);
+      
     } catch (err) {
       if (err instanceof AuthError) {
         setError(err.message);
@@ -389,6 +414,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     register,
     savePartialProfile,
     completeProfile,
+    finalizeRegistration,
     logout,
     clearError,
     getAvailableChurches,
@@ -399,7 +425,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updateChurchData,
     uploadAvatar,
     deleteAccount,
-  }), [user, userChurch, isAuthenticated, isInitializing, isLoading, error, login, register, savePartialProfile, completeProfile, logout, clearError, getAvailableChurches, getAvailableDenominations, getUserChurch, updateUser, updatePersonalData, updateChurchData, uploadAvatar, deleteAccount]);
+  }), [user, userChurch, isAuthenticated, isInitializing, isLoading, error, login, register, savePartialProfile, completeProfile, finalizeRegistration, logout, clearError, getAvailableChurches, getAvailableDenominations, getUserChurch, updateUser, updatePersonalData, updateChurchData, uploadAvatar, deleteAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

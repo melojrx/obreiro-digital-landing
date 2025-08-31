@@ -76,10 +76,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       console.log('✅ ProtectedRoute: Já autenticado, mas perfil completo, redirecionando para dashboard');
       return <Navigate to="/dashboard" replace />;
     }
-    if (isAuthenticated && !profileComplete && location.pathname !== '/cadastro/etapa-2' && location.pathname !== '/cadastro/etapa-3') {
-      console.log('✅ ProtectedRoute: Já autenticado, mas perfil incompleto, redirecionando para etapa-2');
-      return <Navigate to="/cadastro/etapa-2" replace />;
-    }
+    // Permitir acesso às rotas de cadastro para usuários autenticados ou não autenticados
+    // O fluxo das 3 etapas deve ser preservado
     console.log('✅ ProtectedRoute: Permitindo acesso');
     return <>{children}</>;
   }

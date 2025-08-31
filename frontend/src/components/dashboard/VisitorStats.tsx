@@ -150,7 +150,7 @@ export const VisitorStats: React.FC<VisitorStatsProps> = ({ className }) => {
                 const percentage = maxVisitors > 0 ? (month.visitors / maxVisitors) * 100 : 0;
                 
                 return (
-                  <div key={month.month} className="flex items-center space-x-3">
+                  <div key={`${month.month}-${index}`} className="flex items-center space-x-3">
                     <div className="text-xs text-gray-500 w-16">
                       {new Date(month.month + '-01').toLocaleDateString('pt-BR', { 
                         month: 'short' 

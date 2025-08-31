@@ -6,6 +6,7 @@ Sistema completo de membresia com dados eclesiásticos
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from datetime import date, timedelta
 from apps.core.models import (
     BaseModel, ActiveManager, TenantManager,
@@ -139,6 +140,45 @@ class Member(BaseModel):
         help_text="Estado civil"
     )
     
+    # =====================================
+    # DADOS DO CÔNJUGE (quando casado)
+    # =====================================
+    
+    spouse_name = models.CharField(
+        "Nome do Cônjuge",
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Nome completo do cônjuge (preencher se casado)"
+    )
+    
+    spouse_is_member = models.BooleanField(
+        "Cônjuge é Membro da Igreja",
+        default=False,
+        help_text="Marcar se o cônjuge também é membro desta igreja"
+    )
+    
+    spouse_member = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='spouse_of',
+        verbose_name="Cônjuge (Membro)",
+        help_text="Selecionar o cônjuge se for membro da igreja"
+    )
+    
+    # =====================================
+    # DADOS FAMILIARES
+    # =====================================
+    
+    children_count = models.PositiveSmallIntegerField(
+        "Quantidade de Filhos",
+        null=True,
+        blank=True,
+        help_text="Número de filhos (opcional)"
+    )
+
     # Contato
     email = models.EmailField(
         "E-mail",
@@ -169,7 +209,21 @@ class Member(BaseModel):
     address = models.TextField(
         "Endereço",
         blank=True,
-        help_text="Endereço completo"
+        help_text="Endereço (rua, avenida, etc.)"
+    )
+    
+    number = models.CharField(
+        "Número",
+        max_length=20,
+        blank=True,
+        help_text="Número da residência"
+    )
+    
+    complement = models.CharField(
+        "Complemento",
+        max_length=100,
+        blank=True,
+        help_text="Complemento (apartamento, bloco, etc.)"
     )
     
     neighborhood = models.CharField(
@@ -291,17 +345,6 @@ class Member(BaseModel):
     # DADOS FAMILIARES
     # =====================================
     
-    # Cônjuge (se casado)
-    spouse = models.ForeignKey(
-        'self',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='married_to',
-        verbose_name="Cônjuge",
-        help_text="Cônjuge (se casado e também for membro)"
-    )
-    
     # Responsável (para menores de idade)
     responsible = models.ForeignKey(
         'self',
@@ -409,13 +452,36 @@ class Member(BaseModel):
         # Validar datas lógicas
         if self.conversion_date and self.birth_date:
             if self.conversion_date < self.birth_date:
-                raise models.ValidationError("Data de conversão não pode ser anterior ao nascimento")
+                raise ValidationError("Data de conversão não pode ser anterior ao nascimento")
         
         if self.baptism_date and self.conversion_date:
             if self.baptism_date < self.conversion_date:
-                raise models.ValidationError("Data de batismo não pode ser anterior à conversão")
+                raise ValidationError("Data de batismo não pode ser anterior à conversão")
+        
+        # Validar dados do cônjuge
+        self._validate_spouse_data()
         
         super().save(*args, **kwargs)
+    
+    def _validate_spouse_data(self):
+        """Valida consistência dos dados do cônjuge"""
+        # Se não é casado, limpar dados do cônjuge
+        if self.marital_status != 'married':
+            self.spouse_name = None
+            self.spouse_is_member = False
+            self.spouse_member = None
+            return
+        
+        # Se spouse_member está preenchido, deve marcar spouse_is_member
+        if self.spouse_member:
+            self.spouse_is_member = True
+            # Se um membro específico foi selecionado, usar o nome dele
+            if self.spouse_member.full_name:
+                self.spouse_name = self.spouse_member.full_name
+        
+        # Permitir que spouse_is_member seja True mesmo sem spouse_member
+        # Isso facilita o cadastro quando o cônjuge ainda não foi cadastrado
+        # A vinculação pode ser feita posteriormente através da edição
     
     # =====================================
     # PROPRIEDADES CALCULADAS
@@ -460,7 +526,22 @@ class Member(BaseModel):
         if not self.address:
             return ""
         
-        parts = [self.address]
+        # Monta o endereço base
+        address_parts = [self.address]
+        
+        # Adiciona número se existir
+        if self.number:
+            address_parts.append(f"nº {self.number}")
+        
+        # Adiciona complemento se existir
+        if self.complement:
+            address_parts.append(self.complement)
+        
+        # Junta o endereço base
+        address_line = ", ".join(address_parts)
+        parts = [address_line]
+        
+        # Adiciona bairro, cidade/estado e CEP
         if self.neighborhood:
             parts.append(f"Bairro {self.neighborhood}")
         if self.city and self.state:
@@ -496,8 +577,8 @@ class Member(BaseModel):
         family = []
         
         # Cônjuge
-        if self.spouse:
-            family.append(self.spouse)
+        if self.spouse_member:
+            family.append(self.spouse_member)
         
         # Dependentes
         family.extend(self.dependents.filter(is_active=True))

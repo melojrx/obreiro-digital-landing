@@ -6,7 +6,7 @@ Gerencia papéis hierárquicos e acesso por igreja
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
-from apps.core.models import BaseModel, ActiveManager, RoleChoices, GenderChoices
+from apps.core.models import BaseModel, ActiveManager, RoleChoices, GenderChoices, SubscriptionPlanChoices
 from apps.core.models import validate_cpf, phone_validator
 
 
@@ -105,6 +105,16 @@ class CustomUser(AbstractUser):
         default=False,
         verbose_name="Perfil Completo",
         help_text="Indica se o usuário completou todas as etapas do cadastro."
+    )
+    
+    # Campo para plano de assinatura (apenas para DENOMINATION_ADMIN)
+    subscription_plan = models.CharField(
+        "Plano de Assinatura",
+        max_length=20,
+        choices=SubscriptionPlanChoices.choices,
+        blank=True,
+        null=True,
+        help_text="Plano de assinatura SaaS (apenas para administradores de denominação)"
     )
     
     # Configurar email como campo de login

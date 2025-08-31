@@ -82,26 +82,28 @@ const Visitantes: React.FC = () => {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Visitantes</h1>
-            <p className="text-gray-600 mt-1">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:justify-between">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 truncate">Visitantes</h1>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">
               Gerencie os visitantes registrados via QR Code
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
+          <div className="flex flex-wrap gap-2 justify-end">
+            <Button
+              variant="outline"
               onClick={() => navigate('/configuracoes/qr-codes')}
-              className="border-purple-500 text-purple-600"
+              className="border-purple-500 text-purple-600 text-sm h-9"
             >
               <QrCode className="h-4 w-4 mr-2" />
-              Gerenciar QR Codes
+              <span className="hidden sm:inline">Gerenciar QR Codes</span>
+              <span className="sm:hidden">QR Codes</span>
             </Button>
             {(permissions.canManageVisitors || process.env.NODE_ENV === 'development') && (
-              <Button onClick={handleCreateVisitor} className="bg-blue-600 hover:bg-blue-700">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Novo Visitante
+              <Button onClick={handleCreateVisitor} className="bg-blue-600 hover:bg-blue-700 text-sm h-9">
+                <UserPlus className="h-4 w-4 mr-1" />
+                <span>Novo</span>
+                <span className="hidden sm:inline"> Visitante</span>
               </Button>
             )}
           </div>
@@ -152,7 +154,7 @@ const Visitantes: React.FC = () => {
         />
 
         {/* Tabela de Visitantes */}
-        <div className="bg-white rounded-lg shadow">
+  <div className="bg-white rounded-lg shadow p-0 md:p-0">
           {visitorsLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">

@@ -150,8 +150,23 @@ class VisitorViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Visitor.objects.all()
         
-        # Usar o TenantManager para filtrar por igreja automaticamente
-        return Visitor.objects.filter(is_active=True)
+        # Buscar igreja do usuário
+        try:
+            from apps.accounts.models import ChurchUser
+            church_user = ChurchUser.objects.filter(user=user, is_active=True).first()
+            
+            if church_user and church_user.church:
+                # Filtrar visitantes apenas da igreja do usuário
+                return Visitor.objects.filter(
+                    church=church_user.church,
+                    is_active=True
+                )
+            else:
+                # Se usuário não tem igreja associada, retornar queryset vazio
+                return Visitor.objects.none()
+        except Exception as e:
+            print(f"❌ Erro ao filtrar visitantes por igreja: {e}")
+            return Visitor.objects.none()
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""
@@ -190,8 +205,8 @@ class VisitorViewSet(viewsets.ModelViewSet):
             
             if church_user and church_user.church:
                 church = church_user.church
-                # Priorizar branch específica do usuário, senão primeira branch da igreja
-                branch = church_user.branch or church.branches.filter(is_active=True).first()
+                # Buscar primeira filial ativa da igreja
+                branch = church.branches.filter(is_active=True).first()
                 
                 print(f"💾 Criando visitante para igreja: {church.name} (ID: {church.id})")
                 if branch:

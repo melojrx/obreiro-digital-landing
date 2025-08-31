@@ -51,8 +51,8 @@ export const VisitorsFilters: React.FC<VisitorsFiltersProps> = ({
   return (
     <div className="space-y-4">
       {/* Barra de busca principal */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             type="text"
@@ -63,25 +63,39 @@ export const VisitorsFilters: React.FC<VisitorsFiltersProps> = ({
             disabled={loading}
           />
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          className={showAdvancedFilters ? 'bg-gray-100' : ''}
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          Filtros
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className={showAdvancedFilters ? 'bg-gray-100 flex-1 sm:flex-none' : 'flex-1 sm:flex-none'}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            <span className="hidden xs:inline">Filtros</span>
+            <span className="xs:hidden">Filtrar</span>
+            {activeFiltersCount > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {activeFiltersCount}
+              </Badge>
+            )}
+          </Button>
           {activeFiltersCount > 0 && (
-            <Badge variant="secondary" className="ml-2">
-              {activeFiltersCount}
-            </Badge>
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-xs text-gray-500 hidden sm:inline-flex"
+              onClick={handleClearFilters}
+              disabled={loading}
+            >
+              <X className="h-3 w-3 mr-1" /> Limpar
+            </Button>
           )}
-        </Button>
+        </div>
       </div>
 
       {/* Filtros avançados */}
       {showAdvancedFilters && (
-        <div className="p-4 bg-gray-50 rounded-lg space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 bg-gray-50 rounded-lg space-y-4 animate-in fade-in">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Status de Follow-up */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Status de Follow-up</label>
@@ -179,7 +193,7 @@ export const VisitorsFilters: React.FC<VisitorsFiltersProps> = ({
 
           {/* Botão limpar filtros */}
           {activeFiltersCount > 0 && (
-            <div className="flex justify-end">
+            <div className="flex justify-end sm:hidden">
               <Button
                 variant="ghost"
                 size="sm"

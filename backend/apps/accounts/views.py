@@ -20,7 +20,8 @@ from django.utils import timezone
 
 from .models import CustomUser, UserProfile, ChurchUser
 from .serializers import (
-    UserRegistrationSerializer,
+    UserRegistrationSerializer, UserRegistrationValidationSerializer,
+    ChurchDataValidationSerializer, UserCompleteRegistrationNewSerializer,
     UserCompleteRegistrationSerializer,
     UserSerializer,
     UserProfileSerializer,
@@ -32,82 +33,186 @@ from apps.core.models import RoleChoices
 from apps.core.permissions import IsSuperUser, IsChurchAdmin, IsMemberUser
 from apps.churches.models import Church
 from apps.denominations.models import Denomination
+from rest_framework.parsers import JSONParser
+
+
+@api_view(['PATCH'])
+@permission_classes([permissions.IsAuthenticated])
+def save_partial_profile_view(request):
+    """\n+    Salva dados parciais do perfil do usuário (etapa intermediária antes de completar o perfil).\n+\n+    Não cria igreja nova. Apenas atualiza:\n+      - Dados básicos do usuário (full_name, phone)\n+      - Perfil (birth_date, gender, bio, cpf)\n+      - Dados da igreja já existente vinculada (name, email, phone, address) se vínculo existir\n+    Retorna payload compatível com user_me_view para manter UX do frontend.\n+    """
+    user = request.user
+    data = request.data or {}
+
+    # Atualizar dados do usuário
+    if 'full_name' in data and data['full_name']:
+        user.full_name = data['full_name']
+        name_parts = data['full_name'].split()
+        if name_parts:
+            user.first_name = name_parts[0]
+            user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+
+    if 'phone' in data and data['phone']:
+        user.phone = data['phone']
+
+    user.save()
+
+    # Atualizar / criar perfil
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    if 'birth_date' in data:
+        profile.birth_date = data['birth_date'] or None
+    if 'gender' in data:
+        profile.gender = data['gender'] or None
+    if 'bio' in data:
+        profile.bio = data['bio'] or ''
+    if 'cpf' in data:
+        cpf_val = data['cpf'] or None
+        # Evitar duplicidade de CPF se fornecido
+        if cpf_val and UserProfile.objects.filter(cpf=cpf_val).exclude(user=user).exists():
+            return Response({'error': 'CPF já cadastrado em outro usuário'}, status=status.HTTP_400_BAD_REQUEST)
+        profile.cpf = cpf_val
+    profile.save()
+
+    # Atualizar dados parciais da igreja existente (se houver vínculo)
+    church_user = user.church_users.first()
+    if church_user:
+        church = church_user.church
+        church_changed = False
+        if 'church' in data and isinstance(data['church'], dict):
+            cdata = data['church']
+            if 'name' in cdata and cdata['name']:
+                church.name = cdata['name']; church_changed = True
+            if 'email' in cdata and cdata['email']:
+                church.email = cdata['email']; church_changed = True
+            if 'phone' in cdata and cdata['phone']:
+                church.phone = cdata['phone']; church_changed = True
+            if 'address' in cdata and cdata['address']:
+                church.address = cdata['address']; church_changed = True
+        if church_changed:
+            church.save()
+    else:
+        church = None
+
+    # Montar resposta compatível com user_me_view
+    return Response({
+        'id': user.id,
+        'email': user.email,
+        'full_name': user.full_name,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'phone': user.phone,
+        'is_active': user.is_active,
+        'date_joined': user.date_joined,
+        'is_profile_complete': user.is_profile_complete,
+        'profile': {
+            'bio': profile.bio if profile else '',
+            'birth_date': profile.birth_date if profile else None,
+            'gender': profile.gender if profile else '',
+            'avatar': profile.avatar.url if profile and profile.avatar else None,
+        } if profile else None
+    }, status=status.HTTP_200_OK)
 
 
 class UserRegistrationView(generics.CreateAPIView):
     """
-    View para registro inicial de usuário via cadastro SaaS (Etapa 1 de 3).
+    View para validação inicial de usuário via cadastro SaaS (Etapa 1 de 3).
     
-    Fluxo: Dados pessoais básicos → Escolha denominação → Plano assinatura
-    Resultado: Usuário vira Denomination Admin (assinante pagante)
+    IMPORTANTE: Esta view apenas VALIDA os dados, não cria o usuário.
+    O usuário só será criado na etapa 3 após selecionar o plano.
     """
-    queryset = CustomUser.objects.all()
-    serializer_class = UserRegistrationSerializer
+    serializer_class = UserRegistrationValidationSerializer
     permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Criar usuário
-        user = serializer.save()
-        
-        # Criar token de autenticação
-        token, created = Token.objects.get_or_create(user=user)
+        # Apenas validar os dados, NÃO criar o usuário
+        validated_data = serializer.validated_data
         
         return Response({
-            'token': token.key,
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'full_name': user.full_name,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'phone': user.phone,
-                'is_active': user.is_active,
-                'date_joined': user.date_joined,
-                'is_profile_complete': user.is_profile_complete
+            'message': 'Dados validados com sucesso',
+            'data': {
+                'email': validated_data['email'],
+                'full_name': validated_data['full_name'],
+                'phone': validated_data['phone'],
+                'birth_date': validated_data.get('birth_date'),
+                'gender': validated_data.get('gender'),
             }
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_200_OK)
 
 
 class CompleteProfileView(generics.CreateAPIView):
     """
-    View para completar perfil do usuário via cadastro SaaS (Etapa 2 de 3).
+    View para validação dos dados da igreja via cadastro SaaS (Etapa 2 de 3).
     
-    Recebe: Denominação escolhida + dados da primeira igreja
-    Cria: Igreja inicial + Filial sede + Vínculo como Denomination Admin
+    IMPORTANTE: Esta view apenas VALIDA os dados, não cria a igreja.
+    A igreja só será criada na etapa 3 após selecionar o plano.
     """
-    serializer_class = UserCompleteRegistrationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ChurchDataValidationSerializer
+    permission_classes = [permissions.AllowAny]  # Mudado para AllowAny pois usuário ainda não existe
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(
-            data=request.data,
-            context={'user': request.user}
-        )
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Completar perfil
-        result = serializer.save()
+        # Apenas validar os dados, NÃO criar a igreja
+        validated_data = serializer.validated_data
         
         return Response({
-            'id': result['user'].id,
-            'email': result['user'].email,
-            'full_name': result['user'].full_name,
-            'first_name': result['user'].first_name,
-            'last_name': result['user'].last_name,
-            'phone': result['user'].phone,
-            'is_active': result['user'].is_active,
-            'date_joined': result['user'].date_joined,
-            'is_profile_complete': result['user'].is_profile_complete,
+            'message': 'Dados da igreja validados com sucesso',
+            'data': validated_data
+        }, status=status.HTTP_200_OK)
+
+
+class FinalizeRegistrationView(generics.CreateAPIView):
+    """
+    View para finalizar o cadastro SaaS (Etapa 3 de 3).
+    
+    Recebe: TODOS os dados (pessoais + igreja + plano selecionado)
+    Cria: Usuário + Igreja + Filial + Perfil + Token de autenticação
+    
+    IMPORTANTE: Só aqui o usuário DENOMINATION_ADMIN é criado no banco.
+    """
+    serializer_class = UserCompleteRegistrationNewSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Criar tudo de uma vez: usuário + igreja + filial + perfil
+        result = serializer.save()
+        
+        # Criar token de autenticação
+        token, created = Token.objects.get_or_create(user=result['user'])
+        
+        return Response({
+            'token': token.key,
+            'user': {
+                'id': result['user'].id,
+                'email': result['user'].email,
+                'full_name': result['user'].full_name,
+                'first_name': result['user'].first_name,
+                'last_name': result['user'].last_name,
+                'phone': result['user'].phone,
+                'subscription_plan': result['user'].subscription_plan,
+                'is_active': result['user'].is_active,
+                'date_joined': result['user'].date_joined,
+                'is_profile_complete': result['user'].is_profile_complete,
+            },
             'profile': {
                 'bio': result['profile'].bio if result['profile'] else '',
                 'birth_date': result['profile'].birth_date if result['profile'] else None,
                 'gender': result['profile'].gender if result['profile'] else '',
                 'avatar': result['profile'].avatar.url if result['profile'] and result['profile'].avatar else None,
-            } if result['profile'] else None
-        }, status=status.HTTP_200_OK)
+            } if result['profile'] else None,
+            'church': {
+                'id': result['church'].id,
+                'name': result['church'].name,
+                'subscription_plan': result['church'].subscription_plan,
+            },
+            'message': 'Cadastro finalizado com sucesso! Bem-vindo ao sistema.'
+        }, status=status.HTTP_201_CREATED)
 
 
 class UserLoginView(ObtainAuthToken):

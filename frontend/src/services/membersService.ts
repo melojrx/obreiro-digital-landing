@@ -53,6 +53,13 @@ export const MINISTERIAL_FUNCTION_CHOICES: Array<{ value: string; label: string 
   { value: 'auxiliary', label: 'Auxiliar' }
 ];
 
+export const MEMBERSHIP_STATUS_CHOICES: Array<{ value: string; label: string }> = [
+  { value: 'active', label: 'Ativo' },
+  { value: 'inactive', label: 'Inativo' },
+  { value: 'transferred', label: 'Transferido' },
+  { value: 'deceased', label: 'Falecido' }
+];
+
 // Tipos para Membros
 export interface Member {
   id: number;
@@ -69,6 +76,8 @@ export interface Member {
   phone?: string;
   phone_secondary?: string;
   address?: string;
+  number?: string;
+  complement?: string;
   neighborhood?: string;
   city?: string;
   state?: string;
@@ -102,6 +111,16 @@ export interface Member {
   accept_sms: boolean;
   accept_email: boolean;
   accept_whatsapp: boolean;
+  
+  // Campos do cônjuge
+  spouse_name?: string;
+  spouse_is_member: boolean;
+  spouse_member?: number;
+  spouse_member_name?: string;
+  
+  // Dados familiares
+  children_count?: number;
+  
   created_at: string;
   updated_at: string;
   is_active: boolean;
@@ -185,6 +204,8 @@ export interface CreateMemberData {
   phone?: string;
   phone_secondary?: string;
   address?: string;
+  number?: string;
+  complement?: string;
   neighborhood?: string;
   city?: string;
   state?: string;
@@ -203,6 +224,15 @@ export interface CreateMemberData {
   accept_sms?: boolean;
   accept_email?: boolean;
   accept_whatsapp?: boolean;
+  
+  // Campos do cônjuge
+  spouse_name?: string;
+  spouse_is_member?: boolean;
+  spouse_member?: number;
+  
+  // Dados familiares
+  children_count?: number;
+  
   // Campos de papel do sistema
   create_system_user?: boolean;
   system_role?: string;
@@ -293,7 +323,7 @@ export const membersService = {
       // Se não há foto, usar JSON
       const { photo, ...jsonData } = data; // Remove photo do objeto
       
-      // Limpar valores undefined/null para evitar problemas
+      // Limpar apenas valores undefined/null, mantendo strings vazias
       const cleanData = Object.fromEntries(
         Object.entries(jsonData).filter(([_, value]) => value !== undefined && value !== null)
       );
@@ -311,6 +341,9 @@ export const membersService = {
 
   // Atualizar membro
   async updateMember(id: number, data: Partial<CreateMemberData>): Promise<Member> {
+    console.log('🔍 updateMember - ID:', id);
+    console.log('🔍 updateMember - Dados recebidos:', data);
+    
     // Se há foto, usar FormData
     if (data.photo && data.photo instanceof File) {
       const formData = new FormData();
@@ -325,6 +358,8 @@ export const membersService = {
         }
       });
 
+      console.log('📤 updateMember - Enviando FormData');
+
       const response = await api.patch(API_ENDPOINTS.members.update(id), formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -335,16 +370,26 @@ export const membersService = {
       // Se não há foto, usar JSON
       const { photo, ...jsonData } = data; // Remove photo do objeto
       
-      // Limpar valores undefined/null para evitar problemas
+      // Limpar apenas valores undefined/null, mantendo strings vazias
       const cleanData = Object.fromEntries(
         Object.entries(jsonData).filter(([_, value]) => value !== undefined && value !== null)
       );
+
+      console.log('📤 updateMember - Dados limpos para envio:', cleanData);
+      console.log('📤 updateMember - Campos específicos:', {
+        number: cleanData.number,
+        complement: cleanData.complement,
+        address: cleanData.address,
+        zipcode: cleanData.zipcode
+      });
 
       const response = await api.patch(API_ENDPOINTS.members.update(id), cleanData, {
         headers: {
           'Content-Type': 'application/json',
         },
       });
+      
+      console.log('✅ updateMember - Resposta do servidor:', response.data);
       return response.data;
     }
   },

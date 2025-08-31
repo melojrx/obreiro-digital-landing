@@ -7,7 +7,8 @@ const actions = [
     label: 'Adicionar novo membro',
     icon: PlusCircle,
     color: 'from-blue-500 to-cyan-500',
-    link: '/members/new'
+    // Ajustado para rota em português existente no App.tsx
+    link: '/membros/novo'
   },
   {
     label: 'Criar novo evento',

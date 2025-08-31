@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import InputMask from 'react-input-mask';
 import { 
   User, 
   Phone, 
@@ -37,9 +38,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { CreateMemberData, Member, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
+import { 
+  CreateMemberData, 
+  Member, 
+  MINISTERIAL_FUNCTION_CHOICES,
+  MEMBERSHIP_STATUS_CHOICES
+} from '@/services/membersService';
 import { useAuth } from '@/hooks/useAuth';
-import { useRoleHierarchy } from '@/hooks/useRoleHierarchy';
 
 // Schema de validação
 const phoneRegex = /^\(\d{2}\) \d{4,5}-\d{4}$/;
@@ -51,6 +56,15 @@ const memberSchema = z.object({
   birth_date: z.string().min(1, 'Data de nascimento é obrigatória'),
   gender: z.enum(['M', 'F'], { required_error: 'Selecione o gênero' }),
   marital_status: z.string().optional(),
+  
+  // Campos do cônjuge
+  spouse_name: z.string().optional(),
+  spouse_is_member: z.boolean().optional(),
+  spouse_member: z.number().optional(),
+  
+  // Dados familiares
+  children_count: z.number().min(0, 'Quantidade de filhos deve ser 0 ou maior').optional(),
+  
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   phone: z.string().optional().refine(
     (val) => !val || val === '' || phoneRegex.test(val),
@@ -61,10 +75,15 @@ const memberSchema = z.object({
     { message: 'Telefone deve estar no formato (XX) XXXXX-XXXX ou (XX) XXXX-XXXX' }
   ),
   address: z.string().optional(),
+  number: z.string().optional(),
+  complement: z.string().optional(),
   neighborhood: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
-  zipcode: z.string().optional(),
+  zipcode: z.string().optional().refine(
+    (val) => !val || val === '' || /^\d{5}-?\d{3}$/.test(val),
+    { message: 'CEP deve estar no formato XXXXX-XXX' }
+  ),
   membership_status: z.string().optional(),
   baptism_date: z.string().optional(),
   conversion_date: z.string().optional(),
@@ -107,8 +126,12 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   title = 'Novo Membro',
 }) => {
   const { userChurch } = useAuth();
-  const { availableRoles, canAssignRoles, isLoading: rolesLoading } = useRoleHierarchy();
+  // Simplificação temporária - remover hierarchy
+  const availableRoles = [] as any[];
+  const canAssignRoles = false;
+  const rolesLoading = false;
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState('personal');
 
   const form = useForm<MemberFormData>({
@@ -118,12 +141,23 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       cpf: member?.cpf || '',
       rg: member?.rg || '',
       birth_date: member?.birth_date || '',
-      gender: member?.gender || 'N',
+      gender: (member?.gender === 'M' || member?.gender === 'F' ? member?.gender : 'M') as 'M' | 'F',
       marital_status: member?.marital_status || 'single',
+      
+      // Campos do cônjuge
+      spouse_name: member?.spouse_name || '',
+      spouse_is_member: member?.spouse_is_member || false,
+      spouse_member: member?.spouse_member || undefined,
+      
+      // Dados familiares
+      children_count: member?.children_count || undefined,
+      
       email: member?.email || '',
       phone: member?.phone || '',
       phone_secondary: member?.phone_secondary || '',
       address: member?.address || '',
+      number: member?.number || '',
+      complement: member?.complement || '',
       neighborhood: member?.neighborhood || '',
       city: member?.city || '',
       state: member?.state || '',
@@ -172,10 +206,21 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         cpf: data.cpf || undefined,
         rg: data.rg || undefined,
         marital_status: data.marital_status || undefined,
+        
+        // Campos do cônjuge
+        spouse_name: data.spouse_name || undefined,
+        spouse_is_member: data.spouse_is_member,
+        spouse_member: data.spouse_member || undefined,
+        
+        // Dados familiares
+        children_count: data.children_count || undefined,
+        
         email: data.email || undefined,
         phone: data.phone || undefined,
         phone_secondary: data.phone_secondary || undefined,
         address: data.address || undefined,
+        number: data.number || undefined,
+        complement: data.complement || undefined,
         neighborhood: data.neighborhood || undefined,
         city: data.city || undefined,
         state: data.state || undefined,
@@ -202,6 +247,9 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         // Status ministerial inicial
         initial_ministerial_status: data.initial_ministerial_status,
         initial_status_reason: data.initial_status_reason,
+        
+        // Foto
+        photo: selectedPhoto || undefined,
       };
       
       console.log('📤 MemberForm - Dados finais enviados:', formData);
@@ -215,6 +263,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setSelectedPhoto(file); // Armazenar o arquivo
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string);
@@ -468,6 +517,116 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       )}
                     />
                   </div>
+
+                  {/* Campos do cônjuge - só aparece se estado civil for casado */}
+                  {form.watch('marital_status') === 'married' && (
+                    <div className="mt-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <h4 className="text-lg font-medium mb-4 flex items-center gap-2">
+                        <Users className="h-5 w-5" />
+                        Informações do Cônjuge
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="spouse_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nome do Cônjuge</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Nome completo do cônjuge" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="spouse_is_member"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>
+                                  Cônjuge é membro da igreja?
+                                </FormLabel>
+                                <FormDescription>
+                                  Marque se o cônjuge também é membro desta igreja
+                                </FormDescription>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Campo para selecionar o cônjuge se for membro */}
+                        {form.watch('spouse_is_member') && (
+                          <FormField
+                            control={form.control}
+                            name="spouse_member"
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-2">
+                                <FormLabel>Selecionar Cônjuge Membro</FormLabel>
+                                <Select onValueChange={(value) => field.onChange(Number(value))} defaultValue={field.value?.toString()}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Selecione o cônjuge da lista de membros" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {/* TODO: Implementar lista de membros disponíveis */}
+                                    <SelectItem value="0">Selecione um membro...</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormDescription>
+                                  Selecione o cônjuge da lista de membros cadastrados
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Campo Quantidade de Filhos */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Informações Familiares
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="children_count"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantidade de Filhos</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                                value={field.value || ''}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Número de filhos (opcional)
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -536,7 +695,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       Endereço
                     </h4>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <FormField
                         control={form.control}
                         name="zipcode"
@@ -544,7 +703,16 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                           <FormItem>
                             <FormLabel>CEP</FormLabel>
                             <FormControl>
-                              <Input placeholder="00000-000" {...field} />
+                              <InputMask
+                                mask="99999-999"
+                                value={field.value || ''}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                              >
+                                {(inputProps: any) => (
+                                  <Input placeholder="00000-000" {...inputProps} />
+                                )}
+                              </InputMask>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -558,7 +726,35 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                           <FormItem className="md:col-span-2">
                             <FormLabel>Endereço</FormLabel>
                             <FormControl>
-                              <Input placeholder="Rua, Avenida, número..." {...field} />
+                              <Input placeholder="Rua, Avenida..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="number"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Número</FormLabel>
+                            <FormControl>
+                              <Input placeholder="123" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="complement"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Complemento</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Apto 101, Bloco A..." {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

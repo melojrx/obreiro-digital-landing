@@ -90,7 +90,7 @@ cd backend && python manage.py create_platform_admin
 ### Estrutura Geral
 - **Backend**: Django REST Framework com arquitetura modular por apps
 - **Frontend**: React + TypeScript com Vite, usando shadcn/ui
-- **Database**: PostgreSQL (produção) / SQLite (desenvolvimento)
+- **Database**: PostgreSQL (desenvolvimento e produção)
 - **Autenticação**: Token-based com sistema hierárquico de permissões
 
 ### Apps Django (backend/apps/)
@@ -160,7 +160,7 @@ Base URL: `http://localhost:8000/api/v1/`
 
 ### Backend
 - Django 5.2.3 + Django REST Framework
-- PostgreSQL/SQLite
+- PostgreSQL
 - Token Authentication
 - Pillow (processamento de imagens)
 - drf-spectacular (documentação automática)

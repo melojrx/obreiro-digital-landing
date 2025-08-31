@@ -15,7 +15,7 @@ interface ChurchData {
 const CadastroEtapa3 = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, completeProfile, isLoading, error } = useAuth();
+  const { finalizeRegistration, isLoading, error } = useAuth();
 
   // Dados da igreja e pessoais vindos das etapas anteriores
   const { churchData, personalData, rawFormData } = location.state || {};
@@ -25,10 +25,39 @@ const CadastroEtapa3 = () => {
   const [success, setSuccess] = useState(false);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
 
-  // Redirecionar se não houver dados
+  // Redirecionar se não houver dados das etapas anteriores
   useEffect(() => {
-    if (!personalData || !churchData) {
+    let step1Data = personalData;
+    let step2Data = churchData;
+    
+    // Tentar carregar do localStorage como fallback
+    if (!step1Data) {
+      try {
+        const raw = localStorage.getItem('registration_step1_data');
+        if (raw) step1Data = JSON.parse(raw);
+      } catch {}
+    }
+    
+    if (!step2Data) {
+      try {
+        const raw = localStorage.getItem('registration_step2_data');
+        if (raw) step2Data = JSON.parse(raw);
+      } catch {}
+    }
+    
+    // Validar se temos dados essenciais das duas etapas
+    if (!step1Data || !step1Data.email || !step1Data.full_name) {
+      console.log('❌ CadastroEtapa3: Dados da etapa 1 não encontrados, redirecionando...');
       navigate('/cadastro');
+      return;
+    }
+    
+    if (!step2Data || !step2Data.church_name || !step2Data.denomination_id) {
+      console.log('❌ CadastroEtapa3: Dados da etapa 2 não encontrados, redirecionando...');
+      navigate('/cadastro/etapa-2', { 
+        state: { personalData: step1Data }
+      });
+      return;
     }
   }, [personalData, churchData, navigate]);
 
@@ -54,16 +83,67 @@ const CadastroEtapa3 = () => {
   }, []);
 
   const handleFinalize = async () => {
-    if (!churchData || !selectedPlan) return;
+    // Obter dados de todas as etapas (props ou localStorage)
+    let step1Data = personalData;
+    let step2Data = churchData;
+    
+    if (!step1Data) {
+      try {
+        const raw = localStorage.getItem('registration_step1_data');
+        if (raw) step1Data = JSON.parse(raw);
+      } catch {}
+    }
+    
+    if (!step2Data) {
+      try {
+        const raw = localStorage.getItem('registration_step2_data');
+        if (raw) step2Data = JSON.parse(raw);
+      } catch {}
+    }
+    
+    if (!step2Data || !selectedPlan || !step1Data) {
+      console.error('❌ Dados incompletos para finalização:', { step1Data, step2Data, selectedPlan });
+      return;
+    }
     
     try {
-      // Adicionar o plano selecionado aos dados da igreja
-      const finalChurchData = {
-        ...churchData,
-        subscription_plan: selectedPlan.id
+      // Combinar TODOS os dados (pessoais + igreja + plano) para o novo endpoint
+      const finalRegistrationData = {
+        // Dados pessoais (etapa 1)
+        email: step1Data.email,
+        full_name: step1Data.full_name,
+        phone: step1Data.phone,
+        password: step1Data.password,
+        birth_date: step1Data.birth_date,
+        gender: step1Data.gender,
+        
+        // Dados da igreja (etapa 2)
+        denomination_id: step2Data.denomination_id,
+        church_name: step2Data.church_name,
+        church_cnpj: step2Data.church_cnpj,
+        church_email: step2Data.church_email,
+        church_phone: step2Data.church_phone,
+        branch_name: step2Data.branch_name,
+        church_address: step2Data.church_address,
+        pastor_name: step2Data.pastor_name,
+        cpf: step2Data.cpf,
+        bio: step2Data.bio,
+        email_notifications: step2Data.email_notifications,
+        sms_notifications: step2Data.sms_notifications,
+        
+        // Plano (etapa 3)
+        subscription_plan: selectedPlan.id,
+        role: 'DENOMINATION_ADMIN'
       };
       
-      await completeProfile(finalChurchData);
+      await finalizeRegistration(finalRegistrationData);
+      
+      // Limpar dados persistidos das etapas anteriores
+      try {
+        localStorage.removeItem('registration_step1_data');
+        localStorage.removeItem('registration_step2_data');
+      } catch {}
+      
       setSuccess(true);
       
       // Redirecionar baseado no plano
@@ -81,7 +161,7 @@ const CadastroEtapa3 = () => {
           navigate('/pagamento', { 
             state: { 
               plan: selectedPlan,
-              churchData: finalChurchData 
+              registrationData: finalRegistrationData 
             } 
           });
         }
@@ -394,16 +474,7 @@ const CadastroEtapa3 = () => {
               >
                 Voltar
               </button>
-              
-              <button
-                type="button"
-                onClick={() => navigate('/login')}
-                disabled={isLoading}
-                className="flex-1 py-3 px-4 border border-slate-300 text-sm font-semibold rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                Continuar mais tarde
-              </button>
-              
+              {/* Botão finalizar */}
               <button
                 onClick={handleFinalize}
                 disabled={isLoading || !selectedPlan}

@@ -162,11 +162,11 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
   };
 
   // Carrega o histórico de status ao montar o componente
-  useEffect(() => {
-    if (member.id && (!membershipStatuses || membershipStatuses.length === 0)) {
-      loadMembershipStatuses();
-    }
-  }, [member.id]);
+  // useEffect(() => {
+  //   if (member.id && (!membershipStatuses || membershipStatuses.length === 0)) {
+  //     loadMembershipStatuses();
+  //   }
+  // }, [member.id]);
 
   return (
     <div className="space-y-6">
@@ -328,6 +328,49 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                        member.marital_status === 'widowed' ? 'Viúvo(a)' : 'Outro'}
                     </p>
                   </div>
+                  
+                  {/* Informações do Cônjuge */}
+                  {member.marital_status === 'married' && member.spouse_name && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Cônjuge</label>
+                      <div className="text-gray-900">
+                        <p>{member.spouse_name}</p>
+                        {member.spouse_is_member && (
+                          <div className="mt-1 flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              <Heart className="h-3 w-3 mr-1" />
+                              Membro da Igreja
+                            </Badge>
+                            {member.spouse_member_name && (
+                              <span className="text-sm text-gray-600">
+                                • {member.spouse_member_name}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {!member.spouse_is_member && (
+                          <div className="mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              <User className="h-3 w-3 mr-1" />
+                              Não é membro
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Informações Familiares */}
+                  {(member.children_count !== null && member.children_count !== undefined) && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Quantidade de Filhos</label>
+                      <p className="text-gray-900">
+                        {member.children_count === 0 ? 'Nenhum filho' : 
+                         member.children_count === 1 ? '1 filho' : 
+                         `${member.children_count} filhos`}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -397,6 +440,20 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                           <div>
                             <label className="text-sm font-medium text-gray-500">Logradouro</label>
                             <p className="text-gray-900">{member.address}</p>
+                          </div>
+                        )}
+                        
+                        {member.number && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-500">Número</label>
+                            <p className="text-gray-900">{member.number}</p>
+                          </div>
+                        )}
+                        
+                        {member.complement && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-500">Complemento</label>
+                            <p className="text-gray-900">{member.complement}</p>
                           </div>
                         )}
                         

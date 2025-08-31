@@ -8,30 +8,38 @@ const Cadastro = () => {
   
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-  const { register, isLoading, error, isAuthenticated, clearError } = useAuth();
+  const { register, isLoading, error, isAuthenticated, clearError, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { prefill, savedChurchData } = location.state || {}; // Receber dados para preenchimento
 
+  // Carregar de localStorage se não veio via navigation state
+  let storedStep1: any = null;
+  try {
+    if (!prefill) {
+      const raw = localStorage.getItem('registration_step1_data');
+      if (raw) storedStep1 = JSON.parse(raw);
+    }
+  } catch (e) {
+    // ignore parse errors
+  }
+
   const [formData, setFormData] = useState({
-    full_name: prefill?.full_name || '',
-    email: prefill?.email || '',
-    birth_date: prefill?.birth_date || '',
-    gender: prefill?.gender || '',
-    phone: prefill?.phone || '',
+    full_name: prefill?.full_name || storedStep1?.full_name || user?.full_name || '',
+    email: prefill?.email || storedStep1?.email || user?.email || '',
+    birth_date: prefill?.birth_date || storedStep1?.birth_date || '',
+    gender: prefill?.gender || storedStep1?.gender || '',
+    phone: prefill?.phone || storedStep1?.phone || user?.phone || '',
     password: '',
     password_confirm: '',
-    accept_terms: false
+    accept_terms: storedStep1?.accept_terms || false
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
 
-  // Redirecionar se já estiver logado
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard');
-    }
-  }, [isAuthenticated, navigate]);
+  // Redirecionar apenas se perfil já completo (evitar bloquear retorno para etapa 1)
+  // OBS: profile_complete vem via user, então simplificamos: rota pública já lida no ProtectedRoute
+  // Aqui não forçamos saída; deixamos ProtectedRoute cuidar quando perfil completo.
 
   // Limpar erro da API quando campos mudarem
   useEffect(() => {
@@ -48,6 +56,16 @@ const Cadastro = () => {
       ...prev,
       [name]: finalValue
     }));
+    // Persistir incrementalmente (sem senha) para recuperação posterior
+    if (!['password', 'password_confirm'].includes(name)) {
+      try {
+        const snapshot = { ...formData, [name]: finalValue };
+        // não salvar senhas
+        delete (snapshot as any).password;
+        delete (snapshot as any).password_confirm;
+        localStorage.setItem('registration_step1_data', JSON.stringify(snapshot));
+      } catch {}
+    }
     
     // Limpar erro do campo quando usuário começar a digitar
     if (errors[name]) {
@@ -130,12 +148,10 @@ const Cadastro = () => {
       return;
     }
 
-    console.log('✅ Validação passou, iniciando registro...');
+    console.log('✅ Validação passou, prosseguindo para etapa 2...');
 
     try {
-      console.log('📡 Chamando register com dados:', formData);
-      
-      // Garantir que todos os campos obrigatórios estão definidos
+      // Preparar dados para persistir e passar para próxima etapa
       const registrationData = {
         email: formData.email,
         full_name: formData.full_name,
@@ -147,10 +163,14 @@ const Cadastro = () => {
         accept_terms: formData.accept_terms
       };
       
-      console.log('📡 Dados formatados para envio:', registrationData);
+      console.log('📡 Dados validados para etapa 1:', registrationData);
       
-      await register(registrationData);
-      console.log('✅ Register bem-sucedido, definindo success=true');
+      // Persistir etapa 1 para usar na finalização
+      try { 
+        localStorage.setItem('registration_step1_data', JSON.stringify(registrationData)); 
+      } catch {}
+      
+      console.log('✅ Dados da etapa 1 validados e persistidos');
       setSuccess(true);
       
       console.log('⏰ Aguardando 2 segundos antes de navegar...');
@@ -167,8 +187,7 @@ const Cadastro = () => {
         });
       }, 2000);
     } catch (err) {
-      // Erro já foi tratado pelo hook useAuth
-      console.error('❌ Erro no registro:', err);
+      console.error('❌ Erro na validação:', err);
     }
   };
 

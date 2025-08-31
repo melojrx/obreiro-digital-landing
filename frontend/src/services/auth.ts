@@ -37,6 +37,35 @@ export interface CompleteProfileData {
   role?: string;
   email_notifications?: boolean;
   sms_notifications?: boolean;
+  subscription_plan?: string;
+}
+
+export interface FinalizeRegistrationData {
+  // Dados pessoais (etapa 1)
+  email: string;
+  full_name: string;
+  phone: string;
+  password: string;
+  birth_date?: string;
+  gender?: string;
+  
+  // Dados da igreja (etapa 2)
+  denomination_id?: number;
+  church_name: string;
+  church_cnpj?: string;
+  church_email: string;
+  church_phone: string;
+  branch_name?: string;
+  church_address: string;
+  pastor_name: string;
+  cpf?: string;
+  bio?: string;
+  email_notifications?: boolean;
+  sms_notifications?: boolean;
+  
+  // Plano (etapa 3)
+  subscription_plan: string;
+  role?: string;
 }
 
 export interface User {
@@ -208,7 +237,8 @@ export const authService = {
   },
 
   /**
-   * Completar perfil do usuário (Etapa 3 - Final)
+   * Completar perfil do usuário (Etapa 3 - Final) - DEPRECATED
+   * Use finalizeRegistration em vez desta função
    */
   async completeProfile(data: CompleteProfileData): Promise<User> {
     try {
@@ -216,6 +246,27 @@ export const authService = {
       const response = await api.post<User>('/users/complete_profile/', data);
       localStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Finalizar registro completo (Etapa 3 - Final)
+   * Cria usuário DENOMINATION_ADMIN com igreja e plano
+   */
+  async finalizeRegistration(data: FinalizeRegistrationData): Promise<{ user: User; token: string }> {
+    try {
+      const response = await api.post<{ user: User; token: string; message: string }>('/users/finalize_registration/', data);
+      
+      // Salvar token e usuário
+      localStorage.setItem('auth_token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      
+      return {
+        user: response.data.user,
+        token: response.data.token
+      };
     } catch (error) {
       throw handleApiError(error);
     }

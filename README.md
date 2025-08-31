@@ -268,10 +268,120 @@ READ_ONLY (3)            ← Apenas visualização
 - **django-filter** - Filtros avançados de API
 - **django-cors-headers** - Configuração CORS
 
-### Frontend - React Professional
-- **React 18** - Biblioteca JavaScript moderna
-- **TypeScript 5.0** - Tipagem estática avançada
-- **Vite** - Build tool de alta performance
+### 🔄 **Em Desenvolvimento**
+
+#### 🏛️ **Gestão Completa de Igrejas e Filiais**
+
+**Status**: **🟡 EM DESENVOLVIMENTO**
+
+- ⛪ **CRUD de Igrejas**: Cadastro completo com dados administrativos
+- 🏢 **Gestão de Filiais**: Sistema hierárquico igreja-sede → filiais
+- 📊 **Dashboard por Igreja**: Métricas específicas de cada unidade
+- 📈 **Relatórios Consolidados**: Visão geral da denominação
+- 🔗 **Transferência de Membros**: Entre igrejas e filiais
+- 💰 **Gestão Financeira**: Orçamentos e transferências
+
+#### 💰 **Módulo Financeiro**
+
+**Status**: **🔴 PLANEJADO**
+
+- 💰 **Gestão de Dízimos**: Controle de contribuições
+- 📊 **Relatórios Financeiros**: Entradas, saídas e balanços
+- 🏦 **Múltiplas Contas**: Gestão de diferentes contas bancárias
+- 📈 **Orçamentos**: Planejamento e controle orçamentário
+- 📱 **PIX Integrado**: Recebimento via QR Code
+- 🧾 **Emissão de Recibos**: Automatizada com PDF
+
+#### 📅 **Módulo de Atividades**
+
+**Status**: **🔴 PLANEJADO**
+
+- 📅 **Calendário Integrado**: Visualização mensal/semanal
+- 🎪 **Gestão de Eventos**: Cultos, reuniões, eventos especiais
+- 👥 **Controle de Presença**: Lista de participantes
+- 🔔 **Lembretes**: Notificações automáticas
+- 📊 **Relatórios de Participação**: Analytics de engajamento
+- 🎯 **Ministérios**: Gestão de grupos e lideranças
+
+#### 💬 **Módulo de Mensagens**
+
+**Status**: **🔴 PLANEJADO**
+
+- 📧 **Email Marketing**: Campanhas segmentadas
+- 📱 **SMS/WhatsApp**: Integração com APIs
+- 🔔 **Notificações Push**: Alertas em tempo real
+- 📋 **Templates**: Mensagens pré-definidas
+- 📊 **Analytics**: Taxa de abertura e engajamento
+- 🎯 **Segmentação**: Por grupos, ministérios, idade
+
+#### 📖 **Módulo de Devocionais**
+
+**Status**: **🔴 PLANEJADO**
+
+- 📖 **Biblioteca de Devocionais**: Conteúdo diário
+- ✍️ **Editor de Conteúdo**: Criação personalizada
+- 📅 **Programação**: Agendamento automático
+- 📱 **App Mobile**: Acesso offline
+- 💬 **Comentários**: Interação da comunidade
+- 📊 **Métricas de Leitura**: Engajamento do conteúdo
+
+#### 🚨 **Sistema de Alertas**
+
+**Status**: **🔴 PLANEJADO**
+
+- 🔔 **Alertas Personalizados**: Por eventos e métricas
+- 📊 **Dashboard de Alertas**: Central de notificações
+- ⚙️ **Configurações**: Personalização por usuário
+- 📧 **Múltiplos Canais**: Email, SMS, Push
+- 🎯 **Alertas Inteligentes**: IA para detecção de padrões
+
+#### 📈 **Relatórios Avançados**
+
+**Status**: **🔴 PLANEJADO**
+
+- 📊 **Business Intelligence**: Dashboards executivos
+- 📈 **Análise de Crescimento**: Tendências e projeções
+- 📋 **Relatórios Customizados**: Builder visual
+- 📱 **Exportação**: PDF, Excel, CSV
+- 🎯 **KPIs Eclesiásticos**: Métricas específicas
+- 📅 **Relatórios Periódicos**: Automatizados
+
+#### ⚙️ **Configurações e Personalizações**
+
+**Status**: **🔴 PLANEJADO**
+
+- 🎨 **Temas Personalizados**: Cores e logos da igreja
+- ⚙️ **Configurações Globais**: Parâmetros do sistema
+- 🔧 **Customizações**: Campos e formulários
+- 🌐 **Multi-idioma**: Português, Inglês, Espanhol
+- 📱 **PWA**: Instalação como app
+- 🔌 **Integrações**: APIs externas
+
+#### 🔗 **Integrações**
+
+**Status**: **🔴 PLANEJADO**
+
+- 💰 **Gateways de Pagamento**: PagSeguro, Mercado Pago
+- 📧 **Email Services**: SendGrid, Mailgun
+- 📱 **WhatsApp Business**: API oficial
+- 🏦 **Open Banking**: Integração bancária
+- 📊 **Google Analytics**: Métricas web
+- ☁️ **Cloud Storage**: AWS S3, Google Drive
+
+## 🛠️ Stack Tecnológica
+
+### Backend
+- **Django 5.2.3** - Framework web Python
+- **Django REST Framework** - API REST robusta
+- **PostgreSQL** - Banco de dados (desenvolvimento e produção)
+- **Token Authentication** - Sistema de autenticação
+- **Pillow** - Processamento de imagens
+- **drf-spectacular** - Documentação automática da API
+
+### Frontend
+- **React 18** - Biblioteca JavaScript
+- **TypeScript** - Tipagem estática
+- **Vite** - Build tool moderna
 - **Tailwind CSS** - Framework CSS utilitário
 - **shadcn/ui** - Sistema de componentes profissional
 - **React Router v6** - Roteamento SPA avançado

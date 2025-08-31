@@ -12,7 +12,7 @@ from drf_spectacular.views import (
 from apps.denominations.views import DenominationViewSet
 from apps.churches.views import ChurchViewSet
 from apps.branches.views import BranchViewSet
-from apps.members.views import MemberViewSet, MembershipStatusViewSet
+from apps.members.views import MemberViewSet
 from apps.visitors.views import VisitorViewSet
 from apps.activities.views import ActivityViewSet
 
@@ -27,7 +27,6 @@ router.register(r'denominations', DenominationViewSet, basename='denomination')
 router.register(r'churches', ChurchViewSet, basename='church')
 router.register(r'branches', BranchViewSet, basename='branch')
 router.register(r'members', MemberViewSet, basename='member')
-router.register(r'membership-status', MembershipStatusViewSet, basename='membershipstatus')
 router.register(r'visitors', VisitorViewSet, basename='visitor')
 router.register(r'activities', ActivityViewSet, basename='activity')
 
@@ -39,6 +38,8 @@ urlpatterns = [
     # Endpoints de registro de usuários
     path('users/register/', views.UserRegistrationView.as_view(), name='users-register'),
     path('users/complete_profile/', views.CompleteProfileView.as_view(), name='users-complete-profile'),
+    path('users/finalize_registration/', views.FinalizeRegistrationView.as_view(), name='users-finalize-registration'),
+    path('users/save_partial_profile/', views.save_partial_profile_view, name='users-save-partial-profile'),
     
     # Usuários (endpoints de perfil) - URLs diretas
     path('users/me/', views.user_me_view, name='users-me'),

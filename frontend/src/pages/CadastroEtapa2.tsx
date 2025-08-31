@@ -34,25 +34,53 @@ const CadastroEtapa2 = () => {
   const location = useLocation();
   const { personalData, savedChurchData } = location.state || {};
 
-  // Carregar dados salvos se existirem
+  // Verificar se há dados da etapa 1 (navigation state ou localStorage)
   useEffect(() => {
-    if (savedChurchData) {
-      setFormData({
-        denomination_id: savedChurchData.denomination_id?.toString() || '',
-        church_name: savedChurchData.church_name || '',
-        church_cnpj: savedChurchData.church_cnpj || '',
-        church_email: savedChurchData.church_email || '',
-        church_phone: savedChurchData.church_phone || '',
-        branch_name: savedChurchData.branch_name || '',
-        church_address: savedChurchData.church_address || '',
-        pastor_name: savedChurchData.pastor_name || '',
-        church_zipcode: '', // CEP não é salvo no churchData
-        church_city: '', // Estes campos são de endereço completo
-        church_state: '',
-        church_neighborhood: '',
-        church_number: '',
-        church_complement: ''
-      });
+    let step1Data = personalData;
+    
+    if (!step1Data) {
+      // Tentar carregar do localStorage como fallback
+      try {
+        const raw = localStorage.getItem('registration_step1_data');
+        if (raw) step1Data = JSON.parse(raw);
+      } catch {}
+    }
+    
+    // Se ainda não há dados da etapa 1, redirecionar
+    if (!step1Data || !step1Data.email || !step1Data.full_name) {
+      console.log('❌ CadastroEtapa2: Dados da etapa 1 não encontrados, redirecionando...');
+      navigate('/cadastro');
+      return;
+    }
+  }, [personalData, navigate]);
+
+  // Carregar dados salvos (navigation state ou localStorage)
+  useEffect(() => {
+    let restored: any = null;
+    try {
+      const raw = localStorage.getItem('registration_step2_data');
+      if (raw) restored = JSON.parse(raw);
+    } catch {}
+
+    const source = savedChurchData || restored;
+    if (source) {
+      setFormData(prev => ({
+        ...prev,
+        denomination_id: source.denomination_id?.toString() || source.denomination_id || '',
+        church_name: source.church_name || '',
+        church_cnpj: source.church_cnpj || '',
+        church_email: source.church_email || '',
+        church_phone: source.church_phone || '',
+        branch_name: source.branch_name || '',
+        church_address: source.church_address || '',
+        pastor_name: source.pastor_name || '',
+        church_zipcode: source.church_zipcode || '',
+        church_city: source.church_city || '',
+        church_state: source.church_state || '',
+        church_neighborhood: source.church_neighborhood || '',
+        church_number: source.church_number || '',
+        church_complement: source.church_complement || ''
+      }));
     }
   }, [savedChurchData]);
 
@@ -86,6 +114,12 @@ const CadastroEtapa2 = () => {
       ...prev,
       [name]: value
     }));
+
+    // Persistir snapshot local da etapa 2
+    try {
+      const snapshot = { ...formData, [name]: value };
+      localStorage.setItem('registration_step2_data', JSON.stringify(snapshot));
+    } catch {}
     
     // Limpar erro do campo quando usuário começar a digitar
     if (errors[name]) {
@@ -158,6 +192,7 @@ const CadastroEtapa2 = () => {
       ...prev,
       church_cnpj: formatted
     }));
+    try { localStorage.setItem('registration_step2_data', JSON.stringify({ ...formData, church_cnpj: formatted })); } catch {}
     
     if (errors.church_cnpj) {
       setErrors(prev => ({
@@ -185,6 +220,7 @@ const CadastroEtapa2 = () => {
       ...prev,
       church_phone: formatted
     }));
+    try { localStorage.setItem('registration_step2_data', JSON.stringify({ ...formData, church_phone: formatted })); } catch {}
     
     if (errors.church_phone) {
       setErrors(prev => ({
@@ -204,13 +240,17 @@ const CadastroEtapa2 = () => {
     setCepError(null);
     try {
       const address = await getAddressByCEP(onlyDigits);
-      setFormData(prev => ({
-        ...prev,
-        church_address: address.logradouro,
-        church_city: address.localidade,
-        church_state: address.uf,
-        church_neighborhood: address.bairro,
-      }));
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          church_address: address.logradouro,
+          church_city: address.localidade,
+          church_state: address.uf,
+          church_neighborhood: address.bairro,
+        };
+        try { localStorage.setItem('registration_step2_data', JSON.stringify(updated)); } catch {}
+        return updated;
+      });
       // Focar no campo de número após a busca
       document.getElementById('church_number')?.focus();
     } catch (err) {
@@ -232,7 +272,11 @@ const CadastroEtapa2 = () => {
       .replace(/^(\d{5})(\d)/, '$1-$2')
       .slice(0, 9);
 
-    setFormData(prev => ({ ...prev, church_zipcode: formattedCep }));
+    setFormData(prev => {
+      const updated = { ...prev, church_zipcode: formattedCep };
+      try { localStorage.setItem('registration_step2_data', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     
     if (formattedCep.replace(/\D/g, '').length === 8) {
       handleCepSearch(formattedCep);
@@ -257,58 +301,38 @@ const CadastroEtapa2 = () => {
       church_phone: formData.church_phone,
       branch_name: formData.branch_name || undefined,
       church_address: formData.church_address,
+      church_city: formData.church_city || undefined,
+      church_state: formData.church_state || undefined,
+      church_zipcode: formData.church_zipcode || undefined,
       pastor_name: formData.pastor_name,
       role: 'pastor'
     };
 
     try {
-      console.log('💾 Salvando dados parciais no backend...');
+      console.log('💾 Validando e persistindo dados da etapa 2...');
       
-      // ✅ SALVAR dados no backend antes de navegar
-      await savePartialProfile(profileData);
+      // Persistir dados da etapa 2 para usar na finalização
+      try { 
+        localStorage.setItem('registration_step2_data', JSON.stringify(formData)); 
+      } catch {}
       
-      console.log('✅ Dados salvos com sucesso, navegando para Etapa 3');
+      console.log('✅ Dados da etapa 2 validados e persistidos, navegando para Etapa 3');
       
-      // Navegar apenas após sucesso no salvamento
+      // Navegar para etapa 3 com todos os dados
       navigate('/cadastro/etapa-3', { 
         state: { 
           personalData: personalData, // Dados da Etapa 1
           churchData: profileData,    // Dados da Etapa 2
           rawFormData: formData,
-          saved: true // Flag indicando que foi salvo
+          validated: true // Flag indicando que foi validado
         } 
       });
       
     } catch (err) {
-      console.error('❌ Erro ao salvar dados parciais:', err);
-      // Erro já tratado pelo hook useAuth
+      console.error('❌ Erro ao validar dados:', err);
     }
   };
 
-  const handleContinueLater = async () => {
-    // Salvar progresso antes de sair
-    if (Object.values(formData).some(value => value.trim() !== '')) {
-      const profileData = {
-        denomination_id: formData.denomination_id ? parseInt(formData.denomination_id) : undefined,
-        church_name: formData.church_name || undefined,
-        church_cnpj: formData.church_cnpj || undefined,
-        church_email: formData.church_email || undefined,
-        church_phone: formData.church_phone || undefined,
-        branch_name: formData.branch_name || undefined,
-        church_address: formData.church_address || undefined,
-        pastor_name: formData.pastor_name || undefined,
-      };
-      
-      try {
-        await savePartialProfile(profileData);
-        console.log('💾 Progresso salvo para continuar mais tarde');
-      } catch (err) {
-        console.warn('⚠️ Não foi possível salvar o progresso:', err);
-      }
-    }
-    
-    navigate('/dashboard');
-  };
 
   const handleBack = async () => {
     // Salvar progresso atual antes de voltar
@@ -321,11 +345,15 @@ const CadastroEtapa2 = () => {
         church_phone: formData.church_phone || undefined,
         branch_name: formData.branch_name || undefined,
         church_address: formData.church_address || undefined,
+        church_city: formData.church_city || undefined,
+        church_state: formData.church_state || undefined,
+        church_zipcode: formData.church_zipcode || undefined,
         pastor_name: formData.pastor_name || undefined,
       };
       
       try {
         await savePartialProfile(profileData);
+        try { localStorage.setItem('registration_step2_data', JSON.stringify(formData)); } catch {}
         console.log('💾 Progresso salvo antes de voltar');
       } catch (err) {
         console.warn('⚠️ Não foi possível salvar o progresso:', err);
@@ -786,22 +814,6 @@ const CadastroEtapa2 = () => {
                   </>
                 ) : (
                   'Voltar'
-                )}
-              </button>
-              
-              <button
-                type="button"
-                onClick={handleContinueLater}
-                disabled={isLoading}
-                className="flex-1 py-3 px-4 border border-slate-300 text-sm font-semibold rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400 mr-2 inline-block"></div>
-                    Salvando...
-                  </>
-                ) : (
-                  'Continuar mais tarde'
                 )}
               </button>
               

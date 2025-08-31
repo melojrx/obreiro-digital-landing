@@ -477,5 +477,7 @@ media_prod/
 frontend_build/
 logs/
 
-# Arquivos de ambiente específicos (já cobertos acima)
-# .env_dev e .env_prod já estão na seção ARQUIVOS DE AMBIENTE
+# Arquivos de ambiente específicos
+.env_dev
+.env_prod
+.databricks

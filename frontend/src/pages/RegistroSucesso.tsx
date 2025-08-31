@@ -207,7 +207,19 @@ const RegistroSucesso: React.FC = () => {
           </Button>
           
           <Button
-            onClick={() => window.close()}
+            onClick={() => {
+              // Tenta fechar a janela se foi aberta por script, senão redireciona
+              try {
+                window.close();
+                // Se chegou aqui, window.close() não funcionou
+                setTimeout(() => {
+                  window.location.href = '/';
+                }, 100);
+              } catch (error) {
+                // Fallback: redirecionar para home
+                window.location.href = '/';
+              }
+            }}
             className="flex-1"
           >
             Finalizar

@@ -58,7 +58,7 @@ def reverse_migration(apps, schema_editor):
 class Migration(migrations.Migration):
     
     dependencies = [
-        ('members', '0003_merge_0002_alter_member_gender_0002_membershipstatus'),
+        ('members', '0002_alter_member_gender'),
     ]
     
     operations = [

@@ -90,7 +90,7 @@ const AppContent = () => {
       <Route 
         path="/cadastro/etapa-2" 
         element={
-          <ProtectedRoute level="auth_incomplete">
+          <ProtectedRoute level="public">
             <CadastroEtapa2 />
           </ProtectedRoute>
         } 
@@ -98,7 +98,7 @@ const AppContent = () => {
       <Route 
         path="/cadastro/etapa-3" 
         element={
-          <ProtectedRoute level="auth_incomplete">
+          <ProtectedRoute level="public">
             <CadastroEtapa3 />
           </ProtectedRoute>
         } 
