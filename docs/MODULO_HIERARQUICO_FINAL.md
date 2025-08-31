@@ -42,10 +42,9 @@ O **Módulo de Gestão Hierárquica** foi implementado com **100% de sucesso** e
 
 ✅ **Arquitetura multi-tenant escalável**  
 ✅ **API REST completa** com documentação Swagger  
-✅ **Dashboard analítico avançado** consolidado  
-✅ **Sistema de QR Code** para captação de visitantes  
+✅ **Dashboard analítico avançado** consolidado    
 ✅ **Interface responsiva e intuitiva** mobile-first  
-✅ **Gestão hierárquica** de denominações, igrejas e filiais
+✅ **Gestão hierárquica** de igrejas e filiais
 
 ---
 
@@ -203,9 +202,9 @@ erDiagram
 
 #### **Relatórios Financeiros**
 - ✅ Consolidação por denominação
-- ✅ Performance por igreja
+- ✅ Performance por igreja ???
 - ✅ Exportação Excel/PDF
-- ✅ Métricas de dízimos e ofertas
+- ✅ Métricas de dízimos e ofertas ???
 
 ### 2. CRUD Completo de Igrejas
 

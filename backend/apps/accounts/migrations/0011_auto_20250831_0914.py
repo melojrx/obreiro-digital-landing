@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0010_customuser_subscription_plan'),
+        ('accounts', '0010_churchuser_can_create_churches_and_more'),
     ]
 
     operations = [

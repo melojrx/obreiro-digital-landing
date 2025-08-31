@@ -47,7 +47,7 @@ class Denomination(BaseModel):
         on_delete=models.PROTECT,
         related_name='administered_denominations',
         verbose_name="Administrador Principal",
-        help_text="Usuário que criou e administra esta denominação"
+        help_text="Usuário que criou e administra esta denominação. Dono da Conta."
     )
     
     # Dados de contato da sede

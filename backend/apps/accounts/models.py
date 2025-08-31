@@ -372,31 +372,6 @@ class ChurchUser(BaseModel):
         help_text="Se pode gerenciar filiais"
     )
     
-    # Permissões específicas de denominação
-    can_manage_denomination = models.BooleanField(
-        "Gerenciar Denominação",
-        default=False,
-        help_text="Se pode gerenciar configurações da denominação"
-    )
-    
-    can_create_churches = models.BooleanField(
-        "Criar Igrejas",
-        default=False,
-        help_text="Se pode criar novas igrejas na denominação"
-    )
-    
-    can_manage_church_admins = models.BooleanField(
-        "Gerenciar Admins de Igreja",
-        default=False,
-        help_text="Se pode definir administradores de igrejas"
-    )
-    
-    can_view_financial_reports = models.BooleanField(
-        "Ver Relatórios Financeiros",
-        default=False,
-        help_text="Se pode ver relatórios financeiros consolidados"
-    )
-    
     # Filiais específicas que pode gerenciar
     managed_branches = models.ManyToManyField(
         'branches.Branch',
