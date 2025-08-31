@@ -11,10 +11,12 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Count, Q
 from datetime import datetime, date
 
-from .models import Member
+from .models import Member, MembershipStatusLog, MinisterialFunctionLog
 from .serializers import (
     MemberSerializer, MemberListSerializer, MemberCreateSerializer, 
-    MemberUpdateSerializer, MemberSummarySerializer
+    MemberUpdateSerializer, MemberSummarySerializer,
+    MembershipStatusLogSerializer, MemberStatusChangeSerializer,
+    MinisterialFunctionLogSerializer, MinisterialFunctionChangeSerializer
 )
 
 
@@ -159,32 +161,36 @@ class MemberViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['patch'])
     def change_status(self, request, pk=None):
-        """Alterar status de membresia"""
+        """Alterar status de membresia - VERSÃO SIMPLIFICADA COM AUDITORIA"""
         member = self.get_object()
-        new_status = request.data.get('membership_status')
+        serializer = MemberStatusChangeSerializer(data=request.data)
         
-        if not new_status:
+        if not serializer.is_valid():
             return Response(
-                {'error': 'Status de membresia é obrigatório'}, 
+                serializer.errors, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validar se o status é válido
-        valid_statuses = [choice[0] for choice in member._meta.get_field('membership_status').choices]
-        if new_status not in valid_statuses:
-            return Response(
-                {'error': 'Status de membresia inválido'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Usar o método melhorado do model que já faz o log
+        changed = member.update_membership_status(
+            new_status=serializer.validated_data['new_status'],
+            reason=serializer.validated_data.get('reason', ''),
+            changed_by=request.user
+        )
         
-        member.membership_status = new_status
-        member.save()
-        
-        serializer = self.get_serializer(member)
-        return Response({
-            'message': 'Status de membresia alterado com sucesso',
-            'member': serializer.data
-        })
+        if changed:
+            # Retornar dados atualizados
+            member_serializer = self.get_serializer(member)
+            return Response({
+                'message': 'Status de membresia alterado com sucesso',
+                'member': member_serializer.data,
+                'logged': True  # Confirma que foi logado
+            })
+        else:
+            return Response({
+                'message': 'Nenhuma alteração necessária - status já é o mesmo',
+                'logged': False
+            })
     
     @action(detail=True, methods=['get'])
     def profile(self, request, pk=None):
@@ -204,6 +210,104 @@ class MemberViewSet(viewsets.ModelViewSet):
         member_data['ministries_list'] = member.get_ministries_list()
         
         return Response(member_data)
+    
+    @action(detail=True, methods=['get'])
+    def status_history(self, request, pk=None):
+        """Histórico de mudanças de status - ENDPOINT SIMPLES E EFICIENTE"""
+        member = self.get_object()
+        
+        # Buscar histórico ordenado por data
+        history = MembershipStatusLog.objects.filter(member=member).order_by('-created_at')
+        
+        # Paginação opcional
+        page = self.paginate_queryset(history)
+        if page is not None:
+            serializer = MembershipStatusLogSerializer(page, many=True)
+            return self.get_paginated_response({
+                'member_name': member.full_name,
+                'current_status': member.membership_status,
+                'current_status_display': member.get_membership_status_display(),
+                'history': serializer.data,
+                'total_changes': history.count()
+            })
+        
+        # Sem paginação
+        serializer = MembershipStatusLogSerializer(history, many=True)
+        return Response({
+            'member_name': member.full_name,
+            'current_status': member.membership_status,
+            'current_status_display': member.get_membership_status_display(),
+            'history': serializer.data,
+            'total_changes': history.count()
+        })
+    
+    @action(detail=True, methods=['patch'])
+    def change_ministerial_function(self, request, pk=None):
+        """Alterar função ministerial - COM AUDITORIA AUTOMÁTICA"""
+        member = self.get_object()
+        serializer = MinisterialFunctionChangeSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Usar o método melhorado do model que já faz o log
+        changed = member.update_ministerial_function(
+            new_function=serializer.validated_data['new_function'],
+            effective_date=serializer.validated_data['effective_date'],
+            end_date=serializer.validated_data.get('end_date'),
+            observations=serializer.validated_data.get('observations', ''),
+            changed_by=request.user
+        )
+        
+        if changed:
+            # Retornar dados atualizados
+            member_serializer = self.get_serializer(member)
+            return Response({
+                'message': 'Função ministerial alterada com sucesso',
+                'member': member_serializer.data,
+                'logged': True
+            })
+        else:
+            return Response({
+                'message': 'Nenhuma alteração necessária - função já é a mesma',
+                'logged': False
+            })
+    
+    @action(detail=True, methods=['get'])
+    def ministerial_history(self, request, pk=None):
+        """Histórico de mudanças de função ministerial"""
+        member = self.get_object()
+        
+        # Buscar histórico ordenado por data efetiva
+        history = MinisterialFunctionLog.objects.filter(member=member).order_by('-effective_date', '-created_at')
+        
+        # Paginação opcional
+        page = self.paginate_queryset(history)
+        if page is not None:
+            serializer = MinisterialFunctionLogSerializer(page, many=True)
+            return Response({
+                'count': self.paginator.page.paginator.count,
+                'next': self.paginator.get_next_link(),
+                'previous': self.paginator.get_previous_link(),
+                'member_name': member.full_name,
+                'current_function': member.ministerial_function,
+                'current_function_display': member.get_ministerial_function_display(),
+                'total_changes': self.paginator.page.paginator.count,
+                'history': serializer.data,
+            })
+        
+        # Sem paginação
+        serializer = MinisterialFunctionLogSerializer(history, many=True)
+        return Response({
+            'member_name': member.full_name,
+            'current_function': member.ministerial_function,
+            'current_function_display': member.get_ministerial_function_display(),
+            'history': serializer.data,
+            'total_changes': history.count()
+        })
 
     @action(detail=False, methods=['get'])
     def export(self, request):

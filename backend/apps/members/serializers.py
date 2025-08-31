@@ -5,7 +5,7 @@ Gerencia serialização de membros
 
 from rest_framework import serializers
 from datetime import date
-from .models import Member
+from .models import Member, MembershipStatusLog, MinisterialFunctionLog
 
 
 class MemberSerializer(serializers.ModelSerializer):
@@ -244,3 +244,97 @@ class MemberSummarySerializer(serializers.ModelSerializer):
             today = date.today()
             return today.year - obj.birth_date.year - ((today.month, today.day) < (obj.birth_date.month, obj.birth_date.day))
         return None
+
+
+# =====================================
+# SERIALIZERS PARA AUDITORIA SIMPLES
+# =====================================
+
+class MembershipStatusLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer para histórico de mudanças de status - SIMPLES E EFICIENTE
+    """
+    
+    member_name = serializers.CharField(source='member.full_name', read_only=True)
+    changed_by_name = serializers.CharField(source='changed_by.full_name', read_only=True)
+    old_status_display = serializers.CharField(source='get_old_status_display', read_only=True)
+    new_status_display = serializers.CharField(source='get_new_status_display', read_only=True)
+    
+    class Meta:
+        model = MembershipStatusLog
+        fields = [
+            'id', 'member', 'member_name',
+            'old_status', 'old_status_display',
+            'new_status', 'new_status_display', 
+            'reason', 'changed_by', 'changed_by_name',
+            'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class MemberStatusChangeSerializer(serializers.Serializer):
+    """
+    Serializer para mudança de status via API - VALIDAÇÃO SIMPLES
+    """
+    
+    new_status = serializers.ChoiceField(
+        choices=Member._meta.get_field('membership_status').choices,
+        help_text="Novo status de membresia"
+    )
+    
+    reason = serializers.CharField(
+        max_length=500,
+        required=False,
+        allow_blank=True,
+        help_text="Motivo da mudança (opcional)"
+    )
+
+
+class MinisterialFunctionLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer para histórico de mudanças de função ministerial
+    """
+    
+    member_name = serializers.CharField(source='member.full_name', read_only=True)
+    changed_by_name = serializers.CharField(source='changed_by.full_name', read_only=True)
+    old_function_display = serializers.CharField(source='get_old_function_display', read_only=True)
+    new_function_display = serializers.CharField(source='get_new_function_display', read_only=True)
+    
+    class Meta:
+        model = MinisterialFunctionLog
+        fields = [
+            'id', 'member', 'member_name',
+            'old_function', 'old_function_display',
+            'new_function', 'new_function_display',
+            'effective_date', 'end_date', 'observations',
+            'changed_by', 'changed_by_name', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class MinisterialFunctionChangeSerializer(serializers.Serializer):
+    """
+    Serializer para mudança de função ministerial via API
+    """
+    
+    new_function = serializers.ChoiceField(
+        choices=Member._meta.get_field('ministerial_function').choices,
+        help_text="Nova função ministerial"
+    )
+    
+    effective_date = serializers.DateField(
+        help_text="Data em que a função entra em vigor"
+    )
+    
+    end_date = serializers.DateField(
+        required=False,
+        allow_null=True,
+        help_text="Data final da função (opcional)"
+    )
+    
+    observations = serializers.CharField(
+        max_length=1000,
+        required=False,
+        allow_blank=True,
+        help_text="Observações sobre a mudança (opcional)"
+    )

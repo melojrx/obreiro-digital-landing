@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('members', '0004_migrate_ministerial_data'),
+        ('members', '0002_alter_member_gender'),
     ]
 
     operations = [
@@ -25,24 +25,5 @@ class Migration(migrations.Migration):
             model_name='member',
             name='spouse_name',
             field=models.CharField(blank=True, help_text='Nome completo do cônjuge (preencher se casado)', max_length=200, verbose_name='Nome do Cônjuge'),
-        ),
-        migrations.CreateModel(
-            name='MembershipStatus',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('status', models.CharField(choices=[('member', 'Membro'), ('deacon', 'Diácono'), ('deaconess', 'Diaconisa'), ('elder', 'Presbítero'), ('evangelist', 'Evangelista'), ('pastor', 'Pastor'), ('female_pastor', 'Pastora'), ('missionary', 'Missionário'), ('female_missionary', 'Missionária'), ('leader', 'Líder'), ('cooperator', 'Cooperador(a)'), ('auxiliary', 'Auxiliar')], default='member', help_text='Função/cargo ministerial', max_length=20)),
-                ('is_active', models.BooleanField(default=True, help_text='Se o status está ativo/inativo', verbose_name='Ativo/Inativo')),
-                ('ordination_date', models.DateField(blank=True, help_text='Data de ordenação ministerial (se aplicável)', null=True, verbose_name='Data de Ordenação')),
-                ('termination_date', models.DateField(blank=True, help_text='Data de término do status (se aplicável)', null=True, verbose_name='Data de Término')),
-                ('observation', models.TextField(blank=True, help_text='Observações sobre o status', verbose_name='Observação')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('id_member', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='membership_statuses', to='members.member', verbose_name='Membro')),
-            ],
-            options={
-                'verbose_name': 'Status de Membresia',
-                'verbose_name_plural': 'Status de Membresia',
-                'ordering': ['-created_at'],
-            },
         ),
     ]

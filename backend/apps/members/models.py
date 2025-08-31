@@ -609,20 +609,51 @@ class Member(BaseModel):
             )
         return None
     
-    def update_membership_status(self, new_status, reason=""):
-        """Atualiza status de membresia com log"""
+    def update_membership_status(self, new_status, reason="", changed_by=None):
+        """Atualiza status de membresia com log automático - VERSÃO SIMPLIFICADA"""
         old_status = self.membership_status
-        self.membership_status = new_status
-        self.save()
         
-        # Log da mudança
-        MembershipStatusLog.objects.create(
-            member=self,
-            previous_status=old_status,
-            new_status=new_status,
-            reason=reason,
-            changed_by=None  # TODO: Adicionar usuário quando implementar
-        )
+        # Só cria log se o status realmente mudou
+        if old_status != new_status:
+            self.membership_status = new_status
+            self.save(update_fields=['membership_status', 'updated_at'])
+            
+            # Log da mudança usando a estrutura simples
+            MembershipStatusLog.objects.create(
+                member=self,
+                old_status=old_status,
+                new_status=new_status,
+                reason=reason,
+                changed_by=changed_by
+            )
+            
+            return True  # Indica que houve mudança
+        
+        return False  # Nenhuma mudança necessária
+    
+    def update_ministerial_function(self, new_function, effective_date, observations="", changed_by=None, end_date=None):
+        """Atualiza função ministerial com log automático"""
+        old_function = self.ministerial_function
+        
+        # Só cria log se a função realmente mudou
+        if old_function != new_function:
+            self.ministerial_function = new_function
+            self.save(update_fields=['ministerial_function', 'updated_at'])
+            
+            # Log da mudança usando a estrutura simples
+            MinisterialFunctionLog.objects.create(
+                member=self,
+                old_function=old_function,
+                new_function=new_function,
+                effective_date=effective_date,
+                end_date=end_date,
+                observations=observations,
+                changed_by=changed_by
+            )
+            
+            return True  # Indica que houve mudança
+        
+        return False  # Nenhuma mudança necessária
     
     def transfer_to_church(self, new_church, reason=""):
         """Transfere membro para outra igreja"""
@@ -734,87 +765,129 @@ class MemberTransferLog(BaseModel):
 
 
 # =====================================
-# STATUS DE MEMBRESIA - NOVA ESTRUTURA
+# AUDITORIA DE STATUS - SOLUÇÃO SIMPLES
 # =====================================
-class MinisterialFunctionChoices(models.TextChoices):
-    """Choices padronizados para funções ministeriais"""
-    MEMBER = 'member', 'Membro'
-    DEACON = 'deacon', 'Diácono'
-    DEACONESS = 'deaconess', 'Diaconisa'
-    ELDER = 'elder', 'Presbítero'
-    EVANGELIST = 'evangelist', 'Evangelista'
-    PASTOR = 'pastor', 'Pastor'
-    FEMALE_PASTOR = 'female_pastor', 'Pastora'
-    MISSIONARY = 'missionary', 'Missionário'
-    FEMALE_MISSIONARY = 'female_missionary', 'Missionária'
-    LEADER = 'leader', 'Líder'
-    COOPERATOR = 'cooperator', 'Cooperador(a)'
-    AUXILIARY = 'auxiliary', 'Auxiliar'
-
-
-class MembershipStatus(models.Model):
+class MembershipStatusLog(BaseModel):
     """
-    Status de Membresia - Baseado na estrutura da tabela existente da branch dev/magnum
+    Log de mudanças de status de membresia - SIMPLES E EFICIENTE
+    Mantém histórico completo sem duplicar estrutura de dados
     """
     
-    # Relacionamento com membro (nome do campo da migration: id_member)
-    id_member = models.ForeignKey(
+    member = models.ForeignKey(
         Member,
-        on_delete=models.PROTECT,
-        related_name='membership_statuses',
+        on_delete=models.CASCADE,
+        related_name='status_history',
         verbose_name="Membro"
     )
     
-    # Status ministerial
-    status = models.CharField(
+    old_status = models.CharField(
+        "Status Anterior",
         max_length=20,
-        choices=MinisterialFunctionChoices.choices,
-        default=MinisterialFunctionChoices.MEMBER,
-        help_text="Função/cargo ministerial"
+        choices=MembershipStatusChoices.choices,
+        help_text="Status anterior do membro"
     )
     
-    # Flag ativo (nome do campo da migration: is_active)
-    is_active = models.BooleanField(
-        "Ativo/Inativo",
-        default=True,
-        help_text="Se o status está ativo/inativo"
+    new_status = models.CharField(
+        "Novo Status", 
+        max_length=20,
+        choices=MembershipStatusChoices.choices,
+        help_text="Novo status do membro"
     )
     
-    # Datas importantes
-    ordination_date = models.DateField(
-        "Data de Ordenação",
-        blank=True,
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
         null=True,
-        help_text="Data de ordenação ministerial (se aplicável)"
-    )
-    
-    termination_date = models.DateField(
-        "Data de Término",
         blank=True,
-        null=True,
-        help_text="Data de término do status (se aplicável)"
+        related_name='member_status_changes_made',
+        verbose_name="Alterado por"
     )
     
-    # Observações
-    observation = models.TextField(
-        "Observação",
+    reason = models.TextField(
+        "Motivo",
         blank=True,
-        help_text="Observações sobre o status"
+        help_text="Motivo da mudança de status"
     )
     
-    # Timestamps (da migration original)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at herdado de BaseModel para timestamp automático
     
     class Meta:
-        verbose_name = "Status de Membresia"
-        verbose_name_plural = "Status de Membresia"
+        verbose_name = "Log de Status de Membresia" 
+        verbose_name_plural = "Logs de Status de Membresia"
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['member', '-created_at']),
+            models.Index(fields=['new_status', '-created_at']),
+        ]
     
     def __str__(self):
-        return f"{self.id_member.full_name} - {self.get_status_display()}"
+        return f"{self.member.full_name}: {self.old_status} → {self.new_status}"
+
+
+class MinisterialFunctionLog(BaseModel):
+    """
+    Log de mudanças de função ministerial - SIMPLES E EFICIENTE
+    Mantém histórico completo das funções ministeriais
+    """
     
-    @property
-    def member(self):
-        """Alias para compatibilidade"""
-        return self.id_member
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='ministerial_history',
+        verbose_name="Membro"
+    )
+    
+    old_function = models.CharField(
+        "Função Anterior",
+        max_length=100,
+        choices=Member._meta.get_field('ministerial_function').choices,
+        help_text="Função ministerial anterior"
+    )
+    
+    new_function = models.CharField(
+        "Nova Função",
+        max_length=100,
+        choices=Member._meta.get_field('ministerial_function').choices,
+        help_text="Nova função ministerial"
+    )
+    
+    effective_date = models.DateField(
+        "Data Efetiva",
+        help_text="Data em que a função entra em vigor"
+    )
+    
+    end_date = models.DateField(
+        "Data Final",
+        null=True,
+        blank=True,
+        help_text="Data final da função (vazio se ainda ativa)"
+    )
+    
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ministerial_changes_made',
+        verbose_name="Alterado por"
+    )
+    
+    observations = models.TextField(
+        "Observações",
+        blank=True,
+        help_text="Observações sobre a mudança de função"
+    )
+    
+    # created_at herdado de BaseModel para timestamp automático
+    
+    class Meta:
+        verbose_name = "Log de Função Ministerial"
+        verbose_name_plural = "Logs de Função Ministerial"
+        ordering = ['-effective_date', '-created_at']
+        indexes = [
+            models.Index(fields=['member', '-effective_date']),
+            models.Index(fields=['new_function', '-effective_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.member.full_name}: {self.old_function} → {self.new_function}"

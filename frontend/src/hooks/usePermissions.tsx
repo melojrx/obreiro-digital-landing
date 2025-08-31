@@ -340,6 +340,59 @@ const ROLE_PERMISSIONS = {
     isMember: false,
   },
   
+  BRANCH_MANAGER: {
+    canViewMembers: true,
+    canCreateMembers: true,
+    canEditMembers: true,
+    canDeleteMembers: false,
+    canManageMembers: true,
+    canViewVisitors: true,
+    canCreateVisitors: true,
+    canEditVisitors: true,
+    canDeleteVisitors: false,
+    canManageVisitors: true,
+    canViewActivities: true,
+    canCreateActivities: true,
+    canEditActivities: true,
+    canDeleteActivities: true,
+    canManageActivities: true,
+    canViewBranches: true,
+    canCreateBranches: false,
+    canEditBranches: true, // Pode editar sua própria filial
+    canDeleteBranches: false,
+    canManageBranches: true, // Gerencia apenas sua filial
+    // Permissões hierárquicas - Gerente de filial tem acesso limitado
+    canViewDenominations: false,
+    canCreateDenominations: false,
+    canEditDenominations: false,
+    canDeleteDenominations: false,
+    canManageDenominations: false,
+    canManageDenomination: false,
+    canViewDenominationStats: false,
+    canManageDenominationChurches: false,
+    canViewChurches: true,
+    canCreateChurches: false,
+    canEditChurches: false,
+    canDeleteChurches: false,
+    canManageChurches: false,
+    canViewChurchStats: true,
+    canViewHierarchy: true,
+    canManageHierarchy: false,
+    canNavigateHierarchy: true,
+    // Outras permissões
+    canViewReports: true,
+    canViewDashboard: true,
+    canManageChurch: false,
+    canManageUsers: false,
+    canManageSettings: true, // Configurações da filial
+    isAdmin: false,
+    isChurchAdmin: false,
+    isPastor: false,
+    isSecretary: false,
+    isLeader: false,
+    isMember: false,
+  },
+
   MEMBER: {
     canViewMembers: true,
     canCreateMembers: false,
@@ -465,7 +518,32 @@ export const usePermissions = (): UserPermissions => {
       return ROLE_PERMISSIONS.DENOMINATION_ADMIN;
     }
     
-    // Verificar se é admin geral
+    // Verificar se é admin de igreja
+    if (user.email?.includes('igreja.admin') || user.email?.includes('church.admin')) {
+      return ROLE_PERMISSIONS.CHURCH_ADMIN;
+    }
+    
+    // Verificar se é gerente de filial
+    if (user.email?.includes('filial.admin') || user.email?.includes('branch.manager')) {
+      return ROLE_PERMISSIONS.BRANCH_MANAGER;
+    }
+    
+    // Verificar se é pastor
+    if (user.email?.includes('pastor')) {
+      return ROLE_PERMISSIONS.PASTOR;
+    }
+    
+    // Verificar se é secretário
+    if (user.email?.includes('secretario') || user.email?.includes('secretary')) {
+      return ROLE_PERMISSIONS.SECRETARY;
+    }
+    
+    // Verificar se é líder
+    if (user.email?.includes('lider') || user.email?.includes('leader')) {
+      return ROLE_PERMISSIONS.LEADER;
+    }
+    
+    // Verificar se é admin geral (fallback)
     const isAdmin = user.email?.includes('admin') || false;
     
     if (isAdmin) {
