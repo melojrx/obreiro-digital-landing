@@ -433,7 +433,7 @@ class ChurchUser(BaseModel):
     def set_permissions_by_role(self):
         """
         Define permissões automáticas baseadas no papel do usuário.
-        Chamado automaticamente ao criar um novo ChurchUser.
+        Pode ser chamado durante criação ou para corrigir permissões existentes.
         """
         
         # Reset all permissions (apenas campos que existem no banco)

@@ -440,7 +440,11 @@ class UserCompleteRegistrationNewSerializer(serializers.Serializer):
     sms_notifications = serializers.BooleanField(default=False)
     
     # Papel na igreja e plano (etapa 3)
-    role = serializers.CharField(default=RoleChoices.DENOMINATION_ADMIN)
+    role = serializers.ChoiceField(
+        choices=RoleChoices.choices,
+        default=RoleChoices.DENOMINATION_ADMIN,
+        help_text="Papel do usuário na igreja"
+    )
     subscription_plan = serializers.ChoiceField(
         choices=SubscriptionPlanChoices.choices,
         required=True,
@@ -562,7 +566,7 @@ class UserCompleteRegistrationNewSerializer(serializers.Serializer):
                 church=church,
                 role=validated_data.get('role', RoleChoices.DENOMINATION_ADMIN)
             )
-            church_user.set_permissions_by_role()
+            # Permissões são definidas automaticamente no método save() do modelo
             church_user.managed_branches.add(branch)
             
             # 7. Criar perfil do usuário com os dados extraídos

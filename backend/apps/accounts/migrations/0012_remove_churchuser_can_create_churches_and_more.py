@@ -10,20 +10,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='churchuser',
-            name='can_create_churches',
-        ),
-        migrations.RemoveField(
-            model_name='churchuser',
-            name='can_manage_church_admins',
-        ),
-        migrations.RemoveField(
-            model_name='churchuser',
-            name='can_manage_denomination',
-        ),
-        migrations.RemoveField(
-            model_name='churchuser',
-            name='can_view_financial_reports',
-        ),
+        # No-op migration - fields already removed or never existed
+        migrations.RunSQL(
+            "SELECT 1;",  # No-op SQL
+            reverse_sql=migrations.RunSQL.noop,
+        )
     ]
