@@ -43,6 +43,12 @@ const Sidebar: React.FC = () => {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const permissions = usePermissions();
 
+  // Debug temporário
+  console.log('🔍 Sidebar - user:', user?.email);
+  console.log('🔍 Sidebar - userChurch:', userChurch);
+  console.log('🔍 Sidebar - permissions.canManageDenomination:', permissions.canManageDenomination);
+  console.log('🔍 Sidebar - permissions.canCreateChurches:', permissions.canCreateChurches);
+
   const navigation: NavItem[] = [
     {
       title: 'PRINCIPAL',

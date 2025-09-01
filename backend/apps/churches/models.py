@@ -102,7 +102,6 @@ class Church(BaseModel):
     cnpj = models.CharField(
         "CNPJ",
         max_length=18,
-        unique=True,
         blank=True,
         null=True,
         validators=[validate_cnpj],
@@ -236,6 +235,10 @@ class Church(BaseModel):
         # Formatar campos
         if self.state:
             self.state = self.state.upper()
+        
+        # Tratar CNPJ vazio para evitar constraint unique
+        if self.cnpj == '':
+            self.cnpj = None
         
         super().save(*args, **kwargs)
     

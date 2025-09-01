@@ -510,9 +510,38 @@ export const usePermissions = (): UserPermissions => {
       return DEFAULT_PERMISSIONS;
     }
 
-    // Lógica baseada no email do usuário para desenvolvimento e produção
-    // Em produção será baseada nos dados reais do backend
+    // Usar dados reais do backend via userChurch
+    if (userChurch && userChurch.role) {
+      const role = userChurch.role.toUpperCase();
+      
+      // Debug temporário
+      console.log('🔍 usePermissions - userChurch.role:', userChurch.role);
+      console.log('🔍 usePermissions - role (uppercase):', role);
+      
+      // Mapear roles do backend para permissões do frontend
+      switch (role) {
+        case 'DENOMINATION_ADMIN':
+          return ROLE_PERMISSIONS.DENOMINATION_ADMIN;
+        case 'CHURCH_ADMIN':
+          return ROLE_PERMISSIONS.CHURCH_ADMIN;
+        case 'BRANCH_MANAGER':
+          return ROLE_PERMISSIONS.BRANCH_MANAGER;
+        case 'PASTOR':
+          return ROLE_PERMISSIONS.PASTOR;
+        case 'SECRETARY':
+          return ROLE_PERMISSIONS.SECRETARY;
+        case 'LEADER':
+          return ROLE_PERMISSIONS.LEADER;
+        case 'MEMBER':
+          return ROLE_PERMISSIONS.MEMBER;
+        case 'READ_ONLY':
+          return ROLE_PERMISSIONS.READ_ONLY;
+        default:
+          return ROLE_PERMISSIONS.MEMBER; // Default para member
+      }
+    }
     
+    // Fallback: Lógica baseada no email para desenvolvimento/casos especiais
     // Verificar se é admin de denominação
     if (user.email?.includes('denominacao.admin')) {
       return ROLE_PERMISSIONS.DENOMINATION_ADMIN;

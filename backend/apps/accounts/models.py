@@ -436,17 +436,13 @@ class ChurchUser(BaseModel):
         Chamado automaticamente ao criar um novo ChurchUser.
         """
         
-        # Reset all permissions
+        # Reset all permissions (apenas campos que existem no banco)
         self.can_access_admin = False
         self.can_manage_members = False
         self.can_manage_visitors = False
         self.can_manage_activities = False
         self.can_view_reports = False
         self.can_manage_branches = False
-        self.can_manage_denomination = False
-        self.can_create_churches = False
-        self.can_manage_church_admins = False
-        self.can_view_financial_reports = False
         
         # Set permissions based on role
         if self.role == RoleChoices.SUPER_ADMIN:
@@ -457,10 +453,6 @@ class ChurchUser(BaseModel):
             self.can_manage_activities = True
             self.can_view_reports = True
             self.can_manage_branches = True
-            self.can_manage_denomination = True
-            self.can_create_churches = True
-            self.can_manage_church_admins = True
-            self.can_view_financial_reports = True
             
         elif self.role == RoleChoices.DENOMINATION_ADMIN:
             # Admin de Denominação tem permissões específicas de denominação
@@ -470,10 +462,6 @@ class ChurchUser(BaseModel):
             self.can_manage_activities = True
             self.can_view_reports = True
             self.can_manage_branches = True
-            self.can_manage_denomination = True
-            self.can_create_churches = True
-            self.can_manage_church_admins = True
-            self.can_view_financial_reports = True
             
         elif self.role == RoleChoices.CHURCH_ADMIN:
             # Admin da igreja tem quase todas as permissões

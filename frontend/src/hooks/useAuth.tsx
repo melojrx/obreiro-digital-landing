@@ -83,13 +83,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.log('✅ Dados do usuário carregados do backend:', currentUser);
           
           // Carregar dados da igreja se o perfil estiver completo
+          console.log('🔍 useAuth - currentUser.is_profile_complete:', currentUser.is_profile_complete);
           if (currentUser.is_profile_complete) {
+            console.log('✅ Perfil completo, carregando dados da igreja...');
             try {
               const churchData = await authService.getUserChurch();
+              console.log('✅ Dados da igreja carregados:', churchData);
               setUserChurch(churchData);
             } catch (error) {
-              console.log('❌ Erro ao carregar dados da igreja');
+              console.log('❌ Erro ao carregar dados da igreja:', error);
             }
+          } else {
+            console.log('❌ Perfil não está completo, pulando carregamento da igreja');
           }
         } catch (error) {
           console.log('❌ Erro ao carregar dados do backend, limpando sessão');

@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0013_remove_extra_church_user_fields'),
+        ('accounts', '0011_auto_20250831_0914'),
     ]
 
     operations = [
