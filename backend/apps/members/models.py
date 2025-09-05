@@ -672,51 +672,6 @@ class Member(BaseModel):
         )
 
 
-class MembershipStatusLog(BaseModel):
-    """Log de mudanças de status de membresia"""
-    
-    member = models.ForeignKey(
-        Member,
-        on_delete=models.CASCADE,
-        related_name='status_logs',
-        verbose_name="Membro"
-    )
-    
-    previous_status = models.CharField(
-        "Status Anterior",
-        max_length=20,
-        choices=MembershipStatusChoices.choices
-    )
-    
-    new_status = models.CharField(
-        "Novo Status",
-        max_length=20,
-        choices=MembershipStatusChoices.choices
-    )
-    
-    reason = models.TextField(
-        "Motivo",
-        blank=True,
-        help_text="Motivo da mudança de status"
-    )
-    
-    changed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='member_status_changes',
-        verbose_name="Alterado por"
-    )
-    
-    class Meta:
-        verbose_name = "Log de Status de Membresia"
-        verbose_name_plural = "Logs de Status de Membresia"
-        ordering = ['-created_at']
-    
-    def __str__(self):
-        return f"{self.member.full_name}: {self.previous_status} → {self.new_status}"
-
-
 class MemberTransferLog(BaseModel):
     """Log de transferências de membros entre igrejas"""
     

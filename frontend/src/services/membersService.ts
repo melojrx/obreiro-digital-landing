@@ -413,6 +413,23 @@ export const membersService = {
     const response = await api.get(API_ENDPOINTS.members.export);
     return response.data;
   },
+
+  // Buscar membros disponíveis para vinculação de cônjuge
+  async getAvailableForSpouse(params?: {
+    exclude_member_id?: number;
+    search?: string;
+  }): Promise<{ count: number; results: Array<{
+    id: number;
+    full_name: string;
+    cpf?: string;
+    birth_date: string;
+    age: number;
+    gender: string;
+    membership_date: string;
+  }> }> {
+    const response = await api.get(API_ENDPOINTS.members.availableForSpouse, { params });
+    return response.data;
+  },
 };
 
 // Serviço para MembershipStatus

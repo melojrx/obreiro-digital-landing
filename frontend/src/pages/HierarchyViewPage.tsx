@@ -172,7 +172,8 @@ const HierarchyViewPage: React.FC = () => {
   const handleViewDetails = (node: HierarchyNode) => {
     switch (node.type) {
       case 'denomination':
-        navigate('/denominacao/dashboard');
+        // Navegar para a página específica da denominação ao invés do dashboard
+        navigate(`/denominacao/${(node.data as DenominationDetails).id}/dashboard`);
         break;
       case 'church':
         navigate(`/denominacao/churches/${(node.data as ChurchDetails).id}`);

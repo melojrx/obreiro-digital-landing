@@ -7,15 +7,12 @@ import {
   Calendar,
   MessageSquare,
   FileText,
-  DollarSign,
   Settings,
   LogOut,
   Church,
   Heart,
-  BarChart3,
   Menu,
   ChevronLeft,
-  Building2,
   TreePine
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -61,15 +58,18 @@ const Sidebar: React.FC = () => {
         { title: 'Eventos', icon: Calendar, href: '/eventos' },
       ]
     },
-    // Seção hierárquica - APENAS para Denomination Admins (clientes premium)
-    // SUPER_ADMIN é apenas para desenvolvedores da plataforma
-    ...(permissions.canManageDenomination || permissions.canCreateChurches ? [{
+    // Seção hierárquica - Para Denomination Admins E Church Admins
+    // Church Admin vê o menu hierárquico mas apenas suas filiais/igrejas
+    ...(permissions.canViewHierarchyMenu ? [{
       title: 'GESTÃO HIERÁRQUICA',
       icon: TreePine,
       href: '#',
       children: [
-        { title: 'Dashboard Denominação', icon: Building2, href: '/denominacao/dashboard' },
-        { title: 'Gerenciar Igrejas', icon: Church, href: '/denominacao/churches' },
+        // Gerenciar Igrejas - APENAS para Denomination Admins
+        ...(permissions.canCreateChurches ? [
+          { title: 'Gerenciar Igrejas', icon: Church, href: '/denominacao/churches' }
+        ] : []),
+        // Visão Hierárquica - Para ambos (Church Admin vê apenas suas filiais)
         { title: 'Visão Hierárquica', icon: TreePine, href: '/denominacao/hierarchy' },
       ]
     }] : []),
@@ -87,8 +87,8 @@ const Sidebar: React.FC = () => {
       icon: Settings,
       href: '#',
       children: [
-        { title: 'Financeiro', icon: DollarSign, href: '/financeiro' },
-        { title: 'Relatórios', icon: BarChart3, href: '/relatorios' },
+        // { title: 'Financeiro', icon: DollarSign, href: '/financeiro' },
+        // { title: 'Relatórios', icon: BarChart3, href: '/relatorios' },
         { title: 'Configurações', icon: Settings, href: '/configuracoes' },
       ]
     }

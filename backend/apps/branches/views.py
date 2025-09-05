@@ -29,14 +29,44 @@ class BranchViewSet(viewsets.ModelViewSet):
     ordering = ['name']
     
     def get_queryset(self):
-        """Filtra filiais pela igreja do usuário"""
+        """Filtra filiais baseado no papel do usuário"""
         user = self.request.user
         
         if user.is_superuser:
             return Branch.objects.all()
         
-        # Filtrar por igreja do usuário
-        return Branch.objects.filter(is_active=True)
+        # Buscar relação do usuário com igreja
+        try:
+            from apps.accounts.models import ChurchUser, RoleChoices
+            church_user = ChurchUser.objects.filter(user=user, is_active=True).first()
+            
+            if not church_user or not church_user.church:
+                return Branch.objects.none()
+            
+            # Denomination Admin: vê filiais de todas as igrejas da denominação
+            if church_user.role == RoleChoices.DENOMINATION_ADMIN:
+                if church_user.church.denomination:
+                    return Branch.objects.filter(
+                        church__denomination=church_user.church.denomination,
+                        is_active=True
+                    )
+                else:
+                    # Se não tem denominação, ver apenas da sua igreja
+                    return Branch.objects.filter(
+                        church=church_user.church,
+                        is_active=True
+                    )
+            
+            # Church Admin e outros: vêem apenas filiais da sua igreja específica
+            else:
+                return Branch.objects.filter(
+                    church=church_user.church,
+                    is_active=True
+                )
+                
+        except Exception as e:
+            print(f"❌ Erro ao filtrar filiais por papel do usuário: {e}")
+            return Branch.objects.none()
     
     def get_serializer_class(self):
         """Retorna serializer específico para QR Code em algumas actions"""

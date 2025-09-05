@@ -52,6 +52,7 @@ export interface UserPermissions {
   canViewHierarchy: boolean;
   canManageHierarchy: boolean;
   canNavigateHierarchy: boolean;
+  canViewHierarchyMenu: boolean; // Nova permissão para exibir menu hierárquico
   
   // Relatórios
   canViewReports: boolean;
@@ -114,6 +115,7 @@ const ROLE_PERMISSIONS = {
     canViewHierarchy: true,
     canManageHierarchy: true,
     canNavigateHierarchy: true,
+    canViewHierarchyMenu: true, // Denomination Admin pode ver menu hierárquico
     // Outras permissões
     canViewReports: true,
     canViewDashboard: true,
@@ -167,6 +169,7 @@ const ROLE_PERMISSIONS = {
     canViewHierarchy: true,
     canManageHierarchy: false,
     canNavigateHierarchy: true,
+    canViewHierarchyMenu: true, // Church Admin pode ver menu hierárquico
     // Outras permissões
     canViewReports: true,
     canViewDashboard: true,
@@ -226,6 +229,7 @@ const ROLE_PERMISSIONS = {
     canManageChurch: false,
     canManageUsers: false,
     canManageSettings: false,
+    canViewHierarchyMenu: true,
     isAdmin: false,
     isChurchAdmin: false,
     isPastor: true,
@@ -279,6 +283,7 @@ const ROLE_PERMISSIONS = {
     canManageChurch: false,
     canManageUsers: false,
     canManageSettings: false,
+    canViewHierarchyMenu: true,
     isAdmin: false,
     isChurchAdmin: false,
     isPastor: false,
@@ -332,6 +337,7 @@ const ROLE_PERMISSIONS = {
     canManageChurch: false,
     canManageUsers: false,
     canManageSettings: false,
+    canViewHierarchyMenu: false,
     isAdmin: false,
     isChurchAdmin: false,
     isPastor: false,
@@ -385,6 +391,7 @@ const ROLE_PERMISSIONS = {
     canManageChurch: false,
     canManageUsers: false,
     canManageSettings: true, // Configurações da filial
+    canViewHierarchyMenu: true,
     isAdmin: false,
     isChurchAdmin: false,
     isPastor: false,
@@ -438,6 +445,7 @@ const ROLE_PERMISSIONS = {
     canManageChurch: false,
     canManageUsers: false,
     canManageSettings: false,
+    canViewHierarchyMenu: false,
     isAdmin: false,
     isChurchAdmin: false,
     isPastor: false,
@@ -493,6 +501,7 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
   canManageChurch: false,
   canManageUsers: false,
   canManageSettings: false,
+  canViewHierarchyMenu: false,
   isAdmin: false,
   isChurchAdmin: false,
   isPastor: false,
@@ -534,8 +543,6 @@ export const usePermissions = (): UserPermissions => {
           return ROLE_PERMISSIONS.LEADER;
         case 'MEMBER':
           return ROLE_PERMISSIONS.MEMBER;
-        case 'READ_ONLY':
-          return ROLE_PERMISSIONS.READ_ONLY;
         default:
           return ROLE_PERMISSIONS.MEMBER; // Default para member
       }

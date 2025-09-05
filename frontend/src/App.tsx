@@ -227,6 +227,7 @@ const AppContent = () => {
       />
       
       {/* Rotas do módulo hierárquico */}
+      {/* Dashboard Denominacional removido - não mais necessário
       <Route 
         path="/denominacao/dashboard" 
         element={
@@ -235,6 +236,7 @@ const AppContent = () => {
           </ProtectedRoute>
         } 
       />
+      */}
       <Route 
         path="/denominacao/:denominationId/dashboard" 
         element={

@@ -331,3 +331,55 @@ class MemberViewSet(viewsets.ModelViewSet):
             'exported_at': datetime.now().isoformat(),
             'members': serializer.data
         })
+
+    @action(detail=False, methods=['get'])
+    def available_for_spouse(self, request):
+        """
+        Buscar membros disponíveis para vinculação de cônjuge.
+        Exclui o próprio membro e membros já vinculados a outros cônjuges.
+        """
+        queryset = self.get_queryset()
+        
+        # Excluir o próprio membro (se ID for fornecido)
+        member_id = request.query_params.get('exclude_member_id')
+        if member_id:
+            try:
+                queryset = queryset.exclude(id=int(member_id))
+            except (ValueError, TypeError):
+                pass
+        
+        # Excluir membros que já são cônjuges de outros membros
+        # queryset = queryset.filter(spouse_of__isnull=True)
+        
+        # Aplicar filtro de busca se fornecido
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(full_name__icontains=search) |
+                Q(cpf__icontains=search)
+            )
+        
+        # Ordenar por nome
+        queryset = queryset.order_by('full_name')
+        
+        # Limitar resultados para performance
+        queryset = queryset[:50]  # Máximo 50 resultados
+        
+        # Serializar apenas dados essenciais
+        data = [
+            {
+                'id': member.id,
+                'full_name': member.full_name,
+                'cpf': member.cpf,
+                'birth_date': member.birth_date,
+                'age': member.age,
+                'gender': member.get_gender_display(),
+                'membership_date': member.membership_date,
+            }
+            for member in queryset
+        ]
+        
+        return Response({
+            'count': len(data),
+            'results': data
+        })

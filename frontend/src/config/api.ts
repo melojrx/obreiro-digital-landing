@@ -149,6 +149,7 @@ export const API_ENDPOINTS = {
     profile: (id: number) => `/members/${id}/profile/`,
     updateStatus: (id: number) => `/members/${id}/update_status/`,
     export: '/members/export/',
+    availableForSpouse: '/members/available_for_spouse/',
   },
   
   // Status de Membresia (Nova estrutura)

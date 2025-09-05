@@ -42,7 +42,8 @@ import {
   CreateMemberData, 
   Member, 
   MINISTERIAL_FUNCTION_CHOICES,
-  MEMBERSHIP_STATUS_CHOICES
+  MEMBERSHIP_STATUS_CHOICES,
+  membersService
 } from '@/services/membersService';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -133,6 +134,18 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState('personal');
+  
+  // Estado para membros disponíveis para cônjuge
+  const [availableSpouses, setAvailableSpouses] = useState<Array<{
+    id: number;
+    full_name: string;
+    cpf?: string;
+    birth_date: string;
+    age: number;
+    gender: string;
+    membership_date: string;
+  }>>([]);
+  const [spousesLoading, setSpousesLoading] = useState(false);
 
   const form = useForm<MemberFormData>({
     resolver: zodResolver(memberSchema),
@@ -192,6 +205,34 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       setPhotoPreview(member.photo);
     }
   }, [member]);
+
+  // Função para carregar membros disponíveis para cônjuge
+  const loadAvailableSpouses = async (search?: string) => {
+    if (!form.watch('spouse_is_member')) return;
+    
+    try {
+      setSpousesLoading(true);
+      const response = await membersService.getAvailableForSpouse({
+        exclude_member_id: member?.id, // Excluir o próprio membro se estiver editando
+        search: search || undefined,
+      });
+      setAvailableSpouses(response.results);
+    } catch (error) {
+      console.error('Erro ao carregar membros disponíveis:', error);
+      setAvailableSpouses([]);
+    } finally {
+      setSpousesLoading(false);
+    }
+  };
+
+  // Carregar membros disponíveis quando "cônjuge é membro" for marcado
+  useEffect(() => {
+    if (form.watch('spouse_is_member')) {
+      loadAvailableSpouses();
+    } else {
+      setAvailableSpouses([]);
+    }
+  }, [form.watch('spouse_is_member')]);
 
   const handleSubmit = async (data: MemberFormData) => {
     try {
@@ -572,15 +613,47 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                             render={({ field }) => (
                               <FormItem className="md:col-span-2">
                                 <FormLabel>Selecionar Cônjuge Membro</FormLabel>
-                                <Select onValueChange={(value) => field.onChange(Number(value))} defaultValue={field.value?.toString()}>
+                                <Select 
+                                  onValueChange={(value) => {
+                                    // Não definir valor se for placeholder ou loading/empty
+                                    if (value === 'placeholder' || value === 'loading' || value === 'empty') {
+                                      field.onChange(undefined);
+                                    } else {
+                                      field.onChange(Number(value));
+                                    }
+                                  }} 
+                                  defaultValue={field.value?.toString()}
+                                >
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Selecione o cônjuge da lista de membros" />
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    {/* TODO: Implementar lista de membros disponíveis */}
-                                    <SelectItem value="0">Selecione um membro...</SelectItem>
+                                    {spousesLoading ? (
+                                      <SelectItem value="loading" disabled>
+                                        Carregando membros...
+                                      </SelectItem>
+                                    ) : availableSpouses.length > 0 ? (
+                                      <>
+                                        <SelectItem value="placeholder">Selecione um membro...</SelectItem>
+                                        {availableSpouses.map((spouse) => (
+                                          <SelectItem key={spouse.id} value={spouse.id.toString()}>
+                                            <div className="flex flex-col">
+                                              <span className="font-medium">{spouse.full_name}</span>
+                                              <span className="text-sm text-gray-500">
+                                                {spouse.age} anos • {spouse.gender}
+                                                {spouse.cpf && ` • CPF: ${spouse.cpf}`}
+                                              </span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <SelectItem value="empty" disabled>
+                                        Nenhum membro disponível
+                                      </SelectItem>
+                                    )}
                                   </SelectContent>
                                 </Select>
                                 <FormDescription>
