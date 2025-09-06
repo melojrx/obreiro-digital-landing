@@ -11,6 +11,7 @@ import {
   LogOut,
   Church,
   Heart,
+  HandHeart,
   Menu,
   ChevronLeft,
   TreePine
@@ -78,6 +79,7 @@ const Sidebar: React.FC = () => {
       icon: MessageSquare,
       href: '#',
       children: [
+        { title: 'Pedidos de Oração', icon: HandHeart, href: '/pedidos-oracao' },
         { title: 'Devocionais', icon: Heart, href: '/devocionais' },
         { title: 'Mensagens', icon: MessageSquare, href: '/mensagens' },
       ]

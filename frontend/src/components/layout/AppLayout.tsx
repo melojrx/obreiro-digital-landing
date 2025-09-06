@@ -27,7 +27,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         
         {/* Page Content */}
         <main className={cn(
-          "flex-1 p-6 overflow-y-auto transition-all duration-300",
+          "flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto transition-all duration-300",
           // Adiciona mais espaço quando a sidebar está recolhida
           isCollapsed ? "max-w-full" : "max-w-full"
         )}>

@@ -82,28 +82,28 @@ const Visitantes: React.FC = () => {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 truncate">Visitantes</h1>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">Visitantes</h1>
+            <p className="text-gray-600 mt-1 text-xs sm:text-sm lg:text-base">
               Gerencie os visitantes registrados via QR Code
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-col xs:flex-row gap-2 xs:justify-start xl:justify-end">
             <Button
               variant="outline"
               onClick={() => navigate('/configuracoes/qr-codes')}
-              className="border-purple-500 text-purple-600 text-sm h-9"
+              className="border-purple-500 text-purple-600 text-xs sm:text-sm h-8 sm:h-9 w-full xs:w-auto"
             >
-              <QrCode className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Gerenciar QR Codes</span>
-              <span className="sm:hidden">QR Codes</span>
+              <QrCode className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline lg:hidden">QR Codes</span>
+              <span className="xs:hidden lg:inline">Gerenciar QR Codes</span>
             </Button>
             {(permissions.canManageVisitors || process.env.NODE_ENV === 'development') && (
-              <Button onClick={handleCreateVisitor} className="bg-blue-600 hover:bg-blue-700 text-sm h-9">
-                <UserPlus className="h-4 w-4 mr-1" />
-                <span>Novo</span>
-                <span className="hidden sm:inline"> Visitante</span>
+              <Button onClick={handleCreateVisitor} className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm h-8 sm:h-9 w-full xs:w-auto">
+                <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span className="xs:inline lg:hidden">Novo</span>
+                <span className="hidden lg:inline">Novo Visitante</span>
               </Button>
             )}
           </div>
@@ -111,7 +111,7 @@ const Visitantes: React.FC = () => {
 
         {/* Dashboard KPIs */}
         {permissions.canViewDashboard && stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             <StatsCard
               title="Total de Visitantes"
               value={stats.total}
@@ -154,7 +154,7 @@ const Visitantes: React.FC = () => {
         />
 
         {/* Tabela de Visitantes */}
-  <div className="bg-white rounded-lg shadow p-0 md:p-0">
+        <div className="bg-white rounded-lg shadow overflow-hidden">
           {visitorsLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
@@ -172,13 +172,13 @@ const Visitantes: React.FC = () => {
 
         {/* Informações de Paginação */}
         {totalVisitors > 0 && (
-          <div className="flex justify-between items-center text-sm text-gray-600 px-2">
+          <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-2 text-xs sm:text-sm text-gray-600 px-2">
             <span>
-              Mostrando {visitors.length} de {totalVisitors} visitantes
+              <span className="hidden xs:inline">Mostrando </span>{visitors.length} de {totalVisitors} visitantes
             </span>
             {filters.search && (
-              <span>
-                Filtrado por: "{filters.search}"
+              <span className="text-center xs:text-right">
+                <span className="hidden sm:inline">Filtrado por: </span>"{filters.search}"
               </span>
             )}
           </div>
@@ -186,22 +186,22 @@ const Visitantes: React.FC = () => {
 
         {/* Dialog de Confirmação de Exclusão */}
         <AlertDialog open={!!visitorToDelete} onOpenChange={() => setVisitorToDelete(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent className="w-[95vw] max-w-md mx-auto">
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogTitle className="text-base sm:text-lg">Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm">
                 Tem certeza que deseja excluir este visitante?
                 Esta ação não pode ser desfeita e todos os dados do visitante serão permanentemente removidos.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>
+            <AlertDialogFooter className="flex flex-col-reverse xs:flex-row gap-2">
+              <AlertDialogCancel disabled={deleting} className="w-full xs:w-auto text-sm">
                 Cancelar
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDelete}
                 disabled={deleting}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 w-full xs:w-auto text-sm"
               >
                 {deleting ? 'Excluindo...' : 'Excluir Visitante'}
               </AlertDialogAction>

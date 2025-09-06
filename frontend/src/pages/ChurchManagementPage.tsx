@@ -375,34 +375,37 @@ const ChurchManagementPage: React.FC = () => {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Building2 className="h-7 w-7 text-blue-600" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="text-center lg:text-left">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center justify-center lg:justify-start gap-2">
+              <Building2 className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600" />
               Gerenciar Igrejas
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-600 mt-1 text-xs sm:text-sm lg:text-base">
               Gerencie todas as igrejas da sua denominação
             </p>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 justify-center lg:justify-end">
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefresh}
               disabled={isLoading || isRefreshing}
+              className="flex-1 xs:flex-none h-8 sm:h-9"
             >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''} mr-1 xs:mr-0`} />
+              <span className="xs:hidden">Atualizar</span>
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button variant="outline" size="sm" className="flex-1 xs:flex-none h-8 sm:h-9">
+                  <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4 mr-1 xs:mr-0" />
+                  <span className="xs:hidden">Ações</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleExportData}>
@@ -434,9 +437,10 @@ const ChurchManagementPage: React.FC = () => {
             </DropdownMenu>
 
             {permissions.canCreateChurches && (
-              <Button onClick={handleCreateChurch}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Igreja
+              <Button onClick={handleCreateChurch} className="flex-1 xs:flex-none h-8 sm:h-9">
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden xs:inline">Nova Igreja</span>
+                <span className="xs:hidden">Nova</span>
               </Button>
             )}
           </div>
@@ -444,84 +448,87 @@ const ChurchManagementPage: React.FC = () => {
 
         {/* Filtros */}
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
+          <CardContent className="p-3 sm:p-4">
+            <div className="space-y-3 sm:space-y-0 sm:flex sm:gap-4">
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3 sm:h-4 sm:w-4" />
                   <Input
                     placeholder="Buscar por nome, cidade ou email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-9 sm:pl-10 text-sm h-9 sm:h-10"
                   />
                 </div>
               </div>
               
-              <Select value={filterState} onValueChange={setFilterState}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Todos os estados" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os estados</SelectItem>
-                  {availableStates.map((state) => (
-                    <SelectItem key={state.code} value={state.code}>
-                      {state.name} ({state.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-1 xs:grid-cols-3 sm:flex gap-2 sm:gap-4">
+                <Select value={filterState} onValueChange={setFilterState}>
+                  <SelectTrigger className="w-full sm:w-40 h-9 sm:h-10 text-sm">
+                    <SelectValue placeholder="Estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {availableStates.map((state) => (
+                      <SelectItem key={state.code} value={state.code}>
+                        <span className="xs:hidden">{state.code}</span>
+                        <span className="hidden xs:inline">{state.name}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              <Select value={filterPlan} onValueChange={setFilterPlan}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Todos os planos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os planos</SelectItem>
-                  <SelectItem value="premium">Premium</SelectItem>
-                  <SelectItem value="basic">Básico</SelectItem>
-                  <SelectItem value="trial">Trial</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={filterPlan} onValueChange={setFilterPlan}>
+                  <SelectTrigger className="w-full sm:w-32 h-9 sm:h-10 text-sm">
+                    <SelectValue placeholder="Plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="basic">Básico</SelectItem>
+                    <SelectItem value="trial">Trial</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Todos os status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="active">Ativas</SelectItem>
-                  <SelectItem value="inactive">Inativas</SelectItem>
-                  <SelectItem value="suspended">Suspensas</SelectItem>
-                  <SelectItem value="trial">Período Trial</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-full sm:w-32 h-9 sm:h-10 text-sm">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="active">Ativas</SelectItem>
+                    <SelectItem value="inactive">Inativas</SelectItem>
+                    <SelectItem value="suspended">Suspensas</SelectItem>
+                    <SelectItem value="trial">Trial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Estatísticas */}
         {!isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <Building2 className="h-8 w-8 text-blue-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total de Igrejas</p>
-                    <p className="text-2xl font-bold text-gray-900">{churchesData?.count || 0}</p>
+                  <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+                  <div className="ml-2 sm:ml-4 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Igrejas</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{churchesData?.count || 0}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <Users className="h-8 w-8 text-green-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total de Membros</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+                  <div className="ml-2 sm:ml-4 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Membros</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900">
                       {churches.reduce((sum, church) => sum + church.total_members, 0)}
                     </p>
                   </div>
@@ -530,12 +537,12 @@ const ChurchManagementPage: React.FC = () => {
             </Card>
 
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <MapPin className="h-8 w-8 text-purple-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total de Filiais</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <MapPin className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+                  <div className="ml-2 sm:ml-4 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Filiais</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900">
                       {churches.reduce((sum, church) => sum + (church.branches_count || 0), 0)}
                     </p>
                   </div>
@@ -544,12 +551,12 @@ const ChurchManagementPage: React.FC = () => {
             </Card>
 
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <Calendar className="h-8 w-8 text-orange-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Visitantes (Total)</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
+                  <div className="ml-2 sm:ml-4 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate leading-tight">Visitantes</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900">
                       {churches.reduce((sum, church) => sum + church.total_visitors, 0)}
                     </p>
                   </div>
@@ -561,15 +568,15 @@ const ChurchManagementPage: React.FC = () => {
 
         {/* Tabela de Igrejas */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Lista de Igrejas</CardTitle>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+          <CardHeader className="pb-3 sm:pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <CardTitle className="text-base sm:text-lg text-center sm:text-left">Lista de Igrejas</CardTitle>
+              <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-gray-600">
                 <Select value={String(pageSize)} onValueChange={(value) => {
                   setPageSize(Number(value));
                   setCurrentPage(1);
                 }}>
-                  <SelectTrigger className="w-24">
+                  <SelectTrigger className="w-16 sm:w-24 h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -579,7 +586,7 @@ const ChurchManagementPage: React.FC = () => {
                     <SelectItem value="100">100</SelectItem>
                   </SelectContent>
                 </Select>
-                <span>por página</span>
+                <span className="whitespace-nowrap">por página</span>
               </div>
             </div>
           </CardHeader>
@@ -600,137 +607,290 @@ const ChurchManagementPage: React.FC = () => {
               </div>
             ) : churches.length > 0 ? (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={allSelected}
-                          onCheckedChange={handleSelectAll}
-                          {...(someSelected ? { indeterminate: true } : {})}
-                        />
-                      </TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('name')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Igreja
-                          {getSortIcon('name')}
-                        </div>
-                      </TableHead>
-                      <TableHead>Localização</TableHead>
-                      <TableHead>Plano</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('total_members')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Membros
-                          {getSortIcon('total_members')}
-                        </div>
-                      </TableHead>
-                      <TableHead>Filiais</TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('created_at')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Criada em
-                          {getSortIcon('created_at')}
-                        </div>
-                      </TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {churches.map((church) => (
-                      <TableRow key={church.id}>
-                        <TableCell>
+                {/* Desktop Table */}
+                <div className="hidden lg:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
                           <Checkbox
-                            checked={selectedChurches.includes(church.id)}
-                            onCheckedChange={(checked) => 
-                              handleSelectChurch(church.id, checked as boolean)
-                            }
+                            checked={allSelected}
+                            onCheckedChange={handleSelectAll}
+                            {...(someSelected ? { indeterminate: true } : {})}
                           />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            {church.logo ? (
-                              <img
-                                src={church.logo}
-                                alt={`Logo da ${church.name}`}
-                                className="w-10 h-10 rounded-lg object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                                <Building2 className="h-5 w-5 text-blue-600" />
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleSort('name')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Igreja
+                            {getSortIcon('name')}
+                          </div>
+                        </TableHead>
+                        <TableHead>Localização</TableHead>
+                        <TableHead>Plano</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleSort('total_members')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Membros
+                            {getSortIcon('total_members')}
+                          </div>
+                        </TableHead>
+                        <TableHead>Filiais</TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleSort('created_at')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Criada em
+                            {getSortIcon('created_at')}
+                          </div>
+                        </TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {churches.map((church) => (
+                        <TableRow key={church.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedChurches.includes(church.id)}
+                              onCheckedChange={(checked) => 
+                                handleSelectChurch(church.id, checked as boolean)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              {church.logo ? (
+                                <img
+                                  src={church.logo}
+                                  alt={`Logo da ${church.name}`}
+                                  className="w-10 h-10 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                  <Building2 className="h-5 w-5 text-blue-600" />
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium">{church.name}</div>
+                                <div className="text-sm text-gray-500">{church.email}</div>
                               </div>
-                            )}
-                            <div>
-                              <div className="font-medium">{church.name}</div>
-                              <div className="text-sm text-gray-500">{church.email}</div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 text-gray-400 mr-1" />
-                            {church.city}, {church.state}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {getPlanBadge(church.subscription_plan)}
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(church.subscription_status)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Users className="h-4 w-4 text-gray-400 mr-1" />
-                            <span>{church.total_members}</span>
-                            <span className="text-xs text-gray-500 ml-1">
-                              /{church.max_members}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Building className="h-4 w-4 text-gray-400 mr-1" />
-                            <span>{church.branches_count || 0}</span>
-                            <span className="text-xs text-gray-500 ml-1">
-                              /{church.max_branches}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(church.created_at).toLocaleDateString('pt-BR')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewChurch(church.id)}
-                              title="Ver detalhes"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {permissions.canManageChurch && (
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <MapPin className="h-4 w-4 text-gray-400 mr-1" />
+                              {church.city}, {church.state}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {getPlanBadge(church.subscription_plan)}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(church.subscription_status)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Users className="h-4 w-4 text-gray-400 mr-1" />
+                              <span>{church.total_members}</span>
+                              <span className="text-xs text-gray-500 ml-1">
+                                /{church.max_members}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Building className="h-4 w-4 text-gray-400 mr-1" />
+                              <span>{church.branches_count || 0}</span>
+                              <span className="text-xs text-gray-500 ml-1">
+                                /{church.max_branches}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(church.created_at).toLocaleDateString('pt-BR')}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleEditChurch(church.id)}
-                                title="Editar"
+                                onClick={() => handleViewChurch(church.id)}
+                                title="Ver detalhes"
                               >
-                                <Edit className="h-4 w-4" />
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {permissions.canManageChurch && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditChurch(church.id)}
+                                  title="Editar"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewChurch(church.id)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Ver Detalhes
+                                  </DropdownMenuItem>
+                                  {permissions.canManageChurch && (
+                                    <DropdownMenuItem onClick={() => handleEditChurch(church.id)}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                  )}
+                                  {permissions.canManageChurch && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <DropdownMenuItem 
+                                            onSelect={(e) => e.preventDefault()}
+                                            className="text-red-600"
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Remover
+                                          </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent className="w-[95vw] max-w-md mx-auto">
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle className="text-base">Confirmar remoção</AlertDialogTitle>
+                                            <AlertDialogDescription className="text-sm">
+                                              Tem certeza de que deseja remover a igreja "{church.name}"? 
+                                              Esta ação não pode ser desfeita.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter className="flex flex-col-reverse xs:flex-row gap-2">
+                                            <AlertDialogCancel className="w-full xs:w-auto">Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction
+                                              onClick={() => handleDeleteChurch(church.id, church.name)}
+                                              className="bg-red-600 hover:bg-red-700 w-full xs:w-auto"
+                                            >
+                                              Remover
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile Cards */}
+                <div className="lg:hidden space-y-3">
+                  {/* Select All for Mobile */}
+                  <div className="flex items-center gap-2 p-3 border rounded-lg bg-gray-50">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={handleSelectAll}
+                      {...(someSelected ? { indeterminate: true } : {})}
+                    />
+                    <span className="text-sm text-gray-600">
+                      {allSelected ? 'Desselecionar todas' : someSelected ? `${selectedChurches.length} selecionadas` : 'Selecionar todas'}
+                    </span>
+                  </div>
+
+                  {churches.map((church) => (
+                    <Card key={church.id} className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={selectedChurches.includes(church.id)}
+                          onCheckedChange={(checked) => 
+                            handleSelectChurch(church.id, checked as boolean)
+                          }
+                          className="mt-1"
+                        />
+                        
+                        {church.logo ? (
+                          <img
+                            src={church.logo}
+                            alt={`Logo da ${church.name}`}
+                            className="w-12 h-12 rounded-lg object-cover shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                            <Building2 className="h-6 w-6 text-blue-600" />
+                          </div>
+                        )}
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-gray-900 truncate">{church.name}</h3>
+                              <p className="text-xs text-gray-500 truncate">{church.email}</p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <MapPin className="h-3 w-3 text-gray-400" />
+                                <span className="text-xs text-gray-500">{church.city}, {church.state}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-col gap-1 items-end">
+                              {getPlanBadge(church.subscription_plan)}
+                              {getStatusBadge(church.subscription_status)}
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              <span>{church.total_members}/{church.max_members}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Building className="h-3 w-3" />
+                              <span>{church.branches_count || 0}/{church.max_branches}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>{new Date(church.created_at).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 mt-3">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewChurch(church.id)}
+                              className="flex-1 h-8 text-xs"
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              Ver
+                            </Button>
+                            {permissions.canManageChurch && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditChurch(church.id)}
+                                className="flex-1 h-8 text-xs"
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Editar
                               </Button>
                             )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
+                                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-3 w-3" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
@@ -757,19 +917,19 @@ const ChurchManagementPage: React.FC = () => {
                                           Remover
                                         </DropdownMenuItem>
                                       </AlertDialogTrigger>
-                                      <AlertDialogContent>
+                                      <AlertDialogContent className="w-[95vw] max-w-md mx-auto">
                                         <AlertDialogHeader>
-                                          <AlertDialogTitle>Confirmar remoção</AlertDialogTitle>
-                                          <AlertDialogDescription>
+                                          <AlertDialogTitle className="text-base">Confirmar remoção</AlertDialogTitle>
+                                          <AlertDialogDescription className="text-sm">
                                             Tem certeza de que deseja remover a igreja "{church.name}"? 
                                             Esta ação não pode ser desfeita.
                                           </AlertDialogDescription>
                                         </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogFooter className="flex flex-col-reverse xs:flex-row gap-2">
+                                          <AlertDialogCancel className="w-full xs:w-auto">Cancelar</AlertDialogCancel>
                                           <AlertDialogAction
                                             onClick={() => handleDeleteChurch(church.id, church.name)}
-                                            className="bg-red-600 hover:bg-red-700"
+                                            className="bg-red-600 hover:bg-red-700 w-full xs:w-auto"
                                           >
                                             Remover
                                           </AlertDialogAction>
@@ -781,20 +941,22 @@ const ChurchManagementPage: React.FC = () => {
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
 
                 {/* Paginação */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="text-sm text-gray-600">
-                      Mostrando {(currentPage - 1) * pageSize + 1} até {Math.min(currentPage * pageSize, churchesData?.count || 0)} de {churchesData?.count || 0} resultados
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
+                    <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                      <span className="hidden sm:inline">Mostrando </span>
+                      {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, churchesData?.count || 0)} de {churchesData?.count || 0}
+                      <span className="hidden sm:inline"> resultados</span>
                     </div>
                     <Pagination>
-                      <PaginationContent>
+                      <PaginationContent className="gap-1 sm:gap-2">
                         <PaginationItem>
                           <PaginationPrevious 
                             href="#"
@@ -802,12 +964,12 @@ const ChurchManagementPage: React.FC = () => {
                               e.preventDefault();
                               if (currentPage > 1) setCurrentPage(currentPage - 1);
                             }}
-                            className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                            className={`text-xs sm:text-sm h-8 sm:h-9 ${currentPage === 1 ? 'pointer-events-none opacity-50' : ''}`}
                           />
                         </PaginationItem>
                         
-                        {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                          const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                        {[...Array(Math.min(3, totalPages))].map((_, i) => {
+                          const page = currentPage <= 2 ? i + 1 : currentPage - 1 + i;
                           if (page > totalPages) return null;
                           
                           return (
@@ -819,6 +981,7 @@ const ChurchManagementPage: React.FC = () => {
                                   setCurrentPage(page);
                                 }}
                                 isActive={currentPage === page}
+                                className="text-xs sm:text-sm h-8 w-8 sm:h-9 sm:w-9"
                               >
                                 {page}
                               </PaginationLink>
@@ -833,7 +996,7 @@ const ChurchManagementPage: React.FC = () => {
                               e.preventDefault();
                               if (currentPage < totalPages) setCurrentPage(currentPage + 1);
                             }}
-                            className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                            className={`text-xs sm:text-sm h-8 sm:h-9 ${currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}`}
                           />
                         </PaginationItem>
                       </PaginationContent>
@@ -843,17 +1006,17 @@ const ChurchManagementPage: React.FC = () => {
               </>
             ) : (
               <div className="text-center py-12">
-                <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <Building2 className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
                   Nenhuma igreja encontrada
                 </h3>
-                <p className="text-gray-600 mb-4">
+                <p className="text-sm sm:text-base text-gray-600 mb-4 px-4">
                   {searchTerm || filterState !== 'all' || filterPlan !== 'all' || filterStatus !== 'all'
                     ? 'Tente ajustar os filtros de busca.'
                     : 'Comece criando sua primeira igreja.'}
                 </p>
                 {permissions.canCreateChurches && !searchTerm && filterState === 'all' && filterPlan === 'all' && filterStatus === 'all' && (
-                  <Button onClick={handleCreateChurch}>
+                  <Button onClick={handleCreateChurch} className="w-full xs:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     Criar Primeira Igreja
                   </Button>

@@ -268,46 +268,51 @@ const HierarchyViewPage: React.FC = () => {
     return (
       <div key={node.id} className="select-none">
         <div 
-          className="flex items-center py-3 px-3 hover:bg-gray-50 rounded-lg cursor-pointer group border-l-4 border-transparent hover:border-blue-200"
-          style={{ paddingLeft: `${12 + node.level * 24}px` }}
+          className="flex items-center py-2 sm:py-3 px-2 sm:px-3 hover:bg-gray-50 rounded-lg cursor-pointer group border-l-4 border-transparent hover:border-blue-200"
+          style={{ paddingLeft: `${6 + node.level * 12}px` }}
         >
           <button
             onClick={() => toggleNode(node.id)}
-            className="mr-2"
+            className="mr-1 sm:mr-2 p-1"
           >
             {getExpandIcon(node.children.length > 0, node.expanded)}
           </button>
           
-          {getNodeIcon(node.type, node.expanded)}
+          <div className="shrink-0">
+            {getNodeIcon(node.type, node.expanded)}
+          </div>
           
-          <div className="flex-1 ml-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">{node.name}</span>
+          <div className="flex-1 ml-2 sm:ml-3 min-w-0">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+              <div className="flex flex-col xs:flex-row xs:items-start xs:gap-3 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                    <span className="font-medium text-gray-900 text-sm sm:text-base truncate">{node.name}</span>
                     {getTypeBadge(node.type)}
-                    {node.insights && getTrendIcon(node.insights.trend)}
-                    {node.insights && getPriorityBadge(node.insights.priority)}
+                    <div className="hidden xs:flex items-center gap-1">
+                      {node.insights && getTrendIcon(node.insights.trend)}
+                      {node.insights && getPriorityBadge(node.insights.priority)}
+                    </div>
                   </div>
                   {node.type === 'church' && (
-                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-[10px] sm:text-xs text-gray-500">
                       <span>Saúde: {node.stats.health_score}%</span>
                       <span>Crescimento: {node.stats.growth_rate > 0 ? '+' : ''}{node.stats.growth_rate}%</span>
-                      <span>Engajamento: {node.stats.engagement_rate}%</span>
+                      <span className="hidden sm:inline">Engajamento: {node.stats.engagement_rate}%</span>
                     </div>
                   )}
                 </div>
               </div>
               
-              <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="flex items-center gap-4 text-sm text-gray-500">
+              {/* Stats - always visible on mobile, hover on desktop */}
+              <div className="flex items-center gap-2 sm:gap-4 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
                         <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          {node.stats.members?.toLocaleString() || 0}
+                          <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="text-[10px] sm:text-xs">{node.stats.members?.toLocaleString() || 0}</span>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -320,8 +325,8 @@ const HierarchyViewPage: React.FC = () => {
                     <Tooltip>
                       <TooltipTrigger>
                         <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {node.stats.visitors?.toLocaleString() || 0}
+                          <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="text-[10px] sm:text-xs">{node.stats.visitors?.toLocaleString() || 0}</span>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -330,34 +335,38 @@ const HierarchyViewPage: React.FC = () => {
                     </Tooltip>
                   </TooltipProvider>
                   
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <div className="flex items-center gap-1">
-                          <BarChart3 className="h-4 w-4" />
-                          {node.stats.activities || 0}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Atividades ativas</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  
-                  {node.type === 'church' && node.stats.branches_count !== undefined && (
+                  <div className="hidden sm:flex">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger>
                           <div className="flex items-center gap-1">
-                            <Building2 className="h-4 w-4" />
-                            {node.stats.branches_count}
+                            <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="text-[10px] sm:text-xs">{node.stats.activities || 0}</span>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Filiais</p>
+                          <p>Atividades ativas</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
+                  </div>
+                  
+                  {node.type === 'church' && node.stats.branches_count !== undefined && (
+                    <div className="hidden lg:flex">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="text-[10px] sm:text-xs">{node.stats.branches_count}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Filiais</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   )}
                 </div>
                 
@@ -367,8 +376,9 @@ const HierarchyViewPage: React.FC = () => {
                     size="sm"
                     onClick={() => handleViewDetails(node)}
                     title="Ver detalhes"
+                    className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                   
                   {node.type === 'church' && (
@@ -377,8 +387,9 @@ const HierarchyViewPage: React.FC = () => {
                       size="sm"
                       onClick={() => handleViewInsights(node)}
                       title="Ver insights"
+                      className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                     >
-                      <Brain className="h-4 w-4" />
+                      <Brain className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                   )}
                   
@@ -388,8 +399,9 @@ const HierarchyViewPage: React.FC = () => {
                       size="sm"
                       title="Configurações"
                       onClick={() => navigate(`/denominacao/churches/${(node.data as ChurchDetails).id}/settings`)}
+                      className="hidden sm:flex h-6 w-6 sm:h-8 sm:w-8 p-0"
                     >
-                      <Settings className="h-4 w-4" />
+                      <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                   )}
                 </div>
@@ -399,8 +411,8 @@ const HierarchyViewPage: React.FC = () => {
             {node.insights && node.insights.alerts.length > 0 && (
               <div className="mt-2">
                 <Alert className="py-2">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  <AlertDescription className="text-xs leading-relaxed">
+                  <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <AlertDescription className="text-[10px] sm:text-xs leading-relaxed">
                     {node.insights.alerts[0]} {node.insights.alerts.length > 1 && `e mais ${node.insights.alerts.length - 1} alerta(s)`}
                   </AlertDescription>
                 </Alert>
@@ -457,56 +469,59 @@ const HierarchyViewPage: React.FC = () => {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <TreePine className="h-7 w-7 text-green-600" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="text-center lg:text-left">
+            <h1 className="text-xl sm:text-2xl lg:text-2xl font-bold text-gray-900 flex items-center justify-center lg:justify-start gap-2">
+              <TreePine className="h-6 w-6 sm:h-7 sm:w-7 text-green-600" />
               Visão Hierárquica
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-600 mt-1 text-xs sm:text-sm lg:text-base">
               Navegue pela estrutura completa da denominação com insights em tempo real
             </p>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 justify-center lg:justify-end">
             <Button
               variant="outline"
               size="sm"
               onClick={loadHierarchyData}
               disabled={isLoading}
+              className="flex-1 xs:flex-none"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isLoading ? 'animate-spin' : ''} mr-1 sm:mr-0`} />
+              <span className="xs:hidden">Atualizar</span>
             </Button>
             
             <Button
               variant="outline"
               size="sm"
               onClick={handleExportReport}
+              className="flex-1 xs:flex-none"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
+              <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Exportar</span>
             </Button>
           </div>
         </div>
 
         {/* Filtros */}
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3 sm:h-4 sm:w-4" />
                   <Input
                     placeholder="Buscar na hierarquia..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-9 sm:pl-10 text-sm h-9 sm:h-10"
                   />
                 </div>
               </div>
               
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="w-full sm:w-48 h-9 sm:h-10 text-sm">
                   <SelectValue placeholder="Filtrar por tipo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -522,38 +537,38 @@ const HierarchyViewPage: React.FC = () => {
 
         {/* Estatísticas Resumidas */}
         {hierarchyStats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <Church className="h-8 w-8 text-blue-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total de Igrejas</p>
-                    <p className="text-2xl font-bold text-gray-900">{hierarchyStats.total_churches?.toLocaleString() || 0}</p>
+                  <Church className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+                  <div className="ml-2 sm:ml-4 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Igrejas</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{hierarchyStats.total_churches?.toLocaleString() || 0}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <Building2 className="h-8 w-8 text-purple-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total de Filiais</p>
-                    <p className="text-2xl font-bold text-gray-900">{hierarchyStats.total_branches?.toLocaleString() || 0}</p>
+                  <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+                  <div className="ml-2 sm:ml-4 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Filiais</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{hierarchyStats.total_branches?.toLocaleString() || 0}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <Users className="h-8 w-8 text-green-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total de Membros</p>
-                    <p className="text-2xl font-bold text-gray-900">{hierarchyStats.total_members?.toLocaleString() || 0}</p>
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+                  <div className="ml-2 sm:ml-4 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Membros</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{hierarchyStats.total_members?.toLocaleString() || 0}</p>
                   </div>
                 </div>
               </CardContent>
@@ -571,33 +586,37 @@ const HierarchyViewPage: React.FC = () => {
               // Modo de busca - lista plana
               <div className="space-y-2">
                 {filteredNodes().map(node => (
-                  <div key={node.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {getNodeIcon(node.type, false)}
-                      <div>
-                        <div className="font-medium">{node.name}</div>
-                        <div className="text-sm text-gray-500">
+                  <div key={node.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="shrink-0">
+                        {getNodeIcon(node.type, false)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm sm:text-base truncate">{node.name}</div>
+                        <div className="text-xs sm:text-sm text-gray-500">
                           {getTypeLabel(node.type)}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center justify-between sm:gap-4">
+                      <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                         <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          {node.stats.members}
+                          <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span>{node.stats.members}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {node.stats.visitors}
+                          <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span>{node.stats.visitors}</span>
                         </div>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleViewDetails(node)}
+                        className="h-7 sm:h-9 px-2 sm:px-3"
                       >
-                        <Eye className="h-4 w-4" />
+                        <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="sr-only sm:not-sr-only sm:ml-1">Ver</span>
                       </Button>
                     </div>
                   </div>
@@ -605,8 +624,10 @@ const HierarchyViewPage: React.FC = () => {
               </div>
             ) : (
               // Modo árvore
-              <div className="space-y-1">
-                {hierarchyData.map(node => renderNode(node))}
+              <div className="space-y-1 overflow-x-auto">
+                <div className="min-w-[500px] sm:min-w-0">
+                  {hierarchyData.map(node => renderNode(node))}
+                </div>
               </div>
             )}
 
@@ -626,13 +647,13 @@ const HierarchyViewPage: React.FC = () => {
 
         {/* Dialog de Insights da Igreja */}
         <Dialog open={isInsightsDialogOpen} onOpenChange={setIsInsightsDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] sm:max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-purple-600" />
-                Insights - {selectedChurch?.name}
+              <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+                <span className="truncate">Insights - {selectedChurch?.name}</span>
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm">
                 Análise detalhada de desempenho e recomendações estratégicas
               </DialogDescription>
             </DialogHeader>
@@ -640,15 +661,15 @@ const HierarchyViewPage: React.FC = () => {
             {selectedChurch && (
               <div className="space-y-6">
                 {/* Score de Saúde */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Score de Saúde</CardTitle>
+                    <CardHeader className="pb-2 sm:pb-6">
+                      <CardTitle className="text-sm sm:text-base lg:text-lg">Score de Saúde</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-center">
-                        <div className="relative w-32 h-32">
-                          <div className={`w-32 h-32 rounded-full flex items-center justify-center text-2xl font-bold ${
+                        <div className="relative w-24 h-24 sm:w-32 sm:h-32">
+                          <div className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center text-lg sm:text-2xl font-bold ${
                             selectedChurch.health_score >= 80 ? 'bg-green-100 text-green-800' :
                             selectedChurch.health_score >= 60 ? 'bg-yellow-100 text-yellow-800' :
                             'bg-red-100 text-red-800'
@@ -661,25 +682,25 @@ const HierarchyViewPage: React.FC = () => {
                   </Card>
                   
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Métricas de Crescimento</CardTitle>
+                    <CardHeader className="pb-2 sm:pb-6">
+                      <CardTitle className="text-sm sm:text-base lg:text-lg">Métricas de Crescimento</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex justify-between">
-                        <span>Crescimento de Membros:</span>
-                        <span className={selectedChurch.growth_metrics.member_growth_rate >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    <CardContent className="space-y-2 sm:space-y-3">
+                      <div className="flex justify-between text-xs sm:text-sm">
+                        <span className="truncate pr-2">Crescimento de Membros:</span>
+                        <span className={`font-medium ${selectedChurch.growth_metrics.member_growth_rate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {selectedChurch.growth_metrics.member_growth_rate > 0 ? '+' : ''}{selectedChurch.growth_metrics.member_growth_rate}%
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Crescimento de Visitantes:</span>
-                        <span className={selectedChurch.growth_metrics.visitor_growth_rate >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <div className="flex justify-between text-xs sm:text-sm">
+                        <span className="truncate pr-2">Crescimento de Visitantes:</span>
+                        <span className={`font-medium ${selectedChurch.growth_metrics.visitor_growth_rate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {selectedChurch.growth_metrics.visitor_growth_rate > 0 ? '+' : ''}{selectedChurch.growth_metrics.visitor_growth_rate}%
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Taxa de Retenção:</span>
-                        <span>{selectedChurch.growth_metrics.retention_rate}%</span>
+                      <div className="flex justify-between text-xs sm:text-sm">
+                        <span className="truncate pr-2">Taxa de Retenção:</span>
+                        <span className="font-medium">{selectedChurch.growth_metrics.retention_rate}%</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -687,37 +708,37 @@ const HierarchyViewPage: React.FC = () => {
 
                 {/* Saúde Financeira */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <DollarSign className="h-5 w-5" />
+                  <CardHeader className="pb-2 sm:pb-6">
+                    <CardTitle className="text-sm sm:text-base lg:text-lg flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
                       Saúde Financeira
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+                      <div className="text-center space-y-1">
+                        <div className="text-sm sm:text-xl lg:text-2xl font-bold text-green-600">
                           R$ {selectedChurch.financial_health.monthly_income.toLocaleString()}
                         </div>
-                        <div className="text-sm text-gray-500">Receita Mensal</div>
+                        <div className="text-[10px] sm:text-xs lg:text-sm text-gray-500 leading-tight">Receita Mensal</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">
+                      <div className="text-center space-y-1">
+                        <div className="text-sm sm:text-xl lg:text-2xl font-bold text-red-600">
                           R$ {selectedChurch.financial_health.monthly_expenses.toLocaleString()}
                         </div>
-                        <div className="text-sm text-gray-500">Despesas Mensais</div>
+                        <div className="text-[10px] sm:text-xs lg:text-sm text-gray-500 leading-tight">Despesas Mensais</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-center space-y-1">
+                        <div className="text-sm sm:text-xl lg:text-2xl font-bold text-blue-600">
                           {selectedChurch.financial_health.tithe_consistency}%
                         </div>
-                        <div className="text-sm text-gray-500">Consistência Dízimos</div>
+                        <div className="text-[10px] sm:text-xs lg:text-sm text-gray-500 leading-tight">Consistência Dízimos</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-purple-600">
+                      <div className="text-center space-y-1">
+                        <div className="text-sm sm:text-xl lg:text-2xl font-bold text-purple-600">
                           {selectedChurch.financial_health.budget_adherence}%
                         </div>
-                        <div className="text-sm text-gray-500">Adesão ao Orçamento</div>
+                        <div className="text-[10px] sm:text-xs lg:text-sm text-gray-500 leading-tight">Adesão ao Orçamento</div>
                       </div>
                     </div>
                   </CardContent>

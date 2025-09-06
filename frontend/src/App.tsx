@@ -23,6 +23,7 @@ import Visitantes from "./pages/Visitantes";
 import NovoVisitante from "./pages/NovoVisitante";
 import DetalhesVisitante from "./pages/DetalhesVisitante";
 import EditarVisitante from "./pages/EditarVisitante";
+import PrayerRequestsPage from "./pages/PrayerRequestsPage";
 import GerenciarQRCodes from "./pages/GerenciarQRCodes";
 import RegistroVisitante from "./pages/RegistroVisitante";
 import RegistroSucesso from "./pages/RegistroSucesso";
@@ -189,6 +190,15 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="auth_complete">
             <EditarVisitante />
+          </ProtectedRoute>
+        } 
+      />
+      {/* Rota para pedidos de oração */}
+      <Route 
+        path="/pedidos-oracao" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <PrayerRequestsPage />
           </ProtectedRoute>
         } 
       />

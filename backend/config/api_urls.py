@@ -58,6 +58,9 @@ urlpatterns = [
     # Igrejas (endpoints específicos de denominação)
     path('', include('apps.churches.urls')),
     
+    # Pedidos de Oração
+    path('', include('apps.prayers.urls')),
+    
     # ViewSets registrados no router
     path('', include(router.urls)),
     
