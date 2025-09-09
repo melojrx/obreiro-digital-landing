@@ -1,6 +1,85 @@
 from django.contrib import admin
-from .models import Member, MembershipStatusLog, MemberTransferLog
+from .models import Member, MembershipStatus, MembershipStatusLog, MemberTransferLog
 
-admin.site.register(Member)
-admin.site.register(MembershipStatusLog)
-admin.site.register(MemberTransferLog)
+
+@admin.register(Member)
+class MemberAdmin(admin.ModelAdmin):
+    """Admin configuration for Member model"""
+    list_display = [
+        'full_name', 'church', 'membership_status', 'ministerial_function',
+        'conversion_date', 'membership_date', 'is_active'
+    ]
+    list_filter = [
+        'church', 'membership_status', 'ministerial_function', 'gender', 
+        'marital_status', 'is_active', 'created_at'
+    ]
+    search_fields = ['full_name', 'cpf', 'email', 'phone']
+    ordering = ['church', 'full_name']
+    
+    fieldsets = (
+        ('Identificação', {
+            'fields': ('church', 'user', 'full_name', 'cpf', 'rg')
+        }),
+        ('Dados Pessoais', {
+            'fields': ('birth_date', 'gender', 'marital_status', 'profession', 'education_level')
+        }),
+        ('Contato', {
+            'fields': ('email', 'phone', 'phone_secondary')
+        }),
+        ('Endereço', {
+            'fields': ('address', 'number', 'complement', 'neighborhood', 'city', 'state', 'zipcode')
+        }),
+        ('Dados Eclesiásticos', {
+            'fields': ('membership_status', 'conversion_date', 'baptism_date', 'membership_date', 
+                      'previous_church', 'transfer_letter')
+        }),
+        ('Dados Ministeriais', {
+            'fields': ('ministerial_function', 'ordination_date', 'ministries')
+        }),
+        ('Dados Familiares', {
+            'fields': ('spouse', 'children_count', 'responsible')
+        }),
+        ('Adicional', {
+            'fields': ('photo', 'notes', 'accept_sms', 'accept_email', 'accept_whatsapp')
+        }),
+        ('Controle', {
+            'fields': ('is_active',)
+        })
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(MembershipStatus)
+class MembershipStatusAdmin(admin.ModelAdmin):
+    """Admin configuration for MembershipStatus model"""
+    list_display = [
+        'member', 'status', 'ordination_date', 'termination_date', 'is_current'
+    ]
+    list_filter = ['status', 'ordination_date', 'termination_date', 'is_active']
+    search_fields = ['member__full_name', 'observation']
+    ordering = ['member', '-ordination_date']
+
+
+@admin.register(MembershipStatusLog)
+class MembershipStatusLogAdmin(admin.ModelAdmin):
+    """Admin configuration for MembershipStatusLog model"""
+    list_display = [
+        'member', 'old_status', 'new_status', 'changed_by', 'created_at'
+    ]
+    list_filter = ['old_status', 'new_status', 'created_at']
+    search_fields = ['member__full_name', 'reason']
+    ordering = ['-created_at']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(MemberTransferLog)
+class MemberTransferLogAdmin(admin.ModelAdmin):
+    """Admin configuration for MemberTransferLog model"""
+    list_display = [
+        'member', 'from_church', 'to_church', 'transferred_by', 'created_at'
+    ]
+    list_filter = ['from_church', 'to_church', 'created_at']
+    search_fields = ['member__full_name', 'reason']
+    ordering = ['-created_at']
+    readonly_fields = ['created_at', 'updated_at']

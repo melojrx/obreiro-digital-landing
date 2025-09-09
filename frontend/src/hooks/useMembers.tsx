@@ -76,7 +76,7 @@ export const useMembers = (): UseMembersResult => {
       const params = {
         page: filters.page,
         search: filters.search || undefined,
-        membership_status: filters.status || undefined,
+        is_active: filters.status === 'active' ? true : filters.status === 'inactive' ? false : undefined,
         ministerial_function: filters.ministerial_function || undefined,
         ordering: 'full_name',
       };
@@ -104,7 +104,6 @@ export const useMembers = (): UseMembersResult => {
               full_address: '',
               membership_years: 0,
               transfer_letter: false,
-              ministerial_function: 'member',
               accept_sms: true,
               accept_email: true,
               accept_whatsapp: true,
@@ -127,7 +126,7 @@ export const useMembers = (): UseMembersResult => {
     } finally {
       setMembersLoading(false);
     }
-  }, [filters.page, filters.search, filters.status, filters.ministerial_function]);
+  }, [filters.page, filters.search, filters.status]);
 
   // Refresh all data
   const refreshData = useCallback(async () => {

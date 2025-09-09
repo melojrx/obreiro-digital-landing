@@ -17,11 +17,33 @@ export interface MembershipStatus {
   created_at: string;
   updated_at: string;
   // Campos de compatibilidade
-  ordination_date?: string;
   termination_date?: string;
   observation?: string;
   is_active: boolean;
 }
+
+// Definição constante das funções ministeriais (sincronizada com backend)
+export const MINISTERIAL_FUNCTION_CHOICES = {
+  member: 'Membro',
+  deacon: 'Diácono',
+  deaconess: 'Diaconisa',
+  elder: 'Presbítero',
+  evangelist: 'Evangelista',
+  pastor: 'Pastor',
+  missionary: 'Missionário',
+  leader: 'Líder',
+  cooperator: 'Cooperador',
+  auxiliary: 'Auxiliar',
+} as const;
+
+// Choices para status de membresia
+export const MEMBERSHIP_STATUS_CHOICES = {
+  active: 'Ativo',
+  inactive: 'Inativo',
+  transferred: 'Transferido',
+  disciplined: 'Disciplinado',
+  deceased: 'Falecido',
+} as const;
 
 export interface MinisterialFunctionChoices {
   MEMBER: 'member';
@@ -30,35 +52,13 @@ export interface MinisterialFunctionChoices {
   ELDER: 'elder';
   EVANGELIST: 'evangelist';
   PASTOR: 'pastor';
-  FEMALE_PASTOR: 'female_pastor';
   MISSIONARY: 'missionary';
-  FEMALE_MISSIONARY: 'female_missionary';
   LEADER: 'leader';
   COOPERATOR: 'cooperator';
   AUXILIARY: 'auxiliary';
 }
 
-export const MINISTERIAL_FUNCTION_CHOICES: Array<{ value: string; label: string }> = [
-  { value: 'member', label: 'Membro' },
-  { value: 'deacon', label: 'Diácono' },
-  { value: 'deaconess', label: 'Diaconisa' },
-  { value: 'elder', label: 'Presbítero' },
-  { value: 'evangelist', label: 'Evangelista' },
-  { value: 'pastor', label: 'Pastor' },
-  { value: 'female_pastor', label: 'Pastora' },
-  { value: 'missionary', label: 'Missionário' },
-  { value: 'female_missionary', label: 'Missionária' },
-  { value: 'leader', label: 'Líder' },
-  { value: 'cooperator', label: 'Cooperador(a)' },
-  { value: 'auxiliary', label: 'Auxiliar' }
-];
 
-export const MEMBERSHIP_STATUS_CHOICES: Array<{ value: string; label: string }> = [
-  { value: 'active', label: 'Ativo' },
-  { value: 'inactive', label: 'Inativo' },
-  { value: 'transferred', label: 'Transferido' },
-  { value: 'deceased', label: 'Falecido' }
-];
 
 // Tipos para Membros
 export interface Member {
@@ -83,25 +83,20 @@ export interface Member {
   state?: string;
   zipcode?: string;
   full_address: string;
-  membership_status: 'active' | 'inactive' | 'transferred' | 'deceased';
-  membership_status_display: string;
   membership_date: string;
   membership_years: number;
   baptism_date?: string;
-  conversion_date?: string;
   previous_church?: string;
   transfer_letter: boolean;
+  
+  // Campos ministeriais restaurados
+  membership_status: string;
+  conversion_date?: string;
   ministerial_function: string;
   ordination_date?: string;
   
   // Novos campos da estrutura MembershipStatus
   membership_statuses: MembershipStatus[];
-  current_ministerial_function?: {
-    status: string;
-    status_display: string;
-    effective_date?: string;
-    is_current: boolean;
-  };
   current_status?: string;
   current_status_display?: string;
   profession?: string;
@@ -133,8 +128,6 @@ export interface MemberSummary {
   phone?: string;
   age: number;
   church_name: string;
-  membership_status: string;
-  membership_status_display: string;
   membership_date: string;
   is_active: boolean;
 }
@@ -146,7 +139,7 @@ export interface MemberDashboard {
   new_members_month: number;
   growth_rate: number;
   status_distribution: Array<{
-    membership_status: string;
+    status: string;
     count: number;
   }>;
   gender_distribution: Array<{
@@ -163,8 +156,7 @@ export interface MemberDashboard {
 
 export interface MemberStatistics {
   ministerial_distribution: Array<{
-    ministerial_function: string;
-    count: number;
+      count: number;
   }>;
   marital_distribution: Array<{
     marital_status: string;
@@ -187,7 +179,6 @@ export interface CreateMembershipStatusData {
   end_date?: string;
   reason?: string;
   // Campos de compatibilidade
-  ordination_date?: string;
   termination_date?: string;
   observation?: string;
 }
@@ -210,13 +201,16 @@ export interface CreateMemberData {
   city?: string;
   state?: string;
   zipcode?: string;
-  membership_status?: string;
   baptism_date?: string;
-  conversion_date?: string;
   previous_church?: string;
   transfer_letter?: boolean;
+  
+  // Campos ministeriais restaurados
+  membership_status?: string;
+  conversion_date?: string;
   ministerial_function?: string;
   ordination_date?: string;
+  
   profession?: string;
   education_level?: string;
   photo?: File;
@@ -259,11 +253,9 @@ export const membersService = {
     search?: string;
     church?: number;
     is_active?: boolean;
-    membership_status?: string;
     gender?: string;
     marital_status?: string;
-    ministerial_function?: string;
-    ordering?: string;
+      ordering?: string;
   }): Promise<PaginatedResponse<MemberSummary>> {
     const response = await api.get(API_ENDPOINTS.members.list, { params });
     return response.data;
@@ -488,5 +480,10 @@ export const membershipStatusService = {
   // Obter opções de funções ministeriais
   getMinisterialFunctionChoices() {
     return MINISTERIAL_FUNCTION_CHOICES;
+  },
+  
+  // Obter opções de status de membresia
+  getMembershipStatusChoices() {
+    return MEMBERSHIP_STATUS_CHOICES;
   },
 }; 

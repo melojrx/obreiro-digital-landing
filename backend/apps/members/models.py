@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from datetime import date, timedelta
 from apps.core.models import (
     BaseModel, ActiveManager, TenantManager,
-    GenderChoices, MembershipStatusChoices
+    GenderChoices, MembershipStatusChoices, MinisterialFunctionChoices
 )
 from apps.core.models import validate_cpf, phone_validator, cep_validator
 
@@ -25,6 +25,10 @@ class MemberManager(TenantManager):
             membership_status=MembershipStatusChoices.ACTIVE
         )
     
+    def by_membership_status(self, status):
+        """Filtra por status de membresia"""
+        return self.get_queryset().filter(membership_status=status)
+    
     def for_church(self, church):
         """Membros de uma igreja específica"""
         return self.get_queryset().filter(church=church)
@@ -35,6 +39,10 @@ class MemberManager(TenantManager):
             is_active=True,
             membership_status=MembershipStatusChoices.ACTIVE
         )
+    
+    def by_ministerial_function(self, function):
+        """Filtra por função ministerial"""
+        return self.get_queryset().filter(ministerial_function=function)
     
     def by_age_range(self, min_age=None, max_age=None):
         """Filtra por faixa etária"""
@@ -144,28 +152,15 @@ class Member(BaseModel):
     # DADOS DO CÔNJUGE (quando casado)
     # =====================================
     
-    spouse_name = models.CharField(
-        "Nome do Cônjuge",
-        max_length=200,
-        blank=True,
-        null=True,
-        help_text="Nome completo do cônjuge (preencher se casado)"
-    )
-    
-    spouse_is_member = models.BooleanField(
-        "Cônjuge é Membro da Igreja",
-        default=False,
-        help_text="Marcar se o cônjuge também é membro desta igreja"
-    )
-    
-    spouse_member = models.ForeignKey(
+    # Referência ao cônjuge (se for membro da igreja)
+    spouse = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='spouse_of',
-        verbose_name="Cônjuge (Membro)",
-        help_text="Selecionar o cônjuge se for membro da igreja"
+        verbose_name="Cônjuge",
+        help_text="Cônjuge (se for membro da igreja)"
     )
     
     # =====================================
@@ -259,6 +254,7 @@ class Member(BaseModel):
     # DADOS ECLESIÁSTICOS
     # =====================================
     
+    # Status de membresia
     membership_status = models.CharField(
         "Status de Membresia",
         max_length=20,
@@ -306,31 +302,12 @@ class Member(BaseModel):
     # DADOS MINISTERIAIS
     # =====================================
     
-    ministries = models.ManyToManyField(
-        'activities.Ministry',
-        blank=True,
-        related_name='members',
-        verbose_name="Ministérios",
-        help_text="Ministérios dos quais participa"
-    )
-    
     ministerial_function = models.CharField(
         "Função Ministerial",
         max_length=100,
+        choices=MinisterialFunctionChoices.choices,
+        default=MinisterialFunctionChoices.MEMBER,
         blank=True,
-        choices=[
-            ('member', 'Membro'),
-            ('deacon', 'Diácono'),
-            ('deaconess', 'Diaconisa'),
-            ('elder', 'Presbítero'),
-            ('evangelist', 'Evangelista'),
-            ('pastor', 'Pastor'),
-            ('missionary', 'Missionário'),
-            ('leader', 'Líder'),
-            ('cooperator', 'Cooperador'),
-            ('auxiliary', 'Auxiliar'),
-        ],
-        default='member',
         help_text="Função/cargo ministerial"
     )
     
@@ -340,6 +317,16 @@ class Member(BaseModel):
         null=True,
         help_text="Data de ordenação ministerial (se aplicável)"
     )
+    
+    ministries = models.ManyToManyField(
+        'activities.Ministry',
+        blank=True,
+        related_name='members',
+        verbose_name="Ministérios",
+        help_text="Ministérios dos quais participa"
+    )
+    
+    
     
     # =====================================
     # DADOS FAMILIARES
@@ -424,7 +411,7 @@ class Member(BaseModel):
     # MANAGERS
     # =====================================
     
-    objects = TenantManager()
+    objects = MemberManager()
     
     class Meta:
         verbose_name = "Membro"
@@ -432,12 +419,13 @@ class Member(BaseModel):
         ordering = ['church', 'full_name']
         indexes = [
             models.Index(fields=['church', 'full_name']),
-            models.Index(fields=['church', 'membership_status']),
             models.Index(fields=['church', 'is_active']),
+            models.Index(fields=['church', 'membership_status']),
+            models.Index(fields=['ministerial_function']),
             models.Index(fields=['cpf']),
             models.Index(fields=['birth_date']),
             models.Index(fields=['membership_date']),
-            models.Index(fields=['ministerial_function']),
+            models.Index(fields=['conversion_date']),
         ]
     
     def __str__(self):
@@ -450,38 +438,61 @@ class Member(BaseModel):
             self.state = self.state.upper()
         
         # Validar datas lógicas
-        if self.conversion_date and self.birth_date:
-            if self.conversion_date < self.birth_date:
-                raise ValidationError("Data de conversão não pode ser anterior ao nascimento")
-        
-        if self.baptism_date and self.conversion_date:
-            if self.baptism_date < self.conversion_date:
-                raise ValidationError("Data de batismo não pode ser anterior à conversão")
+        self._validate_dates()
         
         # Validar dados do cônjuge
         self._validate_spouse_data()
         
         super().save(*args, **kwargs)
     
+    def _validate_dates(self):
+        """Valida consistência das datas"""
+        today = date.today()
+        
+        # Validar data de nascimento
+        if self.birth_date and self.birth_date > today:
+            raise ValidationError("Data de nascimento não pode ser no futuro")
+        
+        # Validar data de conversão
+        if self.conversion_date:
+            if self.birth_date and self.conversion_date < self.birth_date:
+                raise ValidationError("Data de conversão não pode ser anterior ao nascimento")
+            if self.conversion_date > today:
+                raise ValidationError("Data de conversão não pode ser no futuro")
+        
+        # Validar data de batismo
+        if self.baptism_date:
+            if self.birth_date and self.baptism_date < self.birth_date:
+                raise ValidationError("Data de batismo não pode ser anterior ao nascimento")
+            if self.conversion_date and self.baptism_date < self.conversion_date:
+                raise ValidationError("Data de batismo não pode ser anterior à conversão")
+            if self.baptism_date > today:
+                raise ValidationError("Data de batismo não pode ser no futuro")
+        
+        # Validar data de ordenação
+        if self.ordination_date:
+            if self.birth_date and self.ordination_date < self.birth_date:
+                raise ValidationError("Data de ordenação não pode ser anterior ao nascimento")
+            if self.ordination_date > today:
+                raise ValidationError("Data de ordenação não pode ser no futuro")
+        
+        # Validar data de membresia
+        if self.membership_date:
+            if self.birth_date and self.membership_date < self.birth_date:
+                raise ValidationError("Data de membresia não pode ser anterior ao nascimento")
+            if self.membership_date > today:
+                raise ValidationError("Data de membresia não pode ser no futuro")
+    
     def _validate_spouse_data(self):
         """Valida consistência dos dados do cônjuge"""
         # Se não é casado, limpar dados do cônjuge
         if self.marital_status != 'married':
-            self.spouse_name = None
-            self.spouse_is_member = False
-            self.spouse_member = None
+            self.spouse = None
             return
         
-        # Se spouse_member está preenchido, deve marcar spouse_is_member
-        if self.spouse_member:
-            self.spouse_is_member = True
-            # Se um membro específico foi selecionado, usar o nome dele
-            if self.spouse_member.full_name:
-                self.spouse_name = self.spouse_member.full_name
-        
-        # Permitir que spouse_is_member seja True mesmo sem spouse_member
-        # Isso facilita o cadastro quando o cônjuge ainda não foi cadastrado
-        # A vinculação pode ser feita posteriormente através da edição
+        # Se o cônjuge for o próprio membro, limpar
+        if self.spouse == self:
+            self.spouse = None
     
     # =====================================
     # PROPRIEDADES CALCULADAS
@@ -508,6 +519,19 @@ class Member(BaseModel):
         return 0
     
     @property
+    def conversion_age(self):
+        """Idade na data de conversão"""
+        if self.conversion_date and self.birth_date:
+            return self.conversion_date.year - self.birth_date.year - (
+                (self.conversion_date.month, self.conversion_date.day) < (self.birth_date.month, self.birth_date.day)
+            )
+        return None
+    
+    def get_conversion_age(self):
+        """Método para obter idade na conversão - compatibilidade"""
+        return self.conversion_age
+    
+    @property
     def is_minor(self):
         """Verifica se é menor de idade"""
         return self.age and self.age < 18
@@ -515,10 +539,7 @@ class Member(BaseModel):
     @property
     def is_active_member(self):
         """Verifica se é membro ativo"""
-        return (
-            self.is_active and 
-            self.membership_status == MembershipStatusChoices.ACTIVE
-        )
+        return self.is_active
     
     @property
     def full_address(self):
@@ -577,8 +598,8 @@ class Member(BaseModel):
         family = []
         
         # Cônjuge
-        if self.spouse_member:
-            family.append(self.spouse_member)
+        if self.spouse:
+            family.append(self.spouse)
         
         # Dependentes
         family.extend(self.dependents.filter(is_active=True))
@@ -600,66 +621,31 @@ class Member(BaseModel):
         """Lista de ministérios como string"""
         return ", ".join([ministry.name for ministry in self.ministries.all()])
     
-    def get_conversion_age(self):
-        """Idade na conversão"""
-        if self.conversion_date and self.birth_date:
-            return self.conversion_date.year - self.birth_date.year - (
-                (self.conversion_date.month, self.conversion_date.day) < 
-                (self.birth_date.month, self.birth_date.day)
-            )
-        return None
-    
     def update_membership_status(self, new_status, reason="", changed_by=None):
-        """Atualiza status de membresia com log automático - VERSÃO SIMPLIFICADA"""
+        """Atualiza status de membresia com log"""
+        if new_status == self.membership_status:
+            return  # Sem mudança
+            
         old_status = self.membership_status
+        self.membership_status = new_status
+        self.save()
         
-        # Só cria log se o status realmente mudou
-        if old_status != new_status:
-            self.membership_status = new_status
-            self.save(update_fields=['membership_status', 'updated_at'])
-            
-            # Log da mudança usando a estrutura simples
-            MembershipStatusLog.objects.create(
-                member=self,
-                old_status=old_status,
-                new_status=new_status,
-                reason=reason,
-                changed_by=changed_by
-            )
-            
-            return True  # Indica que houve mudança
-        
-        return False  # Nenhuma mudança necessária
+        # Criar log da mudança
+        MembershipStatusLog.objects.create(
+            member=self,
+            old_status=old_status,
+            new_status=new_status,
+            changed_by=changed_by,
+            reason=reason
+        )
     
-    def update_ministerial_function(self, new_function, effective_date, observations="", changed_by=None, end_date=None):
-        """Atualiza função ministerial com log automático"""
-        old_function = self.ministerial_function
-        
-        # Só cria log se a função realmente mudou
-        if old_function != new_function:
-            self.ministerial_function = new_function
-            self.save(update_fields=['ministerial_function', 'updated_at'])
-            
-            # Log da mudança usando a estrutura simples
-            MinisterialFunctionLog.objects.create(
-                member=self,
-                old_function=old_function,
-                new_function=new_function,
-                effective_date=effective_date,
-                end_date=end_date,
-                observations=observations,
-                changed_by=changed_by
-            )
-            
-            return True  # Indica que houve mudança
-        
-        return False  # Nenhuma mudança necessária
+    
+    
     
     def transfer_to_church(self, new_church, reason=""):
         """Transfere membro para outra igreja"""
         old_church = self.church
         self.church = new_church
-        self.membership_status = MembershipStatusChoices.ACTIVE
         self.save()
         
         # Log da transferência
@@ -670,6 +656,72 @@ class Member(BaseModel):
             reason=reason,
             transferred_by=None  # TODO: Adicionar usuário
         )
+
+
+class MembershipStatus(BaseModel):
+    """
+    Status de membresia específico por membro
+    Permite múltiplos status simultâneos e histórico completo
+    """
+    
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='membership_statuses',
+        verbose_name="Membro"
+    )
+    
+    status = models.CharField(
+        "Status",
+        max_length=100,
+        choices=MinisterialFunctionChoices.choices,
+        help_text="Status ministerial específico"
+    )
+    
+    ordination_date = models.DateField(
+        "Data de Ordenação",
+        blank=True,
+        null=True,
+        help_text="Data de início do status"
+    )
+    
+    termination_date = models.DateField(
+        "Data de Término",
+        blank=True,
+        null=True,
+        help_text="Data de fim do status (vazio se ainda ativo)"
+    )
+    
+    observation = models.TextField(
+        "Observações",
+        blank=True,
+        help_text="Observações sobre este status"
+    )
+    
+    class Meta:
+        verbose_name = "Status de Membresia"
+        verbose_name_plural = "Status de Membresia"
+        ordering = ['-ordination_date', '-created_at']
+        indexes = [
+            models.Index(fields=['member', '-ordination_date']),
+            models.Index(fields=['status', '-ordination_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.member.full_name} - {self.get_status_display()}"
+    
+    @property
+    def is_current(self):
+        """Verifica se é um status atual (sem data de término)"""
+        return self.termination_date is None
+    
+    def save(self, *args, **kwargs):
+        """Validações no save"""
+        if self.termination_date and self.ordination_date:
+            if self.termination_date <= self.ordination_date:
+                raise ValidationError("Data de término deve ser posterior à data de ordenação")
+        
+        super().save(*args, **kwargs)
 
 
 class MemberTransferLog(BaseModel):
@@ -738,14 +790,12 @@ class MembershipStatusLog(BaseModel):
     old_status = models.CharField(
         "Status Anterior",
         max_length=20,
-        choices=MembershipStatusChoices.choices,
         help_text="Status anterior do membro"
     )
     
     new_status = models.CharField(
         "Novo Status", 
         max_length=20,
-        choices=MembershipStatusChoices.choices,
         help_text="Novo status do membro"
     )
     
@@ -779,70 +829,3 @@ class MembershipStatusLog(BaseModel):
         return f"{self.member.full_name}: {self.old_status} → {self.new_status}"
 
 
-class MinisterialFunctionLog(BaseModel):
-    """
-    Log de mudanças de função ministerial - SIMPLES E EFICIENTE
-    Mantém histórico completo das funções ministeriais
-    """
-    
-    member = models.ForeignKey(
-        Member,
-        on_delete=models.CASCADE,
-        related_name='ministerial_history',
-        verbose_name="Membro"
-    )
-    
-    old_function = models.CharField(
-        "Função Anterior",
-        max_length=100,
-        choices=Member._meta.get_field('ministerial_function').choices,
-        help_text="Função ministerial anterior"
-    )
-    
-    new_function = models.CharField(
-        "Nova Função",
-        max_length=100,
-        choices=Member._meta.get_field('ministerial_function').choices,
-        help_text="Nova função ministerial"
-    )
-    
-    effective_date = models.DateField(
-        "Data Efetiva",
-        help_text="Data em que a função entra em vigor"
-    )
-    
-    end_date = models.DateField(
-        "Data Final",
-        null=True,
-        blank=True,
-        help_text="Data final da função (vazio se ainda ativa)"
-    )
-    
-    changed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='ministerial_changes_made',
-        verbose_name="Alterado por"
-    )
-    
-    observations = models.TextField(
-        "Observações",
-        blank=True,
-        help_text="Observações sobre a mudança de função"
-    )
-    
-    # created_at herdado de BaseModel para timestamp automático
-    
-    class Meta:
-        verbose_name = "Log de Função Ministerial"
-        verbose_name_plural = "Logs de Função Ministerial"
-        ordering = ['-effective_date', '-created_at']
-        indexes = [
-            models.Index(fields=['member', '-effective_date']),
-            models.Index(fields=['new_function', '-effective_date']),
-        ]
-    
-    def __str__(self):
-        return f"{self.member.full_name}: {self.old_function} → {self.new_function}"

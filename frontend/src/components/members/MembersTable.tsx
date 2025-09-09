@@ -25,7 +25,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
-import { Member } from '@/services/membersService';
+import { Member, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
 import { usePermissions } from '@/hooks/usePermissions';
 
 interface MembersTableProps {
@@ -41,6 +41,10 @@ export const MembersTable: React.FC<MembersTableProps> = ({
 }) => {
   const navigate = useNavigate();
   const permissions = usePermissions();
+
+  const getMinisterialFunctionDisplay = (ministerialFunction: string) => {
+    return MINISTERIAL_FUNCTION_CHOICES[ministerialFunction as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || 'Membro';
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -101,20 +105,23 @@ export const MembersTable: React.FC<MembersTableProps> = ({
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12"></TableHead>
-            <TableHead>Nome</TableHead>
-            <TableHead>Contato</TableHead>
-            <TableHead>Função</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Membro desde</TableHead>
-            <TableHead className="text-right">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+    <div className="space-y-4">
+      {/* Layout Desktop (md+) */}
+      <div className="hidden md:block border rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12"></TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Contato</TableHead>
+                <TableHead>Função</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Membro desde</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
           {members.map((member) => (
             <TableRow key={member.id} className="hover:bg-gray-50">
               <TableCell>
@@ -154,7 +161,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
               <TableCell>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-900 capitalize">
-                    {member.current_ministerial_function?.status_display || member.ministerial_function || 'Membro'}
+                    {getMinisterialFunctionDisplay(member.ministerial_function)}
                   </span>
                   {member.membership_statuses && member.membership_statuses.length > 1 && (
                     <HoverCard>
@@ -191,7 +198,9 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                 </div>
               </TableCell>
               <TableCell>
-                {getStatusBadge(member.membership_status)}
+                <Badge variant={member.is_active ? 'default' : 'secondary'} className="text-xs">
+                  {member.is_active ? 'Ativo' : 'Inativo'}
+                </Badge>
               </TableCell>
               <TableCell>
                 <span className="text-sm text-gray-600">
@@ -238,8 +247,149 @@ export const MembersTable: React.FC<MembersTableProps> = ({
               </TableCell>
             </TableRow>
           ))}
-        </TableBody>
-      </Table>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Layout Mobile (< md) */}
+      <div className="md:hidden space-y-3">
+        {members.map((member) => (
+          <div key={member.id} className="bg-white border rounded-lg p-4 space-y-3">
+            {/* Header do Card */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={member.photo} alt={member.full_name} />
+                  <AvatarFallback className="text-sm">
+                    {getInitials(member.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h4 className="font-medium text-gray-900">{member.full_name}</h4>
+                  {member.birth_date && (
+                    <p className="text-sm text-gray-500">
+                      {new Date().getFullYear() - new Date(member.birth_date).getFullYear()} anos
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Actions Menu Mobile */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <span className="sr-only">Abrir menu</span>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
+                    </svg>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleView(member)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Ver detalhes
+                  </DropdownMenuItem>
+                  {permissions.canEditMembers && (
+                    <DropdownMenuItem onClick={() => handleEdit(member)}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                  )}
+                  {permissions.canDeleteMembers && onDelete && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => onDelete(member)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Info Grid */}
+            <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500 block">Contato:</span>
+                <div className="space-y-1 mt-1">
+                  {member.email && (
+                    <div className="flex items-center text-gray-900">
+                      <Mail className="h-3 w-3 mr-1" />
+                      <span className="truncate">{member.email}</span>
+                    </div>
+                  )}
+                  {member.phone && (
+                    <div className="flex items-center text-gray-900">
+                      <Phone className="h-3 w-3 mr-1" />
+                      <span>{member.phone}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <span className="text-gray-500 block">Função:</span>
+                <div className="mt-1">
+                  <span className="text-gray-900 capitalize text-sm">
+                    {getMinisterialFunctionDisplay(member.ministerial_function)}
+                  </span>
+                  {member.membership_statuses && member.membership_statuses.length > 1 && (
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 ml-1">
+                          <Info className="h-3 w-3 text-gray-400" />
+                        </Button>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold">Histórico de Status Ministerial</h4>
+                          <div className="space-y-2">
+                            {member.membership_statuses.slice(0, 3).map((status, index) => (
+                              <div key={status.id} className="flex justify-between items-center text-xs">
+                                <span className={index === 0 ? 'font-medium' : 'text-gray-600'}>
+                                  {status.status_display}
+                                  {index === 0 && ' (Atual)'}
+                                </span>
+                                <span className="text-gray-500">
+                                  {new Date(status.effective_date).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                            ))}
+                            {member.membership_statuses.length > 3 && (
+                              <div className="text-xs text-gray-500 text-center">
+                                +{member.membership_statuses.length - 3} mais...
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Info */}
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div className="flex items-center space-x-2">
+                <Badge variant={member.is_active ? 'default' : 'secondary'} className="text-xs">
+                  {member.is_active ? 'Ativo' : 'Inativo'}
+                </Badge>
+                <span className="text-xs text-gray-500">
+                  desde {formatDate(member.membership_date)}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }; 

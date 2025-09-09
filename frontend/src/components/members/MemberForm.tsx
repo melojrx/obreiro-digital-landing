@@ -41,9 +41,9 @@ import { Badge } from '@/components/ui/badge';
 import { 
   CreateMemberData, 
   Member, 
+  membersService,
   MINISTERIAL_FUNCTION_CHOICES,
-  MEMBERSHIP_STATUS_CHOICES,
-  membersService
+  MEMBERSHIP_STATUS_CHOICES
 } from '@/services/membersService';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -85,13 +85,16 @@ const memberSchema = z.object({
     (val) => !val || val === '' || /^\d{5}-?\d{3}$/.test(val),
     { message: 'CEP deve estar no formato XXXXX-XXX' }
   ),
-  membership_status: z.string().optional(),
   baptism_date: z.string().optional(),
-  conversion_date: z.string().optional(),
   previous_church: z.string().optional(),
   transfer_letter: z.boolean().optional(),
+  
+  // Campos ministeriais restaurados
+  membership_status: z.string().optional(),
+  conversion_date: z.string().optional(),
   ministerial_function: z.string().optional(),
   ordination_date: z.string().optional(),
+  
   profession: z.string().optional(),
   education_level: z.string().optional(),
   notes: z.string().optional(),
@@ -104,9 +107,6 @@ const memberSchema = z.object({
   user_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   user_password: z.string().optional(),
   
-  // Novo campo para status ministerial inicial
-  initial_ministerial_status: z.string().optional(),
-  initial_status_reason: z.string().optional(),
 });
 
 type MemberFormData = z.infer<typeof memberSchema>;
@@ -175,13 +175,16 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       city: member?.city || '',
       state: member?.state || '',
       zipcode: member?.zipcode || '',
-      membership_status: member?.membership_status || 'active',
       baptism_date: member?.baptism_date || '',
-      conversion_date: member?.conversion_date || '',
       previous_church: member?.previous_church || '',
       transfer_letter: member?.transfer_letter || false,
+      
+      // Campos ministeriais restaurados
+      membership_status: member?.membership_status || 'active',
+      conversion_date: member?.conversion_date || '',
       ministerial_function: member?.ministerial_function || 'member',
       ordination_date: member?.ordination_date || '',
+      
       profession: member?.profession || '',
       education_level: member?.education_level || '',
       notes: member?.notes || '',
@@ -194,9 +197,6 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       user_email: '',
       user_password: '',
       
-      // Status ministerial inicial
-      initial_ministerial_status: '',
-      initial_status_reason: '',
     },
   });
 
@@ -266,13 +266,9 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         city: data.city || undefined,
         state: data.state || undefined,
         zipcode: data.zipcode || undefined,
-        membership_status: data.membership_status || undefined,
         baptism_date: data.baptism_date || undefined,
-        conversion_date: data.conversion_date || undefined,
         previous_church: data.previous_church || undefined,
         transfer_letter: data.transfer_letter || undefined,
-        ministerial_function: data.ministerial_function || undefined,
-        ordination_date: data.ordination_date || undefined,
         profession: data.profession || undefined,
         education_level: data.education_level || undefined,
         notes: data.notes || undefined,
@@ -285,9 +281,6 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         user_email: data.user_email,
         user_password: data.user_password,
         
-        // Status ministerial inicial
-        initial_ministerial_status: data.initial_ministerial_status,
-        initial_status_reason: data.initial_status_reason,
         
         // Foto
         photo: selectedPhoto || undefined,
@@ -412,7 +405,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
               </TabsTrigger>
               <TabsTrigger value="ministerial" className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                Status Ministerial
+                Função Ministerial
               </TabsTrigger>
               <TabsTrigger value="additional" className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4" />
@@ -955,73 +948,8 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="membership_status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status de Membresia</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Status da membresia" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="active">Ativo</SelectItem>
-                              <SelectItem value="inactive">Inativo</SelectItem>
-                              <SelectItem value="transferred">Transferido</SelectItem>
-                              <SelectItem value="deceased">Falecido</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
-                    <FormField
-                      control={form.control}
-                      name="ministerial_function"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Função Ministerial</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Função na igreja" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="member">Membro</SelectItem>
-                              <SelectItem value="deacon">Diácono</SelectItem>
-                              <SelectItem value="deaconess">Diaconisa</SelectItem>
-                              <SelectItem value="elder">Presbítero</SelectItem>
-                              <SelectItem value="evangelist">Evangelista</SelectItem>
-                              <SelectItem value="pastor">Pastor</SelectItem>
-                              <SelectItem value="missionary">Missionário</SelectItem>
-                              <SelectItem value="leader">Líder</SelectItem>
-                              <SelectItem value="cooperator">Cooperador</SelectItem>
-                              <SelectItem value="auxiliary">Auxiliar</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
-                    <FormField
-                      control={form.control}
-                      name="conversion_date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Data de Conversão</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
                     <FormField
                       control={form.control}
@@ -1037,22 +965,6 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="ordination_date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Data de Ordenação</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Apenas para funções ministeriais
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
                     <FormField
                       control={form.control}
@@ -1233,26 +1145,50 @@ export const MemberForm: React.FC<MemberFormProps> = ({
               )}
             </TabsContent>
             
-            {/* Status Ministerial */}
+            {/* Função Ministerial */}
             <TabsContent value="ministerial" className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Shield className="h-5 w-5" />
-                    Status Ministerial Inicial
+                    Função Ministerial
                   </CardTitle>
                   <CardDescription>
-                    Define a função ministerial inicial do membro (pode ser alterada posteriormente)
+                    Informações sobre o status e função ministerial do membro
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="initial_ministerial_status"
+                      name="membership_status"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Função Ministerial Inicial</FormLabel>
+                          <FormLabel>Status de Membresia</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Object.entries(MEMBERSHIP_STATUS_CHOICES).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                  {label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="ministerial_function"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Função Ministerial</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -1260,51 +1196,51 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {MINISTERIAL_FUNCTION_CHOICES.map((choice) => (
-                                <SelectItem key={choice.value} value={choice.value}>
-                                  {choice.label}
+                              {Object.entries(MINISTERIAL_FUNCTION_CHOICES).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                  {label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                          <FormDescription>
-                            Se não selecionado, será definido como "Membro"
-                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="initial_status_reason"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Observações sobre o Status Inicial</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Adicione observações sobre a função ministerial inicial..."
-                            className="min-h-[100px]"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Informações sobre o motivo da atribuição desta função ministerial
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">ℹ️ Sobre o Status Ministerial</h4>
-                    <div className="text-sm text-blue-700 space-y-1">
-                      <p>• O status ministerial pode ser alterado posteriormente através do histórico</p>
-                      <p>• Cada mudança será registrada com data e motivo</p>
-                      <p>• Apenas usuários com permissão podem alterar status ministeriais</p>
-                      <p>• Funções como Pastor e Presbítero podem requerer ordenação</p>
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="conversion_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data de Conversão</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            Data da conversão/aceitação de Jesus
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="ordination_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data de Ordenação</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            Data de ordenação ministerial (se aplicável)
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </CardContent>
               </Card>

@@ -7,26 +7,25 @@ const actions = [
     label: 'Adicionar novo membro',
     icon: PlusCircle,
     color: 'from-blue-500 to-cyan-500',
-    // Ajustado para rota em português existente no App.tsx
     link: '/membros/novo'
   },
   {
-    label: 'Criar novo evento',
+    label: 'Criar novo visitante',
+    icon: PlusCircle,
+    color: 'from-pink-500 to-fuchsia-500',
+    link: '/visitantes/novo'
+  },
+  {
+    label: 'Realizar um pedido de oração',
+    icon: MessageSquare,
+    color: 'from-purple-600 to-indigo-500',
+    link: '/pedidos-oracao'
+  },
+  {
+    label: 'Criar um novo evento',
     icon: CalendarPlus,
     color: 'from-green-500 to-emerald-500',
     link: '/events/new'
-  },
-  {
-    label: 'Registrar entrada financeira',
-    icon: DollarSign,
-    color: 'from-yellow-500 to-amber-500',
-    link: '/finance/new'
-  },
-  {
-    label: 'Enviar mensagem aos membros',
-    icon: MessageSquare,
-    color: 'from-purple-500 to-fuchsia-500',
-    link: '/messages/new'
   },
 ];
 

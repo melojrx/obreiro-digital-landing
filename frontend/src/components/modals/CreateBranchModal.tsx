@@ -209,7 +209,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
   if (availability && !availability.can_create) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-600" />
@@ -242,7 +242,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[95vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-blue-600" />

@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MembershipStatus, MINISTERIAL_FUNCTION_CHOICES, CreateMembershipStatusData } from '@/services/membersService';
+import { MembershipStatus, CreateMembershipStatusData } from '@/services/membersService';
 
 // Schema de validação
 const membershipStatusSchema = z.object({
@@ -119,9 +119,11 @@ export const MembershipStatusModal: React.FC<MembershipStatusModalProps> = ({
     return new Date(dateString).toISOString().split('T')[0];
   };
 
-  // Função para obter as opções disponíveis (pode ser expandida com lógica de negócio)
+  // Função para obter as opções disponíveis (simplificada)
   const getAvailableStatusOptions = () => {
-    return MINISTERIAL_FUNCTION_CHOICES;
+    return [
+      { value: 'member', label: 'Membro' }
+    ];
   };
 
   return (

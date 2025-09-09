@@ -207,13 +207,6 @@ class GenderChoices(models.TextChoices):
     FEMALE = 'F', 'Feminino'
 
 
-class MembershipStatusChoices(models.TextChoices):
-    """Status de membresia"""
-    ACTIVE = 'active', 'Ativo'
-    INACTIVE = 'inactive', 'Inativo'
-    TRANSFERRED = 'transferred', 'Transferido'
-    DISCIPLINED = 'disciplined', 'Disciplinado'
-    DECEASED = 'deceased', 'Falecido'
 
 
 class SubscriptionPlanChoices(models.TextChoices):
@@ -243,3 +236,26 @@ class RoleChoices(models.TextChoices):
     LEADER = 'leader', 'Líder'
     MEMBER = 'member', 'Membro'
     READ_ONLY = 'read_only', 'Somente Leitura'
+
+
+class MembershipStatusChoices(models.TextChoices):
+    """Status de membresia"""
+    ACTIVE = 'active', 'Ativo'
+    INACTIVE = 'inactive', 'Inativo'
+    TRANSFERRED = 'transferred', 'Transferido'
+    DISCIPLINED = 'disciplined', 'Disciplinado'
+    DECEASED = 'deceased', 'Falecido'
+
+
+class MinisterialFunctionChoices(models.TextChoices):
+    """Funções ministeriais"""
+    MEMBER = 'member', 'Membro'
+    DEACON = 'deacon', 'Diácono'
+    DEACONESS = 'deaconess', 'Diaconisa'
+    ELDER = 'elder', 'Presbítero'
+    EVANGELIST = 'evangelist', 'Evangelista'
+    PASTOR = 'pastor', 'Pastor'
+    MISSIONARY = 'missionary', 'Missionário'
+    LEADER = 'leader', 'Líder'
+    COOPERATOR = 'cooperator', 'Cooperador'
+    AUXILIARY = 'auxiliary', 'Auxiliar'

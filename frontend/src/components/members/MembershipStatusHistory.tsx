@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
-import { MembershipStatus, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
+import { MembershipStatus } from '@/services/membersService';
 import { usePermissions } from '@/hooks/usePermissions';
 
 interface MembershipStatusHistoryProps {

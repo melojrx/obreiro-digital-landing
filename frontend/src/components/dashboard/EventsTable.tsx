@@ -52,36 +52,78 @@ export function EventsTable() {
     return (
         <div className="space-y-6">
             <h3 className="text-lg font-semibold text-slate-800">Próximos Eventos</h3>
-            <div className="border rounded-lg">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Evento</TableHead>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Horário</TableHead>
-                            <TableHead>Local</TableHead>
-                            <TableHead className="text-right">Confirmados</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {events.map((event) => (
-                            <TableRow key={event.name}>
-                                <TableCell className="font-medium">
-                                    <div className="flex flex-col">
-                                        <span>{event.name}</span>
-                                        <Badge variant={event.typeVariant as "default" | "secondary" | "destructive" | "outline"} className="w-fit mt-1">{event.type}</Badge>
-                                    </div>
-                                </TableCell>
-                                <TableCell>{event.date}</TableCell>
-                                <TableCell>{event.time}</TableCell>
-                                <TableCell>{event.location}</TableCell>
-                                <TableCell className="text-right">{event.confirmed}</TableCell>
+            
+            {/* Layout Desktop (md+) */}
+            <div className="hidden md:block border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Evento</TableHead>
+                                <TableHead>Data</TableHead>
+                                <TableHead>Horário</TableHead>
+                                <TableHead>Local</TableHead>
+                                <TableHead className="text-right">Confirmados</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {events.map((event) => (
+                                <TableRow key={event.name}>
+                                    <TableCell className="font-medium">
+                                        <div className="flex flex-col">
+                                            <span>{event.name}</span>
+                                            <Badge variant={event.typeVariant as "default" | "secondary" | "destructive" | "outline"} className="w-fit mt-1">{event.type}</Badge>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{event.date}</TableCell>
+                                    <TableCell>{event.time}</TableCell>
+                                    <TableCell>{event.location}</TableCell>
+                                    <TableCell className="text-right">{event.confirmed}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </div>
-             <Button variant="outline" className="w-full">
+
+            {/* Layout Mobile (< md) */}
+            <div className="md:hidden space-y-3">
+                {events.map((event) => (
+                    <div key={event.name} className="bg-white border rounded-lg p-4 space-y-3">
+                        {/* Event Header */}
+                        <div className="flex flex-col space-y-2">
+                            <div className="flex items-start justify-between">
+                                <h4 className="font-medium text-gray-900 pr-2">{event.name}</h4>
+                                <Badge variant={event.typeVariant as "default" | "secondary" | "destructive" | "outline"} className="text-xs">
+                                    {event.type}
+                                </Badge>
+                            </div>
+                        </div>
+
+                        {/* Event Details Grid */}
+                        <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span className="text-gray-500 block">Data:</span>
+                                <span className="text-gray-900 font-medium">{event.date}</span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 block">Horário:</span>
+                                <span className="text-gray-900 font-medium">{event.time}</span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 block">Local:</span>
+                                <span className="text-gray-900 font-medium">{event.location}</span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 block">Confirmados:</span>
+                                <span className="text-gray-900 font-medium">{event.confirmed}</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            <Button variant="outline" className="w-full">
                 Ver todos os eventos
             </Button>
         </div>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Member, MembershipStatus, membershipStatusService } from '@/services/membersService';
+import { Member, MembershipStatus, membershipStatusService, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
 import { useAuth } from '@/hooks/useAuth';
 import { MembershipStatusHistory } from './MembershipStatusHistory';
 import { MembershipStatusModal } from './MembershipStatusModal';
@@ -31,6 +31,10 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  const getMinisterialFunctionDisplay = (ministerialFunction: string) => {
+    return MINISTERIAL_FUNCTION_CHOICES[ministerialFunction as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || 'Membro';
+  };
   const [membershipStatuses, setMembershipStatuses] = useState<MembershipStatus[]>(member.membership_statuses || []);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [editingStatus, setEditingStatus] = useState<MembershipStatus | undefined>(undefined);
@@ -217,7 +221,9 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-2xl font-bold">{member.full_name}</h2>
-                {getStatusBadge(member.membership_status, member.membership_status_display)}
+                <Badge variant={member.is_active ? 'default' : 'secondary'} className="text-sm">
+                  {member.is_active ? 'Ativo' : 'Inativo'}
+                </Badge>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
@@ -503,7 +509,9 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                   <div>
                     <label className="text-sm font-medium text-gray-500">Status de Membresia</label>
                     <div className="mt-1">
-                      {getStatusBadge(member.membership_status, member.membership_status_display)}
+                      <Badge variant={member.is_active ? 'default' : 'secondary'} className="text-sm">
+                  {member.is_active ? 'Ativo' : 'Inativo'}
+                </Badge>
                     </div>
                   </div>
                   
@@ -512,12 +520,6 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                     <p className="text-gray-900">{formatDate(member.membership_date)}</p>
                   </div>
                   
-                  {member.conversion_date && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Data de Conversão</label>
-                      <p className="text-gray-900">{formatDate(member.conversion_date)}</p>
-                    </div>
-                  )}
                   
                   {member.baptism_date && (
                     <div>
@@ -525,19 +527,21 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                       <p className="text-gray-900">{formatDate(member.baptism_date)}</p>
                     </div>
                   )}
+                  
+                  {member.conversion_date && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Data de Conversão</label>
+                      <p className="text-gray-900">{formatDate(member.conversion_date)}</p>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Função Ministerial Atual</label>
+                    <label className="text-sm font-medium text-gray-500">Função Ministerial</label>
                     <p className="text-gray-900 capitalize">
-                      {member.current_ministerial_function?.status_display || member.ministerial_function || 'Membro'}
+                      {getMinisterialFunctionDisplay(member.ministerial_function)}
                     </p>
-                    {member.current_ministerial_function?.effective_date && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Desde {formatDate(member.current_ministerial_function.effective_date)}
-                      </p>
-                    )}
                   </div>
                   
                   {member.ordination_date && (

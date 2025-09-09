@@ -11,12 +11,11 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Count, Q
 from datetime import datetime, date
 
-from .models import Member, MembershipStatusLog, MinisterialFunctionLog
+from .models import Member, MembershipStatusLog
 from .serializers import (
     MemberSerializer, MemberListSerializer, MemberCreateSerializer, 
     MemberUpdateSerializer, MemberSummarySerializer,
-    MembershipStatusLogSerializer, MemberStatusChangeSerializer,
-    MinisterialFunctionLogSerializer, MinisterialFunctionChangeSerializer
+    MembershipStatusLogSerializer, MemberStatusChangeSerializer
 )
 
 
@@ -28,14 +27,14 @@ class MemberViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['full_name', 'email', 'cpf']
-    filterset_fields = ['gender', 'marital_status', 'ministerial_function']
+    filterset_fields = ['gender', 'marital_status']
     ordering_fields = ['full_name', 'membership_date', 'created_at']
     ordering = ['-created_at']
     
     def get_queryset(self):
         """QuerySet otimizado com select_related e filtros por igreja"""
         # Filtrar apenas membros da igreja do usuário logado
-        queryset = Member.objects.select_related('church', 'spouse_member', 'responsible')
+        queryset = Member.objects.select_related('church', 'spouse', 'responsible')
         
         # Se o usuário tiver vínculo com igreja, filtrar por ela
         if hasattr(self.request.user, 'church_users') and self.request.user.church_users.exists():
@@ -83,8 +82,8 @@ class MemberViewSet(viewsets.ModelViewSet):
         active_members = queryset.filter(membership_status='active').count()
         
         # Estatísticas por gênero
-        male_count = queryset.filter(gender='male').count()
-        female_count = queryset.filter(gender='female').count()
+        male_count = queryset.filter(gender='M').count()
+        female_count = queryset.filter(gender='F').count()
         
         # Estatísticas por faixa etária (aproximada)
         from datetime import date, timedelta
@@ -241,73 +240,6 @@ class MemberViewSet(viewsets.ModelViewSet):
             'total_changes': history.count()
         })
     
-    @action(detail=True, methods=['patch'])
-    def change_ministerial_function(self, request, pk=None):
-        """Alterar função ministerial - COM AUDITORIA AUTOMÁTICA"""
-        member = self.get_object()
-        serializer = MinisterialFunctionChangeSerializer(data=request.data)
-        
-        if not serializer.is_valid():
-            return Response(
-                serializer.errors,
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Usar o método melhorado do model que já faz o log
-        changed = member.update_ministerial_function(
-            new_function=serializer.validated_data['new_function'],
-            effective_date=serializer.validated_data['effective_date'],
-            end_date=serializer.validated_data.get('end_date'),
-            observations=serializer.validated_data.get('observations', ''),
-            changed_by=request.user
-        )
-        
-        if changed:
-            # Retornar dados atualizados
-            member_serializer = self.get_serializer(member)
-            return Response({
-                'message': 'Função ministerial alterada com sucesso',
-                'member': member_serializer.data,
-                'logged': True
-            })
-        else:
-            return Response({
-                'message': 'Nenhuma alteração necessária - função já é a mesma',
-                'logged': False
-            })
-    
-    @action(detail=True, methods=['get'])
-    def ministerial_history(self, request, pk=None):
-        """Histórico de mudanças de função ministerial"""
-        member = self.get_object()
-        
-        # Buscar histórico ordenado por data efetiva
-        history = MinisterialFunctionLog.objects.filter(member=member).order_by('-effective_date', '-created_at')
-        
-        # Paginação opcional
-        page = self.paginate_queryset(history)
-        if page is not None:
-            serializer = MinisterialFunctionLogSerializer(page, many=True)
-            return Response({
-                'count': self.paginator.page.paginator.count,
-                'next': self.paginator.get_next_link(),
-                'previous': self.paginator.get_previous_link(),
-                'member_name': member.full_name,
-                'current_function': member.ministerial_function,
-                'current_function_display': member.get_ministerial_function_display(),
-                'total_changes': self.paginator.page.paginator.count,
-                'history': serializer.data,
-            })
-        
-        # Sem paginação
-        serializer = MinisterialFunctionLogSerializer(history, many=True)
-        return Response({
-            'member_name': member.full_name,
-            'current_function': member.ministerial_function,
-            'current_function_display': member.get_ministerial_function_display(),
-            'history': serializer.data,
-            'total_changes': history.count()
-        })
 
     @action(detail=False, methods=['get'])
     def export(self, request):

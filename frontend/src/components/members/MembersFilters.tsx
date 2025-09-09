@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, Filter, Download, Plus, Users } from 'lucide-react';
+import { MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,7 +52,7 @@ export const MembersFilters: React.FC<MembersFiltersProps> = ({
     });
   };
 
-  const handleFunctionChange = (value: string) => {
+  const handleMinisterialFunctionChange = (value: string) => {
     onFiltersChange({
       ...filters,
       ministerial_function: value === 'all' ? '' : value,
@@ -112,11 +113,11 @@ export const MembersFilters: React.FC<MembersFiltersProps> = ({
             </Select>
           </div>
 
-          {/* Filtro por Função */}
+          {/* Filtro por Função Ministerial */}
           <div>
             <Select 
               value={filters.ministerial_function || 'all'} 
-              onValueChange={handleFunctionChange}
+              onValueChange={handleMinisterialFunctionChange}
               disabled={loading}
             >
               <SelectTrigger>
@@ -124,19 +125,15 @@ export const MembersFilters: React.FC<MembersFiltersProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as funções</SelectItem>
-                <SelectItem value="member">Membro</SelectItem>
-                <SelectItem value="deacon">Diácono</SelectItem>
-                <SelectItem value="deaconess">Diaconisa</SelectItem>
-                <SelectItem value="elder">Presbítero</SelectItem>
-                <SelectItem value="evangelist">Evangelista</SelectItem>
-                <SelectItem value="pastor">Pastor</SelectItem>
-                <SelectItem value="missionary">Missionário</SelectItem>
-                <SelectItem value="leader">Líder</SelectItem>
-                <SelectItem value="cooperator">Cooperador</SelectItem>
-                <SelectItem value="auxiliary">Auxiliar</SelectItem>
+                {Object.entries(MINISTERIAL_FUNCTION_CHOICES).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
+
         </div>
 
         {/* Ações */}
