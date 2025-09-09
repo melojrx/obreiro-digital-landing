@@ -311,6 +311,9 @@ django.log
 !.vscode/extensions.json
 *.code-workspace
 
+# Continue (VS Code Extension)
+.continue/
+
 # IntelliJ / PyCharm
 .idea/
 *.iml
