@@ -27,7 +27,7 @@ class MemberViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['full_name', 'email', 'cpf']
-    filterset_fields = ['gender', 'marital_status']
+    filterset_fields = ['gender', 'marital_status', 'ministerial_function']
     ordering_fields = ['full_name', 'membership_date', 'created_at']
     ordering = ['-created_at']
     
@@ -307,6 +307,48 @@ class MemberViewSet(viewsets.ModelViewSet):
                 'age': member.age,
                 'gender': member.get_gender_display(),
                 'membership_date': member.membership_date,
+            }
+            for member in queryset
+        ]
+        
+        return Response({
+            'count': len(data),
+            'results': data
+        })
+
+    @action(detail=False, methods=['get'])
+    def leaders(self, request):
+        """
+        Buscar membros que podem ser líderes de ministérios.
+        Filtra por funções ministeriais adequadas para liderança.
+        """
+        # Funções que podem liderar ministérios
+        leader_functions = ['leader', 'pastor', 'elder', 'deacon', 'deaconess']
+        
+        queryset = self.get_queryset().filter(
+            ministerial_function__in=leader_functions,
+            is_active=True
+        )
+        
+        # Aplicar filtro de busca se fornecido
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(full_name__icontains=search) |
+                Q(email__icontains=search)
+            )
+        
+        # Ordenar por nome
+        queryset = queryset.order_by('full_name')
+        
+        # Serializar apenas dados essenciais para o select
+        data = [
+            {
+                'id': member.id,
+                'name': member.full_name,
+                'role': member.get_ministerial_function_display(),
+                'ministerial_function': member.ministerial_function,
+                'email': member.email
             }
             for member in queryset
         ]

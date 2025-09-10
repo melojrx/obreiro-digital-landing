@@ -1,0 +1,52 @@
+name: Complete MCP Servers Configuration
+version: 1.0.0
+schema: v1
+
+mcpServers:
+  # Context7 - Análise avançada de código e contexto  
+  context7:
+    command: npx
+    args: ["@context7/mcp-server@latest"]
+    env:
+      CONTEXT7_API_KEY: ${CONTEXT7_API_KEY}
+      CONTEXT7_PROJECT_ROOT: "."
+      CONTEXT7_INCLUDE_PATTERNS: "**/*.py,**/*.tsx,**/*.ts,**/*.js,**/*.md,**/*.yaml,**/*.yml,**/*.json"
+      CONTEXT7_EXCLUDE_PATTERNS: "**/node_modules/**,**/__pycache__/**,**/migrations/**,**/dist/**,**/build/**,**/.git/**,**/venv/**,**/env/**"
+
+  # Playwright - Automação de browser
+  playwright:
+    command: npx
+    args: ["@playwright/mcp@latest"]
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: "0"
+
+  # GitHub - Integração com repositórios
+  github:
+    command: npx
+    args: ["@modelcontextprotocol/server-github@latest"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_TOKEN}
+
+  # File System - Operações de arquivos
+  filesystem:
+    command: npx
+    args: ["@modelcontextprotocol/server-filesystem@latest"]
+    env:
+      ALLOWED_DIRECTORIES: ".,./backend,./frontend,./docs,./scripts"
+      ENABLE_WRITE: "true"
+
+  # SQLite - Análise de banco de dados
+  sqlite:
+    command: npx
+    args: ["@modelcontextprotocol/server-sqlite@latest"]
+    env:
+      SQLITE_DATABASES: "./backend/db.sqlite3"
+      READ_ONLY: "true"
+
+  # Memory - Contexto persistente
+  memory:
+    command: npx
+    args: ["@modelcontextprotocol/server-memory@latest"]
+    env:
+      MEMORY_BANK_SIZE: "1000"
+      ENABLE_PERSISTENCE: "true"

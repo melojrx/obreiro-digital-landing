@@ -14,7 +14,7 @@ from apps.churches.views import ChurchViewSet
 from apps.branches.views import BranchViewSet
 from apps.members.views import MemberViewSet
 from apps.visitors.views import VisitorViewSet
-from apps.activities.views import ActivityViewSet
+from apps.activities.views import ActivityViewSet, MinistryViewSet
 
 # Importar views de usuários
 from apps.accounts import views
@@ -29,6 +29,7 @@ router.register(r'branches', BranchViewSet, basename='branch')
 router.register(r'members', MemberViewSet, basename='member')
 router.register(r'visitors', VisitorViewSet, basename='visitor')
 router.register(r'activities', ActivityViewSet, basename='activity')
+router.register(r'ministries', MinistryViewSet, basename='ministry')
 
 # URL patterns
 urlpatterns = [
@@ -60,6 +61,9 @@ urlpatterns = [
     
     # Pedidos de Oração
     path('', include('apps.prayers.urls')),
+    
+    # Atividades e Ministérios (endpoints customizados)
+    path('activities/', include('apps.activities.urls')),
     
     # ViewSets registrados no router
     path('', include(router.urls)),

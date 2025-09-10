@@ -155,14 +155,28 @@ class MemberCreateSerializer(serializers.ModelSerializer):
     
     def validate_cpf(self, value):
         """Validação de CPF"""
-        if value and Member.objects.filter(cpf=value).exists():
-            raise serializers.ValidationError("Este CPF já está cadastrado.")
+        if value:
+            # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
+            existing = Member.objects.all().filter(
+                cpf=value,
+                is_active=True
+            ).exists()
+            
+            if existing:
+                raise serializers.ValidationError("Este CPF já está cadastrado.")
         return value
     
     def validate_email(self, value):
         """Validação de email"""
-        if value and Member.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Este e-mail já está cadastrado.")
+        if value:
+            # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
+            existing = Member.objects.all().filter(
+                email=value,
+                is_active=True
+            ).exists()
+            
+            if existing:
+                raise serializers.ValidationError("Este e-mail já está cadastrado.")
         return value
     
     def validate(self, attrs):
@@ -191,21 +205,36 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             'email', 'phone', 'phone_secondary', 'address', 'number', 'complement', 'neighborhood', 
             'city', 'state', 'zipcode', 
             'membership_status', 'conversion_date', 'baptism_date', 'previous_church', 'transfer_letter', 
-            'ministerial_function', 'ordination_date', 'spouse', 'children_count', 'responsible', 'education_level', 
+            'ministerial_function', 'ordination_date', 'spouse', 'children_count', 'responsible', 'profession', 'education_level', 
             'photo', 'notes', 'accept_sms', 'accept_email', 'accept_whatsapp'
         ]
     
     def validate_cpf(self, value):
         """Validação de CPF na atualização"""
-        if value and Member.objects.filter(cpf=value).exclude(pk=self.instance.pk).exists():
-            raise serializers.ValidationError("Este CPF já está cadastrado.")
+        if value:
+            # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
+            existing = Member.objects.all().filter(
+                cpf=value,
+                is_active=True
+            ).exclude(pk=self.instance.pk).exists()
+            
+            if existing:
+                raise serializers.ValidationError("Este CPF já está cadastrado.")
         return value
     
     def validate_email(self, value):
         """Validação de email na atualização"""
-        if value and Member.objects.filter(email=value).exclude(pk=self.instance.pk).exists():
-            raise serializers.ValidationError("Este e-mail já está cadastrado.")
+        if value:
+            # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
+            existing = Member.objects.all().filter(
+                email=value,
+                is_active=True
+            ).exclude(pk=self.instance.pk).exists()
+            
+            if existing:
+                raise serializers.ValidationError("Este e-mail já está cadastrado.")
         return value
+    
 
 
 class MemberSummarySerializer(serializers.ModelSerializer):

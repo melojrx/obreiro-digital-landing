@@ -9,12 +9,16 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from django.utils import timezone
+from datetime import datetime, timedelta
 
 from .models import Ministry, Activity
 from .serializers import (
     MinistrySerializer, MinistryCreateSerializer, MinistryStatsSerializer,
-    ActivitySerializer, ActivityCreateSerializer, ActivitySummarySerializer
+    ActivitySerializer, ActivityCreateSerializer, ActivitySummarySerializer,
+    PublicMinistrySerializer, PublicActivitySerializer
 )
+from apps.core.permissions import IsChurchAdmin, IsMemberUser
 
 
 class MinistryViewSet(viewsets.ModelViewSet):
@@ -24,12 +28,23 @@ class MinistryViewSet(viewsets.ModelViewSet):
     
     queryset = Ministry.objects.all()
     serializer_class = MinistrySerializer
-    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'description']
     filterset_fields = ['church', 'is_active']
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
+    
+    def get_permissions(self):
+        """
+        Define as permissões por ação
+        """
+        if self.action == 'public':
+            permission_classes = [permissions.AllowAny]
+        elif self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsChurchAdmin]
+        else:
+            permission_classes = [IsMemberUser]
+        return [permission() for permission in permission_classes]
     
     def get_queryset(self):
         """
@@ -65,6 +80,22 @@ class MinistryViewSet(viewsets.ModelViewSet):
         activities = ministry.activities.filter(is_active=True)
         serializer = ActivitySummarySerializer(activities, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
+    def public(self, request):
+        """Ministérios públicos para o calendário público"""
+        church_id = request.GET.get('church_id')
+        if not church_id:
+            return Response({'error': 'church_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        ministries = Ministry.objects.filter(
+            church_id=church_id,
+            is_active=True,
+            is_public=True
+        )
+        
+        serializer = PublicMinistrySerializer(ministries, many=True)
+        return Response(serializer.data)
 
 
 class ActivityViewSet(viewsets.ModelViewSet):
@@ -74,12 +105,23 @@ class ActivityViewSet(viewsets.ModelViewSet):
     
     queryset = Activity.objects.all()
     serializer_class = ActivitySerializer
-    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'description']
     filterset_fields = ['church', 'ministry', 'is_active', 'activity_type']
     ordering_fields = ['name', 'start_datetime', 'created_at']
     ordering = ['-start_datetime']
+    
+    def get_permissions(self):
+        """
+        Define as permissões por ação
+        """
+        if self.action == 'public_calendar':
+            permission_classes = [permissions.AllowAny]
+        elif self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsChurchAdmin]
+        else:
+            permission_classes = [IsMemberUser]
+        return [permission() for permission in permission_classes]
     
     def get_queryset(self):
         """
@@ -141,3 +183,50 @@ class ActivityViewSet(viewsets.ModelViewSet):
             'participants_count': activity.participants_count,
             'participants': []
         })
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
+    def public_calendar(self, request):
+        """Calendário público de atividades"""
+        church_id = request.GET.get('church_id')
+        if not church_id:
+            return Response({'error': 'church_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Filtros opcionais
+        ministry_id = request.GET.get('ministry_id')
+        branch_id = request.GET.get('branch_id')
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        
+        # Query base: apenas atividades públicas e ativas
+        activities = Activity.objects.filter(
+            church_id=church_id,
+            is_active=True,
+            is_public=True
+        )
+        
+        # Aplicar filtros opcionais
+        if ministry_id:
+            activities = activities.filter(ministry_id=ministry_id)
+            
+        if branch_id:
+            activities = activities.filter(branch_id=branch_id)
+            
+        if start_date:
+            try:
+                start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                activities = activities.filter(start_datetime__gte=start_date)
+            except (ValueError, TypeError):
+                pass
+                
+        if end_date:
+            try:
+                end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                activities = activities.filter(start_datetime__lte=end_date)
+            except (ValueError, TypeError):
+                pass
+        
+        # Limitar resultados e ordenar
+        activities = activities.order_by('start_datetime')[:100]
+        
+        serializer = PublicActivitySerializer(activities, many=True)
+        return Response(serializer.data)

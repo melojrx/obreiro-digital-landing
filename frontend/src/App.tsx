@@ -23,7 +23,10 @@ import Visitantes from "./pages/Visitantes";
 import NovoVisitante from "./pages/NovoVisitante";
 import DetalhesVisitante from "./pages/DetalhesVisitante";
 import EditarVisitante from "./pages/EditarVisitante";
+import ActivitiesPage from "./pages/ActivitiesPage";
+import CalendarPage from "./pages/CalendarPage";
 import PrayerRequestsPage from "./pages/PrayerRequestsPage";
+import MinistryManagementPage from "./pages/MinistryManagementPage";
 import GerenciarQRCodes from "./pages/GerenciarQRCodes";
 import RegistroVisitante from "./pages/RegistroVisitante";
 import RegistroSucesso from "./pages/RegistroSucesso";
@@ -202,6 +205,24 @@ const AppContent = () => {
           </ProtectedRoute>
         } 
       />
+      {/* Rota para atividades */}
+      <Route 
+        path="/atividades" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <ActivitiesPage />
+          </ProtectedRoute>
+        } 
+      />
+      {/* Rota para gestão de ministérios */}
+      <Route 
+        path="/ministerios" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <MinistryManagementPage />
+          </ProtectedRoute>
+        } 
+      />
       <Route 
         path="/configuracoes/qr-codes" 
         element={
@@ -224,6 +245,15 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="public">
             <RegistroSucesso />
+          </ProtectedRoute>
+        } 
+      />
+      {/* Rota pública para calendário de atividades */}
+      <Route 
+        path="/calendario" 
+        element={
+          <ProtectedRoute level="public">
+            <CalendarPage />
           </ProtectedRoute>
         } 
       />

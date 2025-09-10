@@ -56,7 +56,7 @@ const Sidebar: React.FC = () => {
         { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
         { title: 'Membros', icon: Users, href: '/membros' },
         { title: 'Visitantes', icon: UserPlus, href: '/visitantes' },
-        { title: 'Eventos', icon: Calendar, href: '/eventos' },
+        { title: 'Atividades', icon: Calendar, href: '/atividades' },
       ]
     },
     // Seção hierárquica - Para Denomination Admins E Church Admins
@@ -70,6 +70,8 @@ const Sidebar: React.FC = () => {
         ...(permissions.canCreateChurches ? [
           { title: 'Gerenciar Igrejas', icon: Church, href: '/denominacao/churches' }
         ] : []),
+        // Ministérios - Para todos que têm acesso à gestão hierárquica
+        { title: 'Ministérios', icon: Church, href: '/ministerios' },
         // Visão Hierárquica - Para ambos (Church Admin vê apenas suas filiais)
         { title: 'Visão Hierárquica', icon: TreePine, href: '/denominacao/hierarchy' },
       ]

@@ -137,6 +137,33 @@ class MinistrySummarySerializer(serializers.ModelSerializer):
         ]
 
 
+class PublicMinistrySerializer(serializers.ModelSerializer):
+    """Serializer público para Ministry - apenas campos essenciais"""
+    
+    class Meta:
+        model = Ministry
+        fields = [
+            'id', 'name', 'color'
+        ]
+
+
+class PublicActivitySerializer(serializers.ModelSerializer):
+    """Serializer público para Activity - apenas campos essenciais"""
+    
+    ministry_name = serializers.CharField(source='ministry.name', read_only=True)
+    ministry_color = serializers.CharField(source='ministry.color', read_only=True)
+    activity_type_display = serializers.CharField(source='get_activity_type_display', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    
+    class Meta:
+        model = Activity
+        fields = [
+            'id', 'name', 'description', 'ministry_name', 'ministry_color',
+            'activity_type', 'activity_type_display', 'start_datetime',
+            'end_datetime', 'location', 'branch_name'
+        ]
+
+
 class ActivitySummarySerializer(serializers.ModelSerializer):
     """Serializer resumido para Activity"""
     

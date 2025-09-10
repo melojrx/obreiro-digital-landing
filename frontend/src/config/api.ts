@@ -209,13 +209,26 @@ export const API_ENDPOINTS = {
   
   // Atividades
   activities: {
-    list: '/activities/',
-    detail: (id: number) => `/activities/${id}/`,
+    list: '/activities/activities/',
+    detail: (id: number) => `/activities/activities/${id}/`,
+    create: '/activities/activities/',
+    update: (id: number) => `/activities/activities/${id}/`,
+    delete: (id: number) => `/activities/activities/${id}/`,
+    upcoming: '/activities/activities/upcoming/',
+    publicCalendar: '/activities/activities/public_calendar/',
+    registerParticipant: (id: number) => `/activities/activities/${id}/register_participant/`,
+    participants: (id: number) => `/activities/activities/${id}/participants/`,
   },
   
   // Ministérios
   ministries: {
-    list: '/ministries/',
-    detail: (id: number) => `/ministries/${id}/`,
+    list: '/activities/ministries/',
+    detail: (id: number) => `/activities/ministries/${id}/`,
+    create: '/activities/ministries/',
+    update: (id: number) => `/activities/ministries/${id}/`,
+    delete: (id: number) => `/activities/ministries/${id}/`,
+    stats: (id: number) => `/activities/ministries/${id}/stats/`,
+    activities: (id: number) => `/activities/ministries/${id}/activities/`,
+    public: '/activities/ministries/public/',
   },
 } as const; 
