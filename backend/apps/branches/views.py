@@ -35,34 +35,43 @@ class BranchViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Branch.objects.all()
         
-        # Buscar relação do usuário com igreja
+        # Buscar todas as relações do usuário com igrejas
         try:
             from apps.accounts.models import ChurchUser, RoleChoices
-            church_user = ChurchUser.objects.filter(user=user, is_active=True).first()
+            church_users = ChurchUser.objects.filter(user=user, is_active=True)
             
-            if not church_user or not church_user.church:
+            if not church_users.exists():
                 return Branch.objects.none()
             
-            # Denomination Admin: vê filiais de todas as igrejas da denominação
-            if church_user.role == RoleChoices.DENOMINATION_ADMIN:
-                if church_user.church.denomination:
-                    return Branch.objects.filter(
-                        church__denomination=church_user.church.denomination,
-                        is_active=True
-                    )
-                else:
-                    # Se não tem denominação, ver apenas da sua igreja
-                    return Branch.objects.filter(
-                        church=church_user.church,
-                        is_active=True
-                    )
+            # Coletar todas as igrejas que o usuário tem acesso
+            accessible_churches = set()
             
-            # Church Admin e outros: vêem apenas filiais da sua igreja específica
-            else:
-                return Branch.objects.filter(
-                    church=church_user.church,
-                    is_active=True
-                )
+            for church_user in church_users:
+                if not church_user.church:
+                    continue
+                    
+                # Denomination Admin: vê filiais de todas as igrejas da denominação
+                if church_user.role == RoleChoices.DENOMINATION_ADMIN:
+                    if church_user.church.denomination:
+                        # Adicionar todas as igrejas da denominação
+                        from apps.churches.models import Church
+                        denomination_churches = Church.objects.filter(
+                            denomination=church_user.church.denomination,
+                            is_active=True
+                        )
+                        accessible_churches.update(denomination_churches.values_list('id', flat=True))
+                    else:
+                        # Se não tem denominação, adicionar apenas sua igreja
+                        accessible_churches.add(church_user.church.id)
+                else:
+                    # Church Admin e outros: adicionar apenas sua igreja específica
+                    accessible_churches.add(church_user.church.id)
+            
+            # Retornar filiais de todas as igrejas acessíveis
+            return Branch.objects.filter(
+                church_id__in=accessible_churches,
+                is_active=True
+            )
                 
         except Exception as e:
             print(f"❌ Erro ao filtrar filiais por papel do usuário: {e}")

@@ -16,8 +16,7 @@ from apps.members.views import MemberViewSet
 from apps.visitors.views import VisitorViewSet
 from apps.activities.views import ActivityViewSet, MinistryViewSet
 
-# Importar views de usuários
-from apps.accounts import views
+# Views de usuários removidas - usar sistema de cadastro existente
 
 # Router para ViewSets
 router = DefaultRouter()
@@ -31,24 +30,18 @@ router.register(r'visitors', VisitorViewSet, basename='visitor')
 router.register(r'activities', ActivityViewSet, basename='activity')
 router.register(r'ministries', MinistryViewSet, basename='ministry')
 
+# Importar views necessárias
+from apps.accounts.views import me, my_church, upload_avatar
+
 # URL patterns
 urlpatterns = [
-    # Autenticação e usuários (views baseadas em função/classe)
+    # Autenticação
     path('auth/', include('apps.accounts.urls')),
     
-    # Endpoints de registro de usuários
-    path('users/register/', views.UserRegistrationView.as_view(), name='users-register'),
-    path('users/complete_profile/', views.CompleteProfileView.as_view(), name='users-complete-profile'),
-    path('users/finalize_registration/', views.FinalizeRegistrationView.as_view(), name='users-finalize-registration'),
-    path('users/save_partial_profile/', views.save_partial_profile_view, name='users-save-partial-profile'),
-    
-    # Usuários (endpoints de perfil) - URLs diretas
-    path('users/me/', views.user_me_view, name='users-me'),
-    path('users/update_personal_data/', views.update_personal_data_view, name='users-update-personal-data'),
-    path('users/update_church_data/', views.update_church_data_view, name='users-update-church-data'),
-    path('users/upload-avatar/', views.upload_avatar_view, name='users-upload-avatar'),
-    path('users/delete-account/', views.delete_account_view, name='users-delete-account'),
-    path('users/my_church/', views.user_church_view, name='users-my-church'),
+    # Usuários
+    path('users/me/', me, name='user-me'),
+    path('users/my_church/', my_church, name='user-my-church'),
+    path('users/upload-avatar/', upload_avatar, name='user-upload-avatar'),
     
     # Core (health check, etc)
     path('core/', include('apps.core.urls')),

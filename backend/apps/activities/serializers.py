@@ -105,7 +105,7 @@ class MinistryCreateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'church', 'name', 'description', 'leader', 'color', 'is_public'
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'church']  # church será definido automaticamente
 
 
 class ActivityCreateSerializer(serializers.ModelSerializer):

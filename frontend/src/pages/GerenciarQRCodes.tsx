@@ -13,7 +13,6 @@ import { branchService, BranchQRCode } from '@/services/branchService';
 
 
 const GerenciarQRCodes: React.FC = () => {
-  const { userChurch } = useAuth();
   const [branches, setBranches] = useState<BranchQRCode[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -114,13 +113,44 @@ const GerenciarQRCodes: React.FC = () => {
         <div className="text-center sm:text-left">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Gerenciar QR Codes</h1>
           <p className="text-gray-600 mt-1 text-xs sm:text-sm lg:text-base">
-            Configure e monitore os QR Codes para registro de visitantes
+            Configure e monitore os QR Codes de todas as igrejas e filiais que você tem acesso
           </p>
         </div>
 
         {/* Cards dos QR Codes */}
-        <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-          {branches.map((branch) => (
+        {branches.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <QrCode className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum QR Code encontrado</h3>
+              <p className="text-gray-600 text-center max-w-md">
+                Não há filiais com QR Codes disponíveis para as igrejas que você tem acesso. 
+                Entre em contato com o administrador para criar filiais.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {/* Agrupar por igreja */}
+            {Object.entries(
+              branches.reduce((groups, branch) => {
+                const churchName = branch.church_name;
+                if (!groups[churchName]) {
+                  groups[churchName] = [];
+                }
+                groups[churchName].push(branch);
+                return groups;
+              }, {} as Record<string, BranchQRCode[]>)
+            ).map(([churchName, churchBranches]) => (
+              <div key={churchName} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-gray-900">{churchName}</h2>
+                  <Badge variant="outline" className="text-xs">
+                    {churchBranches.length} filial{churchBranches.length !== 1 ? 'is' : ''}
+                  </Badge>
+                </div>
+                <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                  {churchBranches.map((branch) => (
             <Card key={branch.id} className="relative">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
@@ -221,9 +251,13 @@ const GerenciarQRCodes: React.FC = () => {
                   </Button>
                 </div>
               </CardContent>
-            </Card>
-          ))}
-        </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Instruções */}
         <Card>

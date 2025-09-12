@@ -83,7 +83,7 @@ export interface ActivitySummary {
 
 // Types para criação/edição
 export interface CreateMinistryData {
-  church: number;
+  church?: number; // Opcional - backend pode definir automaticamente
   name: string;
   description?: string;
   leader?: number;

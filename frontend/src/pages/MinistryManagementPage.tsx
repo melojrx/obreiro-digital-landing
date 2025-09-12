@@ -37,7 +37,6 @@ const MinistryManagementPage: React.FC = () => {
   console.log('🔍 MinistryManagementPage - userChurch:', userChurch);
   console.log('🔍 MinistryManagementPage - user:', user);
   
-  const currentChurch = userChurch?.church;
   const [ministryForm, setMinistryForm] = useState<{
     isOpen: boolean;
     ministry?: Ministry;
@@ -55,7 +54,7 @@ const MinistryManagementPage: React.FC = () => {
     isLoading: ministriesLoading, 
     error: ministriesError 
   } = useMinistries({ 
-    church_id: currentChurch?.id,
+    church_id: userChurch?.id,
   });
 
   const createMinistryMutation = useCreateMinistry();
@@ -304,6 +303,8 @@ const MinistryManagementPage: React.FC = () => {
           createMinistryMutation.isPending || 
           updateMinistryMutation.isPending
         }
+        leadersLoading={leadersLoading}
+        leadersError={undefined} // Pode ser melhorado para passar erro real
       />
     </>
   );

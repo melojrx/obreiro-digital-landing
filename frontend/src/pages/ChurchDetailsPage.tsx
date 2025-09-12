@@ -74,6 +74,7 @@ import { ChurchDetails, ChurchStats, AdminUser, BranchDetails } from '@/types/hi
 import CreateBranchModal from '@/components/modals/CreateBranchModal';
 import ShareChurchModal from '@/components/modals/ShareChurchModal';
 import ExportChurchDataModal from '@/components/modals/ExportChurchDataModal';
+import ChurchMembersCard from '@/components/church/ChurchMembersCard';
 
 const ChurchDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -601,6 +602,20 @@ const ChurchDetailsPage: React.FC = () => {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Card de Membros */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-blue-600" />
+                      Membros da Igreja
+                      <Badge variant="outline">{church.total_members}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ChurchMembersCard churchId={church.id} />
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Painel Lateral */}
@@ -669,7 +684,7 @@ const ChurchDetailsPage: React.FC = () => {
                         variant="outline" 
                         className="w-full justify-start" 
                         size="sm"
-                        onClick={() => navigate(`/denominacao/churches/${church.id}/members`)}
+                        onClick={() => navigate('/membros')}
                       >
                         <Users className="h-4 w-4 mr-2" />
                         Gerenciar Membros

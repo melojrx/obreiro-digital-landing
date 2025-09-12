@@ -19,6 +19,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/hooks/useSidebar';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -40,10 +41,12 @@ const Sidebar: React.FC = () => {
   const { user, userChurch, logout } = useAuth();
   const { isCollapsed, toggleSidebar } = useSidebar();
   const permissions = usePermissions();
+  const activeChurch = useCurrentActiveChurch();
 
   // Debug temporário
   console.log('🔍 Sidebar - user:', user?.email);
   console.log('🔍 Sidebar - userChurch:', userChurch);
+  console.log('🔍 Sidebar - activeChurch:', activeChurch);
   console.log('🔍 Sidebar - permissions.canManageDenomination:', permissions.canManageDenomination);
   console.log('🔍 Sidebar - permissions.canCreateChurches:', permissions.canCreateChurches);
 
@@ -81,9 +84,7 @@ const Sidebar: React.FC = () => {
       icon: MessageSquare,
       href: '#',
       children: [
-        { title: 'Pedidos de Oração', icon: HandHeart, href: '/pedidos-oracao' },
-        { title: 'Devocionais', icon: Heart, href: '/devocionais' },
-        { title: 'Mensagens', icon: MessageSquare, href: '/mensagens' },
+  { title: 'Pedidos de Oração', icon: HandHeart, href: '/pedidos-oracao' },
       ]
     },
     {
@@ -156,8 +157,8 @@ const Sidebar: React.FC = () => {
           </div>
         </div>
 
-        {/* Informações da Igreja */}
-        {userChurch && (
+        {/* Informações da Igreja Ativa */}
+        {(activeChurch || userChurch) && (
           <div className={cn(
             "border-b border-blue-700 transition-all duration-300",
             isCollapsed ? "px-2 py-2" : "px-6 py-4"
@@ -173,27 +174,33 @@ const Sidebar: React.FC = () => {
                 </TooltipTrigger>
                 <TooltipContent side="right">
                   <div className="space-y-1">
-                    <p className="font-semibold">{userChurch.name}</p>
-                    {userChurch.cnpj && (
-                      <p className="text-xs">CNPJ: {userChurch.cnpj}</p>
+                    <p className="font-semibold">
+                      {activeChurch?.name || userChurch?.name}
+                    </p>
+                    <p className="text-xs">
+                      {activeChurch?.city || userChurch?.city}, {activeChurch?.state || userChurch?.state}
+                    </p>
+                    {(activeChurch?.denomination_name || userChurch?.cnpj) && (
+                      <p className="text-xs opacity-75">
+                        {activeChurch?.denomination_name || `CNPJ: ${userChurch?.cnpj}`}
+                      </p>
                     )}
-                    <p className="text-xs">{userChurch.city}, {userChurch.state}</p>
                   </div>
                 </TooltipContent>
               </Tooltip>
             ) : (
               <div className="space-y-1">
-                <h2 className="text-sm font-semibold text-white truncate" title={userChurch.name}>
-                  {userChurch.name}
+                <h2 className="text-sm font-semibold text-white truncate" title={activeChurch?.name || userChurch?.name}>
+                  {activeChurch?.name || userChurch?.name}
                 </h2>
-                {userChurch.cnpj && (
-                  <p className="text-xs text-blue-200">
-                    CNPJ: {userChurch.cnpj}
+                <p className="text-xs text-blue-300">
+                  {activeChurch?.city || userChurch?.city}, {activeChurch?.state || userChurch?.state}
+                </p>
+                {(activeChurch?.denomination_name || userChurch?.cnpj) && (
+                  <p className="text-xs text-blue-200 opacity-75">
+                    {activeChurch?.denomination_name || `CNPJ: ${userChurch?.cnpj}`}
                   </p>
                 )}
-                <p className="text-xs text-blue-300">
-                  {userChurch.city}, {userChurch.state}
-                </p>
               </div>
             )}
           </div>

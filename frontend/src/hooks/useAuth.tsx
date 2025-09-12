@@ -88,10 +88,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.log('✅ Perfil completo, carregando dados da igreja...');
             try {
               const churchData = await authService.getUserChurch();
-              console.log('✅ Dados da igreja carregados:', churchData);
+              console.log('✅ Dados da igreja carregados do authService.getUserChurch():', churchData);
               setUserChurch(churchData);
             } catch (error) {
-              console.log('❌ Erro ao carregar dados da igreja:', error);
+              console.error('❌ Erro detalhado ao carregar dados da igreja:', error);
+              // Tentar novamente após um breve delay se o erro for de rede
+              if (error instanceof Error && (error.message.includes('Network') || error.message.includes('timeout'))) {
+                console.log('🔄 Tentando carregar igreja novamente após erro de rede...');
+                setTimeout(async () => {
+                  try {
+                    const churchData = await authService.getUserChurch();
+                    console.log('✅ Dados da igreja carregados na segunda tentativa:', churchData);
+                    setUserChurch(churchData);
+                  } catch (retryError) {
+                    console.error('❌ Falha definitiva ao carregar dados da igreja:', retryError);
+                  }
+                }, 1000);
+              }
             }
           } else {
             console.log('❌ Perfil não está completo, pulando carregamento da igreja');

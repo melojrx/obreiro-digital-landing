@@ -171,17 +171,33 @@ export const useAvailableLeaders = () => {
   return useQuery({
     queryKey: ['available-leaders'],
     queryFn: async () => {
-      // Usar endpoint específico para líderes
-      const response = await api.get('/api/v1/members/leaders/');
-      
-      return response.data.results.map((leader: any) => ({
-        id: leader.id,
-        name: leader.name,
-        role: leader.role,
-        ministerial_function: leader.ministerial_function
-      }));
+      try {
+        // Usar endpoint específico para líderes no ViewSet
+        const response = await api.get('members/leaders/');
+        
+        // Backend retorna: {count: X, results: [...]}
+        const results = response.data.results || [];
+        
+        return results.map((leader: any) => {
+          // Backend agora retorna User IDs diretamente, não precisamos extrair
+          return {
+            id: leader.id, // Já é User ID que pode ser usado diretamente
+            name: leader.name,
+            role: leader.role,
+            type: leader.type,
+            email: leader.email,
+            source: leader.source,
+            member_id: leader.member_id, // ID do Member se disponível
+            churchuser_id: leader.churchuser_id // ID do ChurchUser se disponível
+          };
+        });
+      } catch (error) {
+        console.error('Erro ao buscar líderes disponíveis:', error);
+        return [];
+      }
     },
     staleTime: 1000 * 60 * 10, // 10 minutos
+    retry: 3,
   });
 };
 

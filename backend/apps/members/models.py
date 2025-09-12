@@ -106,10 +106,8 @@ class Member(BaseModel):
         "CPF",
         max_length=14,
         unique=True,
-        blank=True,
-        null=True,
         validators=[validate_cpf],
-        help_text="CPF do membro"
+        help_text="CPF do membro (obrigatório)"
     )
     
     rg = models.CharField(
@@ -185,8 +183,7 @@ class Member(BaseModel):
         "Telefone",
         max_length=20,
         validators=[phone_validator],
-        blank=True,
-        help_text="Telefone principal no formato (XX) XXXXX-XXXX"
+        help_text="Telefone principal no formato (XX) XXXXX-XXXX (obrigatório)"
     )
     
     phone_secondary = models.CharField(

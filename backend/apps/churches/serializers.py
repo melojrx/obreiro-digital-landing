@@ -56,6 +56,29 @@ class ChurchCreateSerializer(serializers.ModelSerializer):
             'cnpj', 'main_pastor', 'logo', 'cover_image', 'subscription_plan'
         ]
     
+    def validate_main_pastor(self, value):
+        """Validar se o usuário pode ser pastor principal"""
+        if value:
+            from apps.accounts.models import RoleChoices
+            
+            # Verificar se o usuário tem papel adequado para ser pastor
+            user_roles = value.church_users.filter(is_active=True).values_list('role', flat=True)
+            
+            # Permitir apenas usuários com papéis de liderança ou sem papel ainda
+            allowed_roles = [
+                RoleChoices.CHURCH_ADMIN,
+                RoleChoices.PASTOR,
+                RoleChoices.SECRETARY
+            ]
+            
+            # Se já tem papéis, verificar se são compatíveis
+            if user_roles and not any(role in allowed_roles for role in user_roles):
+                raise serializers.ValidationError(
+                    "Este usuário não tem permissão para ser pastor principal"
+                )
+        
+        return value
+    
     def validate_email(self, value):
         """Validar email único por denominação"""
         denomination = self.initial_data.get('denomination')
@@ -211,6 +234,29 @@ class ChurchUpdateSerializer(serializers.ModelSerializer):
             'address', 'city', 'state', 'zipcode', 'main_pastor', 'logo',
             'cover_image'
         ]
+    
+    def validate_main_pastor(self, value):
+        """Validar se o usuário pode ser pastor principal"""
+        if value:
+            from apps.accounts.models import RoleChoices
+            
+            # Verificar se o usuário tem papel adequado para ser pastor
+            user_roles = value.church_users.filter(is_active=True).values_list('role', flat=True)
+            
+            # Permitir apenas usuários com papéis de liderança ou sem papel ainda
+            allowed_roles = [
+                RoleChoices.CHURCH_ADMIN,
+                RoleChoices.PASTOR,
+                RoleChoices.SECRETARY
+            ]
+            
+            # Se já tem papéis, verificar se são compatíveis
+            if user_roles and not any(role in allowed_roles for role in user_roles):
+                raise serializers.ValidationError(
+                    "Este usuário não tem permissão para ser pastor principal"
+                )
+        
+        return value
     
     def validate_email(self, value):
         """Validar email único por denominação"""

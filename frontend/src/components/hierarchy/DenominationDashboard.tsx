@@ -28,9 +28,8 @@ import {
 
 // Hooks
 import { useDenominations } from '@/hooks/useDenominations';
-import { useDenominationStats } from '@/hooks/useDenominationStats';
+import { useDenominationKPIs } from '@/hooks/useDenominationStats';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useDenominationMockData } from '@/hooks/useDenominationMockData';
 
 // Componentes
 import { DenominationStatsCard } from './DenominationStatsCard';
@@ -175,15 +174,7 @@ export const DenominationDashboard: React.FC<DenominationDashboardProps> = ({
     loadDenominationChurches,
   } = useDenominations();
 
-  const {
-    denominationStats,
-    consolidatedMetrics,
-    monthlyTrends,
-    geographicalData,
-    loadDenominationStats,
-    refreshAllStats,
-    exportStatsReport,
-  } = useDenominationStats();
+  const { kpis, isLoading, error, rawStats } = useDenominationKPIs();
 
   const [selectedPeriod, setSelectedPeriod] = useState('last_3_months');
   const [activeTab, setActiveTab] = useState('overview');
@@ -192,29 +183,28 @@ export const DenominationDashboard: React.FC<DenominationDashboardProps> = ({
   useEffect(() => {
     if (denominationId) {
       loadDenominationDetails(denominationId);
-      loadDenominationStats(denominationId);
       loadDenominationChurches(denominationId, undefined, 1);
     }
-  }, [denominationId, loadDenominationDetails, loadDenominationStats, loadDenominationChurches]);
+  }, [denominationId, loadDenominationDetails, loadDenominationChurches]);
 
   // Handlers
   const handleRefresh = async () => {
-    await refreshAllStats(denominationId);
+    window.location.reload(); // Força reload dos dados
   };
 
   const handleExportReport = async (format: 'xlsx' | 'pdf') => {
-    await exportStatsReport('denomination', denominationId, format);
+    console.log(`Exportando relatório em ${format}...`);
   };
 
-  // Preparar dados para cards de estatísticas
-  const statsCards = denominationStats ? [
+  // Preparar dados para cards de estatísticas usando dados reais
+  const statsCards = [
     {
       title: 'Total de Igrejas',
       metrics: [
         {
-          value: denominationStats.total_churches,
-          label: 'Igrejas ativas',
-          change: denominationStats.churches_growth_rate,
+          value: kpis.totalChurches,
+          label: 'Igrejas vinculadas',
+          change: kpis.churchesThisYear > 0 ? (kpis.churchesThisYear / Math.max(1, kpis.totalChurches - kpis.churchesThisYear)) * 100 : 0,
           format: 'number' as const,
         },
       ],
@@ -225,9 +215,9 @@ export const DenominationDashboard: React.FC<DenominationDashboardProps> = ({
       title: 'Total de Membros',
       metrics: [
         {
-          value: denominationStats.total_members,
-          label: 'Membros ativos',
-          change: denominationStats.members_growth_rate,
+          value: kpis.totalMembers,
+          label: 'Membros somados',
+          change: kpis.membersGrowth > 0 ? (kpis.membersGrowth / Math.max(1, kpis.totalMembers - kpis.membersGrowth)) * 100 : 0,
           format: 'number' as const,
         },
       ],
@@ -235,32 +225,64 @@ export const DenominationDashboard: React.FC<DenominationDashboardProps> = ({
       color: 'green' as const,
     },
     {
-      title: 'Visitantes',
+      title: 'Total de Filiais',
       metrics: [
         {
-          value: denominationStats.total_visitors,
-          label: 'Total de visitantes',
-          change: 15.2, // Seria calculado
+          value: kpis.totalBranches,
+          label: 'Filiais cadastradas',
+          change: 0, // Calcular quando tiver dados de crescimento
+          format: 'number' as const,
+        },
+      ],
+      icon: <Building2 className="h-4 w-4" />,
+      color: 'indigo' as const,
+    },
+    {
+      title: 'Total de Visitantes',
+      metrics: [
+        {
+          value: kpis.totalVisitors,
+          label: 'Visitantes registrados',
+          change: kpis.visitorsGrowth > 0 ? (kpis.visitorsGrowth / Math.max(1, kpis.totalVisitors - kpis.visitorsGrowth)) * 100 : 0,
           format: 'number' as const,
         },
       ],
       icon: <UserCheck className="h-4 w-4" />,
       color: 'purple' as const,
     },
-    {
-      title: 'Atividades',
-      metrics: [
-        {
-          value: denominationStats.total_activities,
-          label: 'Atividades realizadas',
-          change: 8.7, // Seria calculado
-          format: 'number' as const,
-        },
-      ],
-      icon: <Activity className="h-4 w-4" />,
-      color: 'orange' as const,
-    },
-  ] : [];
+  ];
+
+  // Mostrar loading se dados estão carregando
+  if (isLoading) {
+    return (
+      <div className={cn('space-y-6', className)}>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Carregando estatísticas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar erro se houve falha no carregamento
+  if (error) {
+    return (
+      <div className={cn('space-y-6', className)}>
+        <Card className="p-6 text-center">
+          <div className="text-red-500 mb-2">
+            <Building2 className="h-8 w-8 mx-auto" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Erro ao carregar dados</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Não foi possível carregar as estatísticas da denominação.
+          </p>
+          <Button onClick={handleRefresh} variant="outline">
+            Tentar novamente
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className={cn('space-y-6', className)}>
@@ -340,28 +362,52 @@ export const DenominationDashboard: React.FC<DenominationDashboardProps> = ({
             <div className="lg:col-span-2 space-y-4">
               {/* Gráficos de tendência */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {monthlyTrends.length > 0 && (
-                  <>
-                    <SimpleChart
-                      data={monthlyTrends}
-                      metric="members"
-                      title="Crescimento de Membros"
-                      color="bg-blue-500"
-                    />
-                    <SimpleChart
-                      data={monthlyTrends}
-                      metric="visitors"
-                      title="Visitantes por Mês"
-                      color="bg-green-500"
-                    />
-                  </>
-                )}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Crescimento de Membros
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{kpis.membersGrowth > 0 ? '+' : ''}{kpis.membersGrowth}</div>
+                    <p className="text-xs text-muted-foreground">Novos membros este mês</p>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <UserCheck className="h-4 w-4" />
+                      Crescimento de Visitantes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{kpis.visitorsGrowth > 0 ? '+' : ''}{kpis.visitorsGrowth}</div>
+                    <p className="text-xs text-muted-foreground">Novos visitantes este mês</p>
+                  </CardContent>
+                </Card>
               </div>
               
-              {/* Distribuição geográfica */}
-              {geographicalData.length > 0 && (
-                <GeographicalDistribution data={geographicalData} />
-              )}
+              {/* Atividades e Performance */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Resumo de Atividades
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Total de Atividades</span>
+                    <span className="font-medium">{kpis.totalActivities}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Novas Igrejas (este ano)</span>
+                    <span className="font-medium">{kpis.churchesThisYear}</span>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
             
             <div className="space-y-4">
@@ -371,28 +417,44 @@ export const DenominationDashboard: React.FC<DenominationDashboardProps> = ({
               )}
               
               {/* Métricas consolidadas */}
-              {consolidatedMetrics && (
+              {rawStats && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium">Métricas Consolidadas</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Taxa de Crescimento</span>
-                      <Badge variant={consolidatedMetrics.growth_rate >= 0 ? 'default' : 'destructive'}>
-                        {consolidatedMetrics.growth_rate.toFixed(1)}%
+                      <span className="text-sm text-muted-foreground">Taxa de Retenção</span>
+                      <Badge variant="default">
+                        {kpis.memberRetentionRate.toFixed(1)}%
                       </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Taxa de Conversão</span>
                       <Badge variant="secondary">
-                        {consolidatedMetrics.conversion_rate.toFixed(1)}%
+                        {kpis.visitorConversionRate.toFixed(1)}%
                       </Badge>
                     </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Entidade mais ativa: </span>
-                      <span className="font-medium">{consolidatedMetrics.most_active_entity}</span>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Frequência Média</span>
+                      <Badge variant="outline">
+                        {kpis.averageAttendance.toLocaleString()} pessoas
+                      </Badge>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Igrejas Ativas</span>
+                      <Badge variant="default">
+                        {kpis.activeChurchesPercentage.toFixed(1)}%
+                      </Badge>
+                    </div>
+                    {kpis.totalAlerts > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Alertas</span>
+                        <Badge variant="destructive">
+                          {kpis.totalAlerts} pendentes
+                        </Badge>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

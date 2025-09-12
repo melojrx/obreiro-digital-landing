@@ -315,16 +315,27 @@ class DenominationViewSet(viewsets.ModelViewSet):
         last_month = now - timedelta(days=30)
         this_year = now.replace(month=1, day=1)
         
+        # Para denomination admin, contar todas as igrejas que ele tem acesso
+        # através de ChurchUser, não apenas igrejas da denominação que ele administra
+        from apps.accounts.models import ChurchUser
+        
+        user_churches = ChurchUser.objects.filter(
+            user=user, 
+            role__in=['denomination_admin', 'church_admin', 'pastor']
+        ).select_related('church')
+        
+        # Para denomination admin, incluir todas as igrejas (ativas e inativas)
+        # pois ele precisa ver estatísticas consolidadas de toda sua rede
+        churches = [cu.church for cu in user_churches]
+        
         # Estatísticas básicas
-        total_churches = Church.objects.filter(denomination=denomination, is_active=True).count()
+        total_churches = len(churches)
         total_branches = 0  # Somar filiais quando modelo estiver implementado
         
         # Calcular membros e visitantes reais
         total_members = 0
         total_visitors = 0
         total_activities = 0
-        
-        churches = Church.objects.filter(denomination=denomination, is_active=True)
         for church in churches:
             # Primeiro tentar contar membros reais do banco de dados
             try:
@@ -364,23 +375,21 @@ class DenominationViewSet(viewsets.ModelViewSet):
         # Por enquanto, consideramos todas as igrejas da denominação
         total_branches = max(0, total_churches - 1) if total_churches > 1 else 0
         
-        # Métricas de crescimento
+        # Métricas de crescimento - usar IDs das igrejas do usuário
+        church_ids = [church.id for church in churches]
         members_this_month = 0
         members_last_month = 0
         visitors_this_month = 0
         visitors_last_month = 0
-        churches_this_year = Church.objects.filter(
-            denomination=denomination, 
-            created_at__gte=this_year
-        ).count()
+        churches_this_year = len([c for c in churches if c.created_at >= this_year])
         
         try:
             members_this_month = Member.objects.filter(
-                church__denomination=denomination,
+                church_id__in=church_ids,
                 created_at__gte=last_month
             ).count()
             members_last_month = Member.objects.filter(
-                church__denomination=denomination,
+                church_id__in=church_ids,
                 created_at__lt=last_month
             ).count()
         except:
@@ -389,11 +398,11 @@ class DenominationViewSet(viewsets.ModelViewSet):
         
         try:
             visitors_this_month = Visitor.objects.filter(
-                church__denomination=denomination,
+                church_id__in=church_ids,
                 created_at__gte=last_month
             ).count()
             visitors_last_month = Visitor.objects.filter(
-                church__denomination=denomination,
+                church_id__in=church_ids,
                 created_at__gte=now - timedelta(days=60),
                 created_at__lt=last_month
             ).count()

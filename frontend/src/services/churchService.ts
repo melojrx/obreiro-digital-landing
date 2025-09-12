@@ -383,29 +383,37 @@ class ChurchService {
   }
 
   /**
-   * Exporta dados das igrejas
+   * Obtém membros de uma igreja específica
    */
-  async exportChurches(
-    format: 'csv' | 'xlsx' | 'pdf',
-    filters?: ChurchFilters
-  ): Promise<Blob> {
+  async getChurchMembers(id: number, search?: string): Promise<{ count: number; results: any[] }> {
     const params = new URLSearchParams();
-    params.append('format', format);
-    
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          params.append(key, String(value));
-        }
-      });
+    if (search) {
+      params.append('search', search);
     }
-
-    const response = await api.get(`${this.baseURL}/export/?${params.toString()}`, {
-      responseType: 'blob',
-    });
     
+    const response = await api.get(`${this.baseURL}/${id}/members/?${params.toString()}`);
     return response.data;
   }
+
+  /**
+   * Transfere membro entre igrejas
+   */
+  async transferMember(memberId: number, targetChurchId: number): Promise<void> {
+    await api.post(`${this.baseURL}/transfer-member/`, {
+      member_id: memberId,
+      target_church_id: targetChurchId
+    });
+  }
+
+  /**
+   * Obtém igrejas gerenciadas pelo usuário (para dropdown)
+   */
+  async getManagedChurches(): Promise<{ count: number; results: Array<{ id: number; name: string; city: string; state: string }> }> {
+    const response = await api.get(`${this.baseURL}/managed-churches/`);
+    return response.data;
+  }
+
+
 }
 
 export const churchService = new ChurchService();

@@ -31,7 +31,6 @@ const ActivitiesPage: React.FC = () => {
   const currentChurch = userChurch?.church;
   const [filters, setFilters] = useState<ActivityFilters>({
     church_id: currentChurch?.id,
-    is_active: true,
   });
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<'calendar' | 'upcoming' | 'manage'>('calendar');
@@ -62,6 +61,10 @@ const ActivitiesPage: React.FC = () => {
 
   // Calculate stats
   const stats = useMemo(() => {
+    console.log('🔍 ActivitiesPage - activities:', activities);
+    console.log('🔍 ActivitiesPage - activities.length:', activities.length);
+    console.log('🔍 ActivitiesPage - public activities:', activities.filter(a => a.is_public));
+    
     const today = new Date();
     const thisWeek = new Date();
     thisWeek.setDate(today.getDate() + 7);
@@ -96,7 +99,7 @@ const ActivitiesPage: React.FC = () => {
   };
 
   const handleManageMinistries = () => {
-    toast.info('Gerenciamento de ministérios em desenvolvimento');
+    window.location.href = '/ministerios';
   };
 
   const handleActivityClick = (activity: Activity) => {

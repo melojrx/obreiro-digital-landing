@@ -1,229 +1,17 @@
-"""
-Views para gerenciamento de usuários e autenticação
-"""
-
-from rest_framework import generics, status, permissions
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from django.contrib.auth import authenticate
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from django.contrib.auth.password_validation import ValidationError
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-import os
-from PIL import Image
-from io import BytesIO
-from django.utils import timezone
-
-from .models import CustomUser, UserProfile, ChurchUser
-from .serializers import (
-    UserRegistrationSerializer, UserRegistrationValidationSerializer,
-    ChurchDataValidationSerializer, UserCompleteRegistrationNewSerializer,
-    UserCompleteRegistrationSerializer,
-    UserSerializer,
-    UserProfileSerializer,
-    ChurchUserSerializer,
-    ChurchUserCreateSerializer,
-)
+from rest_framework.authtoken.models import Token
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
 from .auth_serializers import CustomAuthTokenSerializer
-from apps.core.models import RoleChoices
-from apps.core.permissions import IsSuperUser, IsChurchAdmin, IsMemberUser
-from apps.churches.models import Church
-from apps.denominations.models import Denomination
-from rest_framework.parsers import JSONParser
+from .models import ChurchUser
 
-
-@api_view(['PATCH'])
-@permission_classes([permissions.IsAuthenticated])
-def save_partial_profile_view(request):
-    """\n+    Salva dados parciais do perfil do usuário (etapa intermediária antes de completar o perfil).\n+\n+    Não cria igreja nova. Apenas atualiza:\n+      - Dados básicos do usuário (full_name, phone)\n+      - Perfil (birth_date, gender, bio, cpf)\n+      - Dados da igreja já existente vinculada (name, email, phone, address) se vínculo existir\n+    Retorna payload compatível com user_me_view para manter UX do frontend.\n+    """
-    user = request.user
-    data = request.data or {}
-
-    # Atualizar dados do usuário
-    if 'full_name' in data and data['full_name']:
-        user.full_name = data['full_name']
-        name_parts = data['full_name'].split()
-        if name_parts:
-            user.first_name = name_parts[0]
-            user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
-
-    if 'phone' in data and data['phone']:
-        user.phone = data['phone']
-
-    user.save()
-
-    # Atualizar / criar perfil
-    profile, _ = UserProfile.objects.get_or_create(user=user)
-    if 'birth_date' in data:
-        profile.birth_date = data['birth_date'] or None
-    if 'gender' in data:
-        profile.gender = data['gender'] or None
-    if 'bio' in data:
-        profile.bio = data['bio'] or ''
-    if 'cpf' in data:
-        cpf_val = data['cpf'] or None
-        # Evitar duplicidade de CPF se fornecido
-        if cpf_val and UserProfile.objects.filter(cpf=cpf_val).exclude(user=user).exists():
-            return Response({'error': 'CPF já cadastrado em outro usuário'}, status=status.HTTP_400_BAD_REQUEST)
-        profile.cpf = cpf_val
-    profile.save()
-
-    # Atualizar dados parciais da igreja existente (se houver vínculo)
-    church_user = user.church_users.first()
-    if church_user:
-        church = church_user.church
-        church_changed = False
-        if 'church' in data and isinstance(data['church'], dict):
-            cdata = data['church']
-            if 'name' in cdata and cdata['name']:
-                church.name = cdata['name']; church_changed = True
-            if 'email' in cdata and cdata['email']:
-                church.email = cdata['email']; church_changed = True
-            if 'phone' in cdata and cdata['phone']:
-                church.phone = cdata['phone']; church_changed = True
-            if 'address' in cdata and cdata['address']:
-                church.address = cdata['address']; church_changed = True
-        if church_changed:
-            church.save()
-    else:
-        church = None
-
-    # Montar resposta compatível com user_me_view
-    return Response({
-        'id': user.id,
-        'email': user.email,
-        'full_name': user.full_name,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'phone': user.phone,
-        'is_active': user.is_active,
-        'date_joined': user.date_joined,
-        'is_profile_complete': user.is_profile_complete,
-        'profile': {
-            'bio': profile.bio if profile else '',
-            'birth_date': profile.birth_date if profile else None,
-            'gender': profile.gender if profile else '',
-            'avatar': profile.avatar.url if profile and profile.avatar else None,
-        } if profile else None
-    }, status=status.HTTP_200_OK)
-
-
-class UserRegistrationView(generics.CreateAPIView):
-    """
-    View para validação inicial de usuário via cadastro SaaS (Etapa 1 de 3).
-    
-    IMPORTANTE: Esta view apenas VALIDA os dados, não cria o usuário.
-    O usuário só será criado na etapa 3 após selecionar o plano.
-    """
-    serializer_class = UserRegistrationValidationSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        # Apenas validar os dados, NÃO criar o usuário
-        validated_data = serializer.validated_data
-        
-        return Response({
-            'message': 'Dados validados com sucesso',
-            'data': {
-                'email': validated_data['email'],
-                'full_name': validated_data['full_name'],
-                'phone': validated_data['phone'],
-                'birth_date': validated_data.get('birth_date'),
-                'gender': validated_data.get('gender'),
-            }
-        }, status=status.HTTP_200_OK)
-
-
-class CompleteProfileView(generics.CreateAPIView):
-    """
-    View para validação dos dados da igreja via cadastro SaaS (Etapa 2 de 3).
-    
-    IMPORTANTE: Esta view apenas VALIDA os dados, não cria a igreja.
-    A igreja só será criada na etapa 3 após selecionar o plano.
-    """
-    serializer_class = ChurchDataValidationSerializer
-    permission_classes = [permissions.AllowAny]  # Mudado para AllowAny pois usuário ainda não existe
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        # Apenas validar os dados, NÃO criar a igreja
-        validated_data = serializer.validated_data
-        
-        return Response({
-            'message': 'Dados da igreja validados com sucesso',
-            'data': validated_data
-        }, status=status.HTTP_200_OK)
-
-
-class FinalizeRegistrationView(generics.CreateAPIView):
-    """
-    View para finalizar o cadastro SaaS (Etapa 3 de 3).
-    
-    Recebe: TODOS os dados (pessoais + igreja + plano selecionado)
-    Cria: Usuário + Igreja + Filial + Perfil + Token de autenticação
-    
-    IMPORTANTE: Só aqui o usuário DENOMINATION_ADMIN é criado no banco.
-    """
-    serializer_class = UserCompleteRegistrationNewSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        # Criar tudo de uma vez: usuário + igreja + filial + perfil
-        result = serializer.save()
-        
-        # Criar token de autenticação
-        token, created = Token.objects.get_or_create(user=result['user'])
-        
-        return Response({
-            'token': token.key,
-            'user': {
-                'id': result['user'].id,
-                'email': result['user'].email,
-                'full_name': result['user'].full_name,
-                'first_name': result['user'].first_name,
-                'last_name': result['user'].last_name,
-                'phone': result['user'].phone,
-                'subscription_plan': result['user'].subscription_plan,
-                'is_active': result['user'].is_active,
-                'date_joined': result['user'].date_joined,
-                'is_profile_complete': result['user'].is_profile_complete,
-            },
-            'profile': {
-                'bio': result['profile'].bio if result['profile'] else '',
-                'birth_date': result['profile'].birth_date if result['profile'] else None,
-                'gender': result['profile'].gender if result['profile'] else '',
-                'avatar': result['profile'].avatar.url if result['profile'] and result['profile'].avatar else None,
-            } if result['profile'] else None,
-            'church': {
-                'id': result['church'].id,
-                'name': result['church'].name,
-                'subscription_plan': result['church'].subscription_plan,
-            },
-            'message': 'Cadastro finalizado com sucesso! Bem-vindo ao sistema.'
-        }, status=status.HTTP_201_CREATED)
-
-
-class UserLoginView(ObtainAuthToken):
-    """
-    View personalizada para login
-    """
+class CustomAuthToken(ObtainAuthToken):
     serializer_class = CustomAuthTokenSerializer
-
+    
     def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data,
-                                           context={'request': request})
+        serializer = self.serializer_class(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         token, created = Token.objects.get_or_create(user=user)
@@ -234,205 +22,132 @@ class UserLoginView(ObtainAuthToken):
                 'id': user.id,
                 'email': user.email,
                 'full_name': user.full_name,
-                'is_profile_complete': user.is_profile_complete
+                'phone': user.phone,
+                'is_profile_complete': user.is_profile_complete,
             }
         })
 
-
 @api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def available_roles_view(request):
-    """
-    Retorna os papéis disponíveis para atribuição baseado na hierarquia do usuário logado.
+@permission_classes([IsAuthenticated])
+def my_churches(request):
+    """Lista todas as igrejas do usuário atual"""
+    user = request.user
     
-    Hierarquia:
-    - DENOMINATION_ADMIN: pode atribuir todos os papéis abaixo
-    - CHURCH_ADMIN: pode atribuir papéis de Pastor, Secretary, Leader, Member
-    - PASTOR: pode atribuir papéis de Secretary, Leader, Member
-    - SECRETARY: pode atribuir papéis de Leader, Member
-    - LEADER: pode atribuir apenas Member
-    - MEMBER: não pode atribuir papéis
-    """
+    # Buscar todas as igrejas onde o usuário tem acesso
+    church_users = ChurchUser.objects.filter(
+        user=user, 
+        is_active=True
+    ).select_related('church', 'church__denomination')
     
-    # Obter o papel do usuário logado
-    church_user = request.user.church_users.first()
-    if not church_user:
-        return Response(
-            {'error': 'Usuário não está associado a nenhuma igreja'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    user_role = church_user.role
-    
-    # Definir hierarquia de papéis
-    role_hierarchy = {
-        RoleChoices.SUPER_ADMIN: [
-            RoleChoices.DENOMINATION_ADMIN,
-            RoleChoices.CHURCH_ADMIN,
-            RoleChoices.PASTOR,
-            RoleChoices.SECRETARY,
-            RoleChoices.LEADER,
-            RoleChoices.MEMBER,
-            RoleChoices.READ_ONLY
-        ],
-        RoleChoices.DENOMINATION_ADMIN: [
-            RoleChoices.CHURCH_ADMIN,
-            RoleChoices.PASTOR,
-            RoleChoices.SECRETARY,
-            RoleChoices.LEADER,
-            RoleChoices.MEMBER,
-            RoleChoices.READ_ONLY
-        ],
-        RoleChoices.CHURCH_ADMIN: [
-            RoleChoices.PASTOR,
-            RoleChoices.SECRETARY,
-            RoleChoices.LEADER,
-            RoleChoices.MEMBER,
-            RoleChoices.READ_ONLY
-        ],
-        RoleChoices.PASTOR: [
-            RoleChoices.SECRETARY,
-            RoleChoices.LEADER,
-            RoleChoices.MEMBER,
-            RoleChoices.READ_ONLY
-        ],
-        RoleChoices.SECRETARY: [
-            RoleChoices.LEADER,
-            RoleChoices.MEMBER,
-            RoleChoices.READ_ONLY
-        ],
-        RoleChoices.LEADER: [
-            RoleChoices.MEMBER,
-            RoleChoices.READ_ONLY
-        ],
-        RoleChoices.MEMBER: [],
-        RoleChoices.READ_ONLY: []
-    }
-    
-    # Obter papéis disponíveis para o usuário
-    available_roles = role_hierarchy.get(user_role, [])
-    
-    # Converter para formato de resposta
-    roles_data = []
-    for role in available_roles:
-        roles_data.append({
-            'value': role,
-            'label': dict(RoleChoices.choices)[role],
-            'description': get_role_description(role)
-        })
-    
-    return Response({
-        'user_role': user_role,
-        'user_role_label': dict(RoleChoices.choices)[user_role],
-        'available_roles': roles_data,
-        'can_assign_roles': len(available_roles) > 0
-    })
-
-
-def get_role_description(role):
-    """
-    Retorna descrição detalhada do papel
-    """
-    descriptions = {
-        RoleChoices.DENOMINATION_ADMIN: 'Administrador com acesso a todas as igrejas da denominação',
-        RoleChoices.CHURCH_ADMIN: 'Administrador com acesso total à igreja e suas filiais',
-        RoleChoices.PASTOR: 'Pastor com permissões administrativas (exceto gestão de filiais)',
-        RoleChoices.SECRETARY: 'Secretário com acesso a membros, visitantes e relatórios',
-        RoleChoices.LEADER: 'Líder com acesso a visitantes e atividades',
-        RoleChoices.MEMBER: 'Membro comum com acesso básico',
-        RoleChoices.READ_ONLY: 'Usuário com acesso somente leitura'
-    }
-    return descriptions.get(role, 'Papel do sistema')
-
-
-@api_view(['GET'])
-@permission_classes([permissions.AllowAny])
-def available_churches_view(request):
-    """
-    Retorna lista de igrejas disponíveis para cadastro
-    """
-    churches = Church.objects.filter(is_active=True)
-    data = []
-    
-    for church in churches:
-        data.append({
+    churches_data = []
+    for church_user in church_users:
+        church = church_user.church
+        churches_data.append({
             'id': church.id,
             'name': church.name,
             'short_name': church.short_name,
-            'denomination': church.denomination.name if church.denomination else None,
             'city': church.city,
             'state': church.state,
+            'denomination_name': church.denomination.name if church.denomination else None,
+            'role': church_user.get_role_display(),
+            'role_code': church_user.role,
+            'is_active': church_user.is_user_active_church
         })
-    
-    return Response(data)
-
-
-@api_view(['GET'])
-@permission_classes([permissions.AllowAny])
-def available_denominations_view(request):
-    """
-    Retorna lista de denominações disponíveis
-    """
-    denominations = Denomination.objects.filter(is_active=True)
-    data = []
-    
-    for denomination in denominations:
-        data.append({
-            'id': denomination.id,
-            'name': denomination.name,
-            'short_name': denomination.short_name,
-            'description': denomination.description,
-        })
-    
-    return Response(data)
-
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def user_church_view(request):
-    """
-    Retorna dados da igreja do usuário logado
-    """
-    church_user = request.user.church_users.first()
-    if not church_user:
-        return Response(
-            {'error': 'Usuário não está associado a nenhuma igreja'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    church = church_user.church
     
     return Response({
-        'id': church.id,
-        'name': church.name,
-        'short_name': church.short_name,
-        'email': church.email,
-        'phone': church.phone,
-        'address': church.address,
-        'city': church.city,
-        'state': church.state,
-        'zipcode': church.zipcode,
-        'role': church_user.role,
-        'role_label': church_user.get_role_display(),
-        'permissions': {
-            'can_access_admin': church_user.can_access_admin,
-            'can_manage_members': church_user.can_manage_members,
-            'can_manage_visitors': church_user.can_manage_visitors,
-            'can_manage_activities': church_user.can_manage_activities,
-            'can_view_reports': church_user.can_view_reports,
-            'can_manage_branches': church_user.can_manage_branches,
+        'count': len(churches_data),
+        'churches': churches_data
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def active_church(request):
+    """Retorna a igreja ativa do usuário"""
+    user = request.user
+    
+    # Buscar igreja ativa
+    active_church = ChurchUser.objects.get_active_church_for_user(user)
+    
+    if not active_church:
+        return Response(
+            {'error': 'Usuário não tem igreja ativa configurada'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    return Response({
+        'active_church': {
+            'id': active_church.id,
+            'name': active_church.name,
+            'short_name': active_church.short_name,
+            'city': active_church.city,
+            'state': active_church.state,
+            'denomination_name': active_church.denomination.name if active_church.denomination else None
         }
     })
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_active_church(request):
+    """Define qual igreja é ativa para o usuário"""
+    user = request.user
+    church_id = request.data.get('church_id')
+    
+    if not church_id:
+        return Response(
+            {'error': 'church_id é obrigatório'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Verificar se o usuário tem acesso à igreja
+        church_user = ChurchUser.objects.get(
+            user=user,
+            church_id=church_id,
+            is_active=True
+        )
+        
+        # Desmarcar outras igrejas como ativas
+        ChurchUser.objects.filter(
+            user=user,
+            is_user_active_church=True
+        ).update(is_user_active_church=False)
+        
+        # Marcar a nova igreja como ativa
+        church_user.is_user_active_church = True
+        church_user.save()
+        
+        return Response({
+            'message': f'Igreja {church_user.church.name} definida como ativa',
+            'active_church': {
+                'id': church_user.church.id,
+                'name': church_user.church.name,
+                'short_name': church_user.church.short_name
+            }
+        })
+        
+    except ChurchUser.DoesNotExist:
+        return Response(
+            {'error': 'Igreja não encontrada ou usuário sem acesso'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 @api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def user_me_view(request):
-    """
-    Retorna dados completos do usuário logado
-    """
+@permission_classes([IsAuthenticated])
+def me(request):
+    """Retorna dados do usuário atual"""
     user = request.user
-    profile = getattr(user, 'profile', None)
+    
+    # Buscar perfil se existir
+    profile_data = {}
+    if hasattr(user, 'profile') and user.profile:
+        profile_data = {
+            'bio': user.profile.bio,
+            'birth_date': user.profile.birth_date,
+            'gender': user.profile.gender,
+            'avatar': user.profile.avatar.url if user.profile.avatar else None,
+            'email_notifications': user.profile.email_notifications,
+            'sms_notifications': user.profile.sms_notifications,
+        }
     
     return Response({
         'id': user.id,
@@ -444,64 +159,88 @@ def user_me_view(request):
         'is_active': user.is_active,
         'date_joined': user.date_joined,
         'is_profile_complete': user.is_profile_complete,
-        'profile': {
-            'bio': profile.bio if profile else '',
-            'birth_date': profile.birth_date if profile else None,
-            'gender': profile.gender if profile else '',
-            'avatar': profile.avatar.url if profile and profile.avatar else None,
-        } if profile else None
+        'profile': profile_data
     })
 
-
-@api_view(['PATCH'])
-@permission_classes([permissions.IsAuthenticated])
-def update_personal_data_view(request):
-    """
-    Atualiza dados pessoais do usuário
-    """
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_church(request):
+    """Retorna dados da igreja ativa do usuário"""
     user = request.user
-    data = request.data
     
-    # Atualizar campos do usuário
-    if 'full_name' in data:
-        user.full_name = data['full_name']
-        # Atualizar first_name e last_name baseado no full_name
-        name_parts = data['full_name'].split()
-        if name_parts:
-            user.first_name = name_parts[0]
-            user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+    # Buscar igreja ativa
+    active_church = ChurchUser.objects.get_active_church_for_user(user)
     
-    if 'email' in data:
-        # Verificar se o email já existe
-        if CustomUser.objects.filter(email=data['email']).exclude(id=user.id).exists():
-            return Response(
-                {'error': 'Este email já está sendo usado por outro usuário'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        user.email = data['email']
+    if not active_church:
+        return Response(
+            {'error': 'Usuário não tem igreja ativa configurada'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     
-    if 'phone' in data:
-        user.phone = data['phone']
+    # Buscar papel do usuário na igreja
+    church_user = ChurchUser.objects.get(
+        user=user,
+        church=active_church,
+        is_active=True
+    )
     
-    user.save()
-    
-    # Atualizar ou criar perfil
-    profile, created = UserProfile.objects.get_or_create(user=user)
-    
-    if 'bio' in data:
-        profile.bio = data['bio']
-    
-    if 'birth_date' in data:
-        profile.birth_date = data['birth_date'] if data['birth_date'] else None
-    
-    if 'gender' in data:
-        profile.gender = data['gender']
-    
-    profile.save()
-    
-    # Retornar dados atualizados
     return Response({
-        'user': {
+        'id': active_church.id,
+        'name': active_church.name,
+        'short_name': active_church.short_name,
+        'cnpj': active_church.cnpj or '',
+        'email': active_church.email or '',
+        'phone': active_church.phone or '',
+        'address': active_church.address or '',
+        'city': active_church.city,
+        'state': active_church.state,
+        'zipcode': active_church.zipcode or '',
+        'subscription_plan': active_church.subscription_plan,
+        'role': church_user.get_role_display(),
+        'role_label': church_user.get_role_display(),
+        'user_role': church_user.role,
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_avatar(request):
+    """Upload de avatar do usuário"""
+    user = request.user
+    
+    if 'avatar' not in request.FILES:
+        return Response(
+            {'error': 'Arquivo de avatar é obrigatório'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    avatar_file = request.FILES['avatar']
+    
+    # Validar tipo de arquivo
+    allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if avatar_file.content_type not in allowed_types:
+        return Response(
+            {'error': 'Tipo de arquivo não permitido. Use JPEG, PNG, GIF ou WebP'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validar tamanho (5MB max)
+    if avatar_file.size > 5 * 1024 * 1024:
+        return Response(
+            {'error': 'Arquivo muito grande. Tamanho máximo: 5MB'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Criar ou atualizar perfil
+        from .models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        
+        # Salvar avatar
+        profile.avatar = avatar_file
+        profile.save()
+        
+        # Retornar dados atualizados
+        user_data = {
             'id': user.id,
             'email': user.email,
             'full_name': user.full_name,
@@ -516,238 +255,19 @@ def update_personal_data_view(request):
                 'birth_date': profile.birth_date,
                 'gender': profile.gender,
                 'avatar': profile.avatar.url if profile.avatar else None,
+                'email_notifications': profile.email_notifications,
+                'sms_notifications': profile.sms_notifications,
             }
-        },
-        'message': 'Dados pessoais atualizados com sucesso'
-    })
-
-
-@api_view(['PATCH'])
-@permission_classes([permissions.IsAuthenticated])
-def update_church_data_view(request):
-    """
-    Atualiza dados da igreja do usuário
-    """
-    user = request.user
-    church_user = user.church_users.first()
-    
-    if not church_user:
-        return Response(
-            {'error': 'Usuário não está associado a nenhuma igreja'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    church = church_user.church
-    data = request.data
-    
-    # Atualizar campos da igreja
-    if 'name' in data:
-        church.name = data['name']
-    
-    if 'cnpj' in data:
-        church.cnpj = data['cnpj']
-    
-    if 'email' in data:
-        church.email = data['email']
-    
-    if 'phone' in data:
-        church.phone = data['phone']
-    
-    if 'address' in data:
-        church.address = data['address']
-    
-    if 'city' in data:
-        church.city = data['city']
-    
-    if 'state' in data:
-        church.state = data['state']
-    
-    if 'zipcode' in data:
-        church.zipcode = data['zipcode']
-    
-    church.save()
-    
-    # Retornar dados atualizados
-    return Response({
-        'church': {
-            'id': church.id,
-            'name': church.name,
-            'short_name': church.short_name,
-            'cnpj': church.cnpj,
-            'email': church.email,
-            'phone': church.phone,
-            'address': church.address,
-            'city': church.city,
-            'state': church.state,
-            'zipcode': church.zipcode,
-            'subscription_plan': church.subscription_plan,
-            'user_role': church_user.role,
-        },
-        'message': 'Dados da igreja atualizados com sucesso'
-    })
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def upload_avatar_view(request):
-    """
-    Upload de avatar do usuário
-    """
-    user = request.user
-    
-    if 'avatar' not in request.FILES:
-        return Response(
-            {'error': 'Nenhum arquivo enviado'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    avatar_file = request.FILES['avatar']
-    
-    # Validar tipo de arquivo
-    allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-    if avatar_file.content_type not in allowed_types:
-        return Response(
-            {'error': 'Tipo de arquivo não suportado. Use JPEG, PNG, GIF ou WebP'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Validar tamanho (máximo 5MB)
-    if avatar_file.size > 5 * 1024 * 1024:
-        return Response(
-            {'error': 'Arquivo muito grande. Tamanho máximo: 5MB'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    try:
-        # Processar imagem
-        img = Image.open(avatar_file)
-        
-        # Redimensionar se necessário (máximo 300x300)
-        if img.width > 300 or img.height > 300:
-            img.thumbnail((300, 300), Image.Resampling.LANCZOS)
-        
-        # Converter para RGB se necessário
-        if img.mode in ('RGBA', 'LA', 'P'):
-            img = img.convert('RGB')
-        
-        # Salvar imagem processada
-        output = BytesIO()
-        img.save(output, format='JPEG', quality=85)
-        output.seek(0)
-        
-        # Criar ou atualizar perfil
-        profile, created = UserProfile.objects.get_or_create(user=user)
-        
-        # Remover avatar antigo se existir
-        if profile.avatar:
-            try:
-                default_storage.delete(profile.avatar.name)
-            except:
-                pass
-        
-        # Salvar novo avatar com timestamp para evitar cache
-        import time
-        timestamp = int(time.time())
-        file_extension = os.path.splitext(avatar_file.name)[1] or '.jpg'
-        filename = f'avatars/user_{user.id}_{timestamp}{file_extension}'
-        profile.avatar.save(
-            filename,
-            ContentFile(output.read()),
-            save=True
-        )
-        
-        avatar_url = profile.avatar.url
+        }
         
         return Response({
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'full_name': user.full_name,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'phone': user.phone,
-                'is_active': user.is_active,
-                'date_joined': user.date_joined,
-                'is_profile_complete': user.is_profile_complete,
-                'profile': {
-                    'bio': profile.bio,
-                    'birth_date': profile.birth_date,
-                    'gender': profile.gender,
-                    'avatar': avatar_url,
-                }
-            },
-            'avatar_url': avatar_url,
+            'user': user_data,
+            'avatar_url': profile.avatar.url,
             'message': 'Avatar atualizado com sucesso'
         })
         
     except Exception as e:
         return Response(
-            {'error': f'Erro ao processar imagem: {str(e)}'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-
-@api_view(['DELETE'])
-@permission_classes([permissions.IsAuthenticated])
-def delete_account_view(request):
-    """
-    Deleta permanentemente a conta do usuário
-    Requer confirmação via senha
-    """
-    user = request.user
-    data = request.data
-    
-    # Verificar se a senha foi fornecida
-    if 'password' not in data:
-        return Response(
-            {'error': 'Senha é obrigatória para deletar a conta'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Verificar se a senha está correta
-    if not user.check_password(data['password']):
-        return Response(
-            {'error': 'Senha incorreta'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Verificar se o usuário confirmou a ação
-    if not data.get('confirm_deletion', False):
-        return Response(
-            {'error': 'É necessário confirmar a exclusão da conta'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    try:
-        with transaction.atomic():
-            # Remover avatar se existir
-            profile = getattr(user, 'profile', None)
-            if profile and profile.avatar:
-                try:
-                    default_storage.delete(profile.avatar.name)
-                except:
-                    pass
-            
-            # Deletar token de autenticação
-            try:
-                Token.objects.filter(user=user).delete()
-            except:
-                pass
-            
-            # Armazenar informações para resposta
-            user_email = user.email
-            user_name = user.full_name
-            
-            # Deletar usuário (cascade irá deletar perfil e relacionamentos)
-            user.delete()
-            
-            return Response({
-                'message': f'Conta de {user_name} ({user_email}) foi deletada permanentemente',
-                'deleted_at': timezone.now().isoformat()
-            })
-            
-    except Exception as e:
-        return Response(
-            {'error': f'Erro ao deletar conta: {str(e)}'},
+            {'error': f'Erro ao salvar avatar: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -128,6 +128,16 @@ class ChurchViewSet(viewsets.ModelViewSet):
             logger.info(f"Denomination admin {user.email} acessando igrejas das denominações {list(denomination_ids)}")
             return queryset.filter(denomination_id__in=denomination_ids)
         
+        # Verificar se é denomination_admin via ChurchUser
+        denomination_admin_churches = user.church_users.filter(
+            role='denomination_admin',
+            is_active=True
+        ).values_list('church__denomination_id', flat=True).distinct()
+        
+        if denomination_admin_churches:
+            logger.info(f"Denomination admin via ChurchUser {user.email} acessando igrejas das denominações {list(denomination_admin_churches)}")
+            return queryset.filter(denomination_id__in=denomination_admin_churches)
+        
         # Administradores de igreja veem igrejas onde são admins
         admin_church_ids = user.church_users.filter(
             role__in=['denomination_admin', 'church_admin'],
@@ -505,26 +515,22 @@ class ChurchViewSet(viewsets.ModelViewSet):
         Retorna os dados consolidados para o dashboard principal
         da igreja do usuário logado.
         """
-        # Buscar a igreja do usuário atual de forma mais robusta
+        # Buscar a igreja ativa do usuário atual
         try:
             from apps.accounts.models import ChurchUser
             
-            print(f"🏢 Dashboard: Buscando igreja para usuário {request.user.email}")
+            print(f"🏢 Dashboard: Buscando igreja ativa para usuário {request.user.email}")
             
-            church_user = ChurchUser.objects.filter(
-                user=request.user, 
-                is_active=True
-            ).first()
+            church = ChurchUser.objects.get_active_church_for_user(request.user)
             
-            if not church_user:
-                print(f"❌ Dashboard: Usuário {request.user.email} não tem igreja associada")
+            if not church:
+                print(f"❌ Dashboard: Usuário {request.user.email} não tem igreja ativa configurada")
                 return Response(
-                    {"error": "Usuário não está associado a nenhuma igreja."},
+                    {"error": "Usuário não tem igreja ativa configurada."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            church = church_user.church
-            print(f"✅ Dashboard: Igreja encontrada: {church.name} (ID: {church.id})")
+            print(f"✅ Dashboard: Igreja ativa encontrada: {church.name} (ID: {church.id})")
             
         except Exception as e:
             print(f"💥 Dashboard: Erro ao buscar igreja: {e}")
@@ -554,11 +560,14 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 total_members = church.total_members or 0
                 
             try:
-                real_visitors = Visitor.objects.filter(
+                # Contar todos os visitantes da igreja (não apenas do mês)
+                real_visitors_total = Visitor.objects.filter(church=church).count()
+                # Visitantes do mês atual
+                real_visitors_this_month = Visitor.objects.filter(
                     church=church, created_at__gte=start_of_this_month
                 ).count()
-                # Se não tem visitantes reais neste mês, usar o campo total_visitors da igreja
-                total_visitors_this_month = real_visitors if real_visitors > 0 else (church.total_visitors or 0)
+                # Usar total de visitantes se houver, senão usar do campo da igreja
+                total_visitors_this_month = real_visitors_total if real_visitors_total > 0 else (church.total_visitors or 0)
             except:
                 total_visitors_this_month = church.total_visitors or 0
                 
@@ -672,7 +681,115 @@ class ChurchViewSet(viewsets.ModelViewSet):
             }
         }
         
-        return Response(dashboard_data)
+
+    
+    @action(detail=True, methods=['get'])
+    def members(self, request, pk=None):
+        """Listar membros da igreja específica"""
+        church = self.get_object()
+        
+        from apps.members.models import Member
+        from apps.members.serializers import MemberListSerializer
+        
+        # Buscar membros da igreja
+        members = Member.objects.filter(
+            church=church,
+            is_active=True
+        ).select_related('user', 'church').order_by('full_name')
+        
+        # Aplicar filtros se fornecidos
+        search = request.query_params.get('search', '').strip()
+        if search:
+            from django.db.models import Q
+            members = members.filter(
+                Q(full_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(phone__icontains=search)
+            )
+        
+        # Paginação
+        page = self.paginate_queryset(members)
+        if page is not None:
+            serializer = MemberListSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = MemberListSerializer(members, many=True)
+
+    
+    @action(detail=False, methods=['post'], url_path='transfer-member')
+    def transfer_member(self, request):
+        """Transferir membro entre igrejas"""
+        member_id = request.data.get('member_id')
+        target_church_id = request.data.get('target_church_id')
+        
+        if not member_id or not target_church_id:
+            return Response(
+                {'error': 'member_id e target_church_id são obrigatórios'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from apps.members.models import Member
+            
+            # Buscar membro
+            member = Member.objects.get(id=member_id, is_active=True)
+            
+            # Buscar igreja de destino
+            target_church = Church.objects.get(id=target_church_id, is_active=True)
+            
+            # Verificar se o usuário pode gerenciar ambas as igrejas
+            user_churches = self.get_queryset().values_list('id', flat=True)
+            
+            if member.church.id not in user_churches or target_church.id not in user_churches:
+                return Response(
+                    {'error': 'Sem permissão para transferir entre essas igrejas'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Realizar transferência
+            old_church = member.church
+            member.church = target_church
+            member.save()
+            
+            # Atualizar estatísticas
+            old_church.update_statistics()
+            target_church.update_statistics()
+            
+            logger.info(f"Membro {member.full_name} transferido de {old_church.name} para {target_church.name} por {request.user.email}")
+            
+            return Response({
+                'message': f'Membro {member.full_name} transferido com sucesso',
+                'member': {
+                    'id': member.id,
+                    'name': member.full_name,
+                    'old_church': old_church.name,
+                    'new_church': target_church.name
+                }
+            })
+            
+        except Member.DoesNotExist:
+            return Response(
+                {'error': 'Membro não encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Church.DoesNotExist:
+            return Response(
+                {'error': 'Igreja de destino não encontrada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Erro ao transferir membro: {str(e)}")
+
+    
+    @action(detail=False, methods=['get'], url_path='managed-churches')
+    def managed_churches(self, request):
+        """Listar igrejas que o usuário pode gerenciar (para dropdown)"""
+        churches = self.get_queryset().values('id', 'name', 'city', 'state')
+        
+        return Response({
+            'count': len(churches),
+            'results': list(churches)
+        })
     
     @action(detail=False, methods=['get'], url_path='available-states')
     def available_states(self, request):
@@ -786,6 +903,162 @@ class ChurchViewSet(viewsets.ModelViewSet):
             }
         ]
         return Response(plans)
+    
+    def _get_role_explanation(self, system_roles, ministerial_function):
+        """Gera explicação clara sobre papéis do usuário"""
+        from apps.accounts.models import RoleChoices
+        
+        explanations = []
+        
+        if system_roles:
+            role_names = [dict(RoleChoices.choices).get(role, role) for role in system_roles]
+            explanations.append(f"Papel no Sistema: {', '.join(role_names)}")
+        else:
+            explanations.append("Papel no Sistema: Nenhum")
+        
+        if ministerial_function:
+            from apps.core.models import MinisterialFunctionChoices
+            function_display = dict(MinisterialFunctionChoices.choices).get(ministerial_function, ministerial_function)
+            explanations.append(f"Função Ministerial: {function_display}")
+        else:
+            explanations.append("Função Ministerial: Não definida")
+        
+        return " | ".join(explanations)
+
+    @action(detail=False, methods=['get'], url_path='eligible-admins')
+    def eligible_admins(self, request):
+        """Lista usuários elegíveis para serem administradores de igreja"""
+        from django.contrib.auth import get_user_model
+        from apps.accounts.models import RoleChoices
+        
+        User = get_user_model()
+        
+        # Buscar usuários que podem ser administradores
+        eligible_users = User.objects.filter(
+            is_active=True
+        ).select_related('profile').prefetch_related('church_users', 'member_profile')
+        
+        # Filtrar por denominação se especificada
+        denomination_id = request.query_params.get('denomination_id')
+        if denomination_id:
+            eligible_users = eligible_users.filter(
+                models.Q(church_users__church__denomination_id=denomination_id) |
+                models.Q(church_users__isnull=True)
+            ).distinct()
+        
+        # Serializar dados dos usuários
+        users_data = []
+        for user in eligible_users:
+            current_roles = user.church_users.filter(is_active=True).values_list('role', flat=True)
+            
+            # Papéis de sistema que podem ser administradores
+            allowed_system_roles = [
+                RoleChoices.CHURCH_ADMIN,
+                RoleChoices.PASTOR,
+                RoleChoices.SECRETARY,
+                RoleChoices.DENOMINATION_ADMIN
+            ]
+            
+            # Verificar se pode ser admin baseado nos papéis de sistema
+            can_be_admin = (
+                not current_roles or
+                any(role in allowed_system_roles for role in current_roles)
+            )
+            
+            # Obter função ministerial se for membro
+            ministerial_function = None
+            ministerial_function_display = None
+            if hasattr(user, 'member_profile') and user.member_profile:
+                ministerial_function = user.member_profile.ministerial_function
+                ministerial_function_display = user.member_profile.get_ministerial_function_display()
+            
+            if can_be_admin:
+                users_data.append({
+                    'id': user.id,
+                    'full_name': user.full_name,
+                    'email': user.email,
+                    'phone': user.phone,
+                    'current_system_roles': [{
+                        'role': role,
+                        'role_display': dict(RoleChoices.choices).get(role, role)
+                    } for role in current_roles],
+                    'ministerial_function': ministerial_function,
+                    'ministerial_function_display': ministerial_function_display,
+                    'avatar': user.profile.avatar.url if hasattr(user, 'profile') and user.profile.avatar else None,
+                    'role_explanation': self._get_role_explanation(current_roles, ministerial_function)
+                })
+        
+        return Response({
+            'count': len(users_data),
+            'results': users_data
+        })
+    
+    @action(detail=True, methods=['get'], url_path='eligible-admins')
+    def eligible_admins_for_church(self, request, pk=None):
+        """Lista usuários elegíveis para serem administradores de uma igreja específica"""
+        church = self.get_object()
+        
+        from django.contrib.auth import get_user_model
+        from apps.accounts.models import RoleChoices
+        
+        User = get_user_model()
+        
+        eligible_users = User.objects.filter(
+            is_active=True
+        ).select_related('profile').prefetch_related('church_users', 'member_profile')
+        
+        if church.denomination:
+            eligible_users = eligible_users.filter(
+                models.Q(church_users__church__denomination=church.denomination) |
+                models.Q(church_users__isnull=True)
+            ).distinct()
+        
+        users_data = []
+        for user in eligible_users:
+            current_roles = user.church_users.filter(is_active=True).values_list('role', flat=True)
+            
+            # Papéis de sistema que podem ser administradores
+            allowed_system_roles = [
+                RoleChoices.CHURCH_ADMIN,
+                RoleChoices.PASTOR,
+                RoleChoices.SECRETARY,
+                RoleChoices.DENOMINATION_ADMIN
+            ]
+            
+            # Verificar se pode ser admin baseado nos papéis de sistema
+            can_be_admin = (
+                not current_roles or
+                any(role in allowed_system_roles for role in current_roles)
+            )
+            
+            # Obter função ministerial se for membro
+            ministerial_function = None
+            ministerial_function_display = None
+            if hasattr(user, 'member_profile') and user.member_profile:
+                ministerial_function = user.member_profile.ministerial_function
+                ministerial_function_display = user.member_profile.get_ministerial_function_display()
+            
+            if can_be_admin:
+                users_data.append({
+                    'id': user.id,
+                    'full_name': user.full_name,
+                    'email': user.email,
+                    'phone': user.phone,
+                    'current_system_roles': [{
+                        'role': role,
+                        'role_display': dict(RoleChoices.choices).get(role, role)
+                    } for role in current_roles],
+                    'ministerial_function': ministerial_function,
+                    'ministerial_function_display': ministerial_function_display,
+                    'avatar': user.profile.avatar.url if hasattr(user, 'profile') and user.profile.avatar else None,
+                    'is_current_pastor': church.main_pastor_id == user.id,
+                    'role_explanation': self._get_role_explanation(current_roles, ministerial_function)
+                })
+        
+        return Response({
+            'count': len(users_data),
+            'results': users_data
+        })
 
 
 # ============================================

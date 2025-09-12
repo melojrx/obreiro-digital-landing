@@ -64,11 +64,10 @@ class CustomUser(AbstractUser):
     Estende o AbstractUser do Django para usar email ao invés de username.
     """
     
-    # Sobrescrever email para ser único e obrigatório
+    # Email único apenas para usuários ativos
     email = models.EmailField(
         "E-mail",
-        unique=True,
-        help_text="Endereço de e-mail único para login"
+        help_text="Endereço de e-mail para login"
     )
     
     # Campos adicionais para registro inicial
@@ -128,6 +127,13 @@ class CustomUser(AbstractUser):
         verbose_name = "Usuário"
         verbose_name_plural = "Usuários"
         ordering = ['full_name', 'email']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['email'],
+                condition=models.Q(is_active=True),
+                name='unique_active_email'
+            )
+        ]
     
     def __str__(self):
         return f"{self.full_name} ({self.email})"
@@ -196,6 +202,42 @@ class ChurchUserManager(models.Manager):
                 RoleChoices.LEADER
             ]
         )
+    
+    def get_active_church_for_user(self, user):
+        """Retorna a igreja ativa para um usuário"""
+        try:
+            active_church_user = self.get_queryset().filter(
+                user=user, 
+                is_active=True,
+                is_user_active_church=True
+            ).first()
+            
+            if active_church_user:
+                return active_church_user.church
+            
+            # Se não há igreja ativa marcada, usar a primeira igreja onde é admin
+            fallback_church_user = self.get_queryset().filter(
+                user=user, 
+                is_active=True,
+                role__in=[RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN]
+            ).first()
+            
+            if fallback_church_user:
+                # Marcar como ativa automaticamente
+                fallback_church_user.is_user_active_church = True
+                fallback_church_user.save()
+                return fallback_church_user.church
+            
+            # Se não é admin, pegar qualquer igreja ativa
+            any_church_user = self.get_queryset().filter(
+                user=user, 
+                is_active=True
+            ).first()
+            
+            return any_church_user.church if any_church_user else None
+            
+        except Exception:
+            return None
 
 
 class UserProfile(BaseModel):
@@ -395,6 +437,13 @@ class ChurchUser(BaseModel):
         help_text="Observações sobre este usuário"
     )
     
+    # Igreja ativa para denomination admins
+    is_user_active_church = models.BooleanField(
+        "Igreja Ativa do Usuário",
+        default=False,
+        help_text="Se esta é a igreja ativa atual do usuário (para admins de denominação)"
+    )
+    
     # Managers
     objects = ChurchUserManager()
     active = ActiveManager()
@@ -427,6 +476,13 @@ class ChurchUser(BaseModel):
         
         if not self.pk:  # Novo registro
             self.set_permissions_by_role()
+        
+        # Se is_user_active_church está sendo marcado como True, desmarcar outros
+        if self.is_user_active_church:
+            ChurchUser.objects.filter(
+                user=self.user, 
+                is_user_active_church=True
+            ).exclude(pk=self.pk).update(is_user_active_church=False)
         
         super().save(*args, **kwargs)
     

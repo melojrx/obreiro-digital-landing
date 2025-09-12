@@ -48,16 +48,21 @@ class MinistryViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """
-        Filtra o queryset de ministérios.
-        - O TenantManager já filtra por `church`.
+        Filtra o queryset de ministérios usando a igreja ativa do usuário.
         """
         user = self.request.user
         
         if user.is_superuser:
-            return Ministry.objects.all_for_church(self.request.church)
+            return Ministry.objects.all()
 
-        # O TenantManager já aplicou o filtro por request.church
-        return Ministry.objects.all()
+        # Obter igreja ativa do usuário
+        from apps.accounts.models import ChurchUser
+        active_church = ChurchUser.objects.get_active_church_for_user(user)
+        
+        if active_church:
+            return Ministry.objects.filter(church=active_church)
+        else:
+            return Ministry.objects.none()
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -65,6 +70,18 @@ class MinistryViewSet(viewsets.ModelViewSet):
         elif self.action == 'stats':
             return MinistryStatsSerializer
         return MinistrySerializer
+    
+    def perform_create(self, serializer):
+        """Ao criar ministério, associar à igreja ativa do usuário"""
+        from apps.accounts.models import ChurchUser
+        from django.core.exceptions import ValidationError
+        
+        active_church = ChurchUser.objects.get_active_church_for_user(self.request.user)
+        
+        if active_church:
+            serializer.save(church=active_church)
+        else:
+            raise ValidationError("Usuário não tem igreja ativa configurada")
     
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):

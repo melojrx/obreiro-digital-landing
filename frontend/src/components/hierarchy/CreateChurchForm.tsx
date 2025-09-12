@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
@@ -36,6 +37,7 @@ import {
 // Hooks
 import { useDenominations } from '@/hooks/useDenominations';
 import { useAuth } from '@/hooks/useAuth';
+import { useAvailableLeaders } from '@/hooks/useMinistries';
 import { toast } from '@/hooks/use-toast';
 
 // Tipos
@@ -69,6 +71,11 @@ const createChurchSchema = z.object({
   max_members: z.number().min(1, 'Limite mínimo: 1 membro').optional(),
   max_branches: z.number().min(0, 'Limite não pode ser negativo').optional(),
   subscription_plan: z.enum(['basic', 'premium', 'enterprise']).optional(),
+  
+  // Novos campos para delegação e status
+  is_active: z.boolean().default(true),
+  responsible_member_id: z.number().optional(),
+  set_as_active_church: z.boolean().default(false),
 });
 
 type CreateChurchFormValues = z.infer<typeof createChurchSchema>;
@@ -160,6 +167,9 @@ export const CreateChurchForm: React.FC<CreateChurchFormProps> = ({
       max_members: 100,
       max_branches: 5,
       subscription_plan: 'basic',
+      is_active: true,
+      set_as_active_church: false,
+      responsible_member_id: undefined,
     },
   });
 
@@ -182,7 +192,7 @@ export const CreateChurchForm: React.FC<CreateChurchFormProps> = ({
       case 2: // Pastor
         return ['pastor_name', 'pastor_email', 'pastor_phone'];
       case 3: // Configurações
-        return ['max_members', 'max_branches', 'subscription_plan'];
+        return ['max_members', 'max_branches', 'subscription_plan', 'is_active', 'responsible_member_id', 'set_as_active_church'];
       default:
         return [];
     }
@@ -234,6 +244,9 @@ export const CreateChurchForm: React.FC<CreateChurchFormProps> = ({
         max_members: data.max_members,
         max_branches: data.max_branches,
         subscription_plan: data.subscription_plan,
+        is_active: data.is_active,
+        responsible_member_id: data.responsible_member_id,
+        set_as_active_church: data.set_as_active_church,
       };
 
       const newChurch = await createChurch(denominationId, churchData);
@@ -642,6 +655,75 @@ export const CreateChurchForm: React.FC<CreateChurchFormProps> = ({
           {errors.max_branches && (
             <p className="text-sm text-red-600 mt-1">{errors.max_branches.message}</p>
           )}
+        </div>
+      </div>
+      
+      <Separator />
+      
+      {/* Novos campos para delegação e status */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium text-gray-900">Delegação e Status</h4>
+        
+        <div className="flex items-center space-x-2">
+          <Controller
+            name="is_active"
+            control={form.control}
+            render={({ field }) => (
+              <Checkbox
+                id="is_active"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            )}
+          />
+          <Label
+            htmlFor="is_active"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Igreja ativa (membros podem ser cadastrados imediatamente)
+          </Label>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Controller
+            name="set_as_active_church"
+            control={form.control}
+            render={({ field }) => (
+              <Checkbox
+                id="set_as_active_church"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            )}
+          />
+          <Label
+            htmlFor="set_as_active_church"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Definir como minha igreja ativa (trocar contexto atual)
+          </Label>
+        </div>
+        
+        <div>
+          <Label htmlFor="responsible_member_id">Responsável da Igreja (opcional)</Label>
+          <Controller
+            name="responsible_member_id"
+            control={form.control}
+            render={({ field }) => (
+              <Select value={field.value?.toString()} onValueChange={(value) => field.onChange(Number(value))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um membro responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum responsável específico</SelectItem>
+                  {/* Aqui seria carregado da API de líderes disponíveis */}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            O responsável receberá permissões de administrador da igreja
+          </p>
         </div>
       </div>
     </div>

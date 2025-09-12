@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Ministry, CreateMinistryData, MINISTRY_COLORS } from '@/services/activityService';
 import { useAuth } from '@/hooks/useAuth';
+import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 
 // Schema de validação
 const ministryFormSchema = z.object({
@@ -44,8 +45,16 @@ interface MinistryFormProps {
   onClose: () => void;
   onSubmit: (data: CreateMinistryData) => void;
   ministry?: Ministry;
-  availableLeaders?: Array<{ id: number; name: string; role: string }>;
+  availableLeaders?: Array<{ 
+    id: number; 
+    name: string; 
+    role: string; 
+    type?: string;
+    source?: string;
+  }>;
   isLoading?: boolean;
+  leadersLoading?: boolean;
+  leadersError?: any;
 }
 
 export const MinistryForm: React.FC<MinistryFormProps> = ({
@@ -55,13 +64,24 @@ export const MinistryForm: React.FC<MinistryFormProps> = ({
   ministry,
   availableLeaders = [],
   isLoading = false,
+  leadersLoading = false,
+  leadersError = undefined,
 }) => {
-  const { userChurch } = useAuth();
+  const { user } = useAuth();
+  const activeChurch = useCurrentActiveChurch();
   const isEditing = !!ministry;
+
+  // Debug logs
+  console.log('🔍 MinistryForm Debug:', {
+    isOpen,
+    availableLeaders,
+    leadersLoading,
+    leadersError,
+    activeChurch,
+    ministry,
+    user
+  });
   
-  const currentChurch = userChurch?.church;
-
-
   const form = useForm<MinistryFormData>({
     resolver: zodResolver(ministryFormSchema),
     defaultValues: {
@@ -96,23 +116,22 @@ export const MinistryForm: React.FC<MinistryFormProps> = ({
   }, [ministry, isOpen, isEditing, form]);
 
   const handleSubmit = (data: MinistryFormData) => {
-    console.log('🔍 MinistryForm handleSubmit - currentChurch:', currentChurch);
+    console.log('🔍 MinistryForm handleSubmit - activeChurch:', activeChurch);
+    console.log('🔍 MinistryForm handleSubmit - user:', user);
     console.log('🔍 MinistryForm handleSubmit - data:', data);
     
-    if (!currentChurch) {
-      console.error('❌ CurrentChurch não disponível');
-      return;
-    }
-
+    // Criar dados do ministério sem especificar igreja
+    // O backend vai automaticamente associar à igreja ativa do usuário
     const ministryData: CreateMinistryData = {
-      church: currentChurch.id,
+      // Remover church - deixar o backend definir automaticamente
       name: data.name,
       description: data.description || '',
       leader: data.leader || undefined,
       color: data.color,
       is_public: data.is_public,
-    };
+    } as CreateMinistryData;
 
+    console.log('🔍 MinistryForm - Enviando dados:', ministryData);
     onSubmit(ministryData);
   };
 
@@ -196,36 +215,61 @@ export const MinistryForm: React.FC<MinistryFormProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Líder Responsável</FormLabel>
-                    <Select 
-                      onValueChange={(value) => {
-                        if (value === 'no-leader') {
-                          field.onChange(undefined);
-                        } else {
-                          field.onChange(parseInt(value));
-                        }
-                      }}
-                      value={field.value?.toString() || 'no-leader'}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o líder do ministério" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="no-leader">Sem líder definido</SelectItem>
-                        {availableLeaders.map((leader) => (
-                          <SelectItem key={leader.id} value={leader.id.toString()}>
-                            <div className="flex items-center gap-2">
-                              <UserIcon className="h-4 w-4" />
-                              <span>{leader.name}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {leader.role}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {leadersLoading ? (
+                      <div className="text-sm text-blue-600">Carregando líderes...</div>
+                    ) : leadersError ? (
+                      <div className="text-sm text-red-600">
+                        Erro ao carregar líderes. Tente novamente.
+                        <div className="text-xs mt-1 text-gray-500">
+                          {leadersError?.message || 'Verifique sua conexão e permissões.'}
+                        </div>
+                      </div>
+                    ) : availableLeaders.length === 0 ? (
+                      <div className="text-sm text-amber-600">
+                        Nenhum líder disponível encontrado.
+                        <div className="text-xs mt-1 text-gray-500">
+                          Certifique-se de que há membros com funções de liderança cadastrados.
+                        </div>
+                      </div>
+                    ) : (
+                      <Select 
+                        onValueChange={(value) => {
+                          if (value === 'no-leader') {
+                            field.onChange(undefined);
+                          } else {
+                            field.onChange(parseInt(value));
+                          }
+                        }}
+                        value={field.value?.toString() || 'no-leader'}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o líder do ministério" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="no-leader">Sem líder definido</SelectItem>
+                          {availableLeaders.map((leader) => (
+                            <SelectItem key={leader.id} value={leader.id.toString()}>
+                              <div className="flex items-center gap-2">
+                                <UserIcon className="h-4 w-4" />
+                                <span>{leader.name}</span>
+                                <div className="flex gap-1">
+                                  <Badge variant="outline" className="text-xs">
+                                    {leader.role}
+                                  </Badge>
+                                  {leader.source && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {leader.source}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormDescription>
                       Pessoa responsável por liderar e coordenar o ministério
                     </FormDescription>

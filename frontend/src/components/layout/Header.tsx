@@ -13,11 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { ChurchSelector } from "./ChurchSelector";
+import { useInvalidateActiveChurchData } from "@/hooks/useActiveChurch";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const { clearAllChurchCache, forceRefreshActiveChurch } = useInvalidateActiveChurchData();
 
   // Função para fazer logout
   const handleLogout = async () => {
@@ -33,12 +36,17 @@ const Header: React.FC = () => {
     <header className="bg-white border-b border-gray-200">
       {/* Main Header */}
       <div className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center justify-between">
-          {/* Left side - Title + Mobile Search Button */}
+        <div className="flex items-center justify-between gap-4">
+          {/* Left side - Title */}
           <div className="flex items-center space-x-3">
             <div className="flex-1">
               <h2 className="text-lg sm:text-2xl font-semibold text-gray-800">Dashboard</h2>
             </div>
+          </div>
+
+          {/* Center - Church Selector */}
+          <div className="hidden lg:flex flex-1 justify-center">
+            <ChurchSelector />
           </div>
 
           {/* Right side - Actions */}
@@ -96,6 +104,18 @@ const Header: React.FC = () => {
                   <Bell className="mr-2 h-4 w-4" />
                   <span>Notificações</span>
                 </DropdownMenuItem>
+                
+                {/* Debug - Botão temporário para limpar cache */}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="text-blue-600 cursor-pointer text-xs"
+                  onClick={() => {
+                    clearAllChurchCache();
+                    window.location.reload(); // Recarregar página após limpar cache
+                  }}
+                >
+                  🔄 <span className="ml-2">Limpar Cache (Debug)</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   className="text-red-600 cursor-pointer"
@@ -132,6 +152,11 @@ const Header: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Mobile Church Selector */}
+      <div className="px-4 py-3 border-t border-gray-100 lg:hidden">
+        <ChurchSelector />
+      </div>
     </header>
   );
 };

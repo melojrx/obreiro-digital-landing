@@ -5,8 +5,14 @@ Gerencia serialização de membros
 
 from rest_framework import serializers
 from datetime import date
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Member, MembershipStatusLog, MembershipStatus
-from apps.core.models import MembershipStatusChoices, MinisterialFunctionChoices
+from apps.core.models import MembershipStatusChoices, MinisterialFunctionChoices, RoleChoices
+from apps.accounts.models import ChurchUser
+
+User = get_user_model()
 
 
 class MemberSerializer(serializers.ModelSerializer):
@@ -115,8 +121,24 @@ class MemberListSerializer(serializers.ModelSerializer):
 
 class MemberCreateSerializer(serializers.ModelSerializer):
     """
-    Serializer para criação de membros
+    Serializer para criação de membros com suporte a criação de usuário do sistema
     """
+    
+    # Campos para criação de usuário do sistema
+    create_system_user = serializers.BooleanField(default=False, write_only=True)
+    system_role = serializers.ChoiceField(
+        choices=[
+            (RoleChoices.CHURCH_ADMIN, 'Administrador da Igreja'),
+            (RoleChoices.PASTOR, 'Pastor'),
+            (RoleChoices.SECRETARY, 'Secretário(a)'),
+            (RoleChoices.LEADER, 'Líder'),
+            (RoleChoices.MEMBER, 'Membro'),
+        ],
+        required=False,
+        write_only=True
+    )
+    user_email = serializers.EmailField(required=False, write_only=True)
+    user_password = serializers.CharField(min_length=8, required=False, write_only=True)
     
     class Meta:
         model = Member
@@ -150,20 +172,31 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             'profession', 'education_level', 'photo', 'notes',
             
             # Preferências
-            'accept_sms', 'accept_email', 'accept_whatsapp'
+            'accept_sms', 'accept_email', 'accept_whatsapp',
+            
+            # Campos para criação de usuário do sistema
+            'create_system_user', 'system_role', 'user_email', 'user_password'
         ]
     
     def validate_cpf(self, value):
         """Validação de CPF"""
-        if value:
-            # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
-            existing = Member.objects.all().filter(
-                cpf=value,
-                is_active=True
-            ).exists()
+        if not value:
+            raise serializers.ValidationError("CPF é obrigatório.")
             
-            if existing:
-                raise serializers.ValidationError("Este CPF já está cadastrado.")
+        # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
+        existing = Member.objects.all().filter(
+            cpf=value,
+            is_active=True
+        ).exists()
+        
+        if existing:
+            raise serializers.ValidationError("Este CPF já está cadastrado.")
+        return value
+    
+    def validate_phone(self, value):
+        """Validação de telefone"""
+        if not value:
+            raise serializers.ValidationError("Telefone é obrigatório.")
         return value
     
     def validate_email(self, value):
@@ -188,8 +221,70 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             if age > 120:
                 raise serializers.ValidationError("Data de nascimento inválida - idade muito avançada.")
         
+        # Validações para criação de usuário do sistema
+        if attrs.get('create_system_user'):
+            if not attrs.get('system_role'):
+                raise serializers.ValidationError("Papel do sistema é obrigatório quando criar usuário do sistema está marcado.")
+            
+            if not attrs.get('user_email'):
+                raise serializers.ValidationError("E-mail para login é obrigatório quando criar usuário do sistema está marcado.")
+            
+            if not attrs.get('user_password'):
+                raise serializers.ValidationError("Senha inicial é obrigatória quando criar usuário do sistema está marcado.")
+            
+            # Validar se o e-mail já existe (apenas usuários ativos)
+            if User.objects.filter(email=attrs['user_email'], is_active=True).exists():
+                raise serializers.ValidationError("Este e-mail já está sendo usado por outro usuário ativo do sistema.")
+            
+            # Validar senha
+            try:
+                validate_password(attrs['user_password'])
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({"user_password": list(e.messages)})
         
         return attrs
+    
+    def create(self, validated_data):
+        """Criar membro e opcionalmente usuário do sistema"""
+        # Extrair dados do usuário do sistema
+        create_system_user = validated_data.pop('create_system_user', False)
+        system_role = validated_data.pop('system_role', None)
+        user_email = validated_data.pop('user_email', None)
+        user_password = validated_data.pop('user_password', None)
+        
+        # Criar o membro
+        member = super().create(validated_data)
+        
+        # Criar usuário do sistema se solicitado
+        if create_system_user and system_role and user_email and user_password:
+            try:
+                # Criar usuário
+                user = User.objects.create_user(
+                    email=user_email,
+                    password=user_password,
+                    full_name=member.full_name,
+                    phone=member.phone or '',
+                    is_active=True
+                )
+                
+                # Associar usuário ao membro
+                member.user = user
+                member.save()
+                
+                # Criar ChurchUser com o papel especificado
+                ChurchUser.objects.create(
+                    user=user,
+                    church=member.church,
+                    role=system_role,
+                    is_active=True
+                )
+                
+            except Exception as e:
+                # Se houver erro na criação do usuário, deletar o membro criado
+                member.delete()
+                raise serializers.ValidationError(f"Erro ao criar usuário do sistema: {str(e)}")
+        
+        return member
 
 
 class MemberUpdateSerializer(serializers.ModelSerializer):
@@ -211,15 +306,23 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
     
     def validate_cpf(self, value):
         """Validação de CPF na atualização"""
-        if value:
-            # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
-            existing = Member.objects.all().filter(
-                cpf=value,
-                is_active=True
-            ).exclude(pk=self.instance.pk).exists()
+        if not value:
+            raise serializers.ValidationError("CPF é obrigatório.")
             
-            if existing:
-                raise serializers.ValidationError("Este CPF já está cadastrado.")
+        # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
+        existing = Member.objects.all().filter(
+            cpf=value,
+            is_active=True
+        ).exclude(pk=self.instance.pk).exists()
+        
+        if existing:
+            raise serializers.ValidationError("Este CPF já está cadastrado.")
+        return value
+    
+    def validate_phone(self, value):
+        """Validação de telefone na atualização"""
+        if not value:
+            raise serializers.ValidationError("Telefone é obrigatório.")
         return value
     
     def validate_email(self, value):

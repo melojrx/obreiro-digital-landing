@@ -49,8 +49,10 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 
 import { churchService } from '@/services/churchService';
+import { userService, EligibleAdmin } from '@/services/userService';
 import { usePermissions } from '@/hooks/usePermissions';
 import { CreateChurchFormData } from '@/types/hierarchy';
+import RoleExplanationCard from '@/components/ui/role-explanation-card';
 
 // Schema de validação
 const churchFormSchema = z.object({
@@ -95,16 +97,10 @@ const churchFormSchema = z.object({
     .optional()
     .or(z.literal('')),
 
-  // Pastor principal
-  pastor_name: z.string()
-    .min(2, 'Nome do pastor deve ter pelo menos 2 caracteres')
-    .max(150, 'Nome do pastor deve ter no máximo 150 caracteres'),
-  pastor_email: z.string()
-    .email('Email do pastor inválido'),
-  pastor_phone: z.string()
-    .regex(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, 'Formato: (11) 99999-9999')
-    .optional()
-    .or(z.literal('')),
+  // Pastor principal (ID do usuário)
+  main_pastor: z.number()
+    .min(1, 'Selecione um administrador')
+    .optional(),
 
   // Configurações
   subscription_plan: z.string().optional(),
@@ -136,6 +132,8 @@ const CreateChurchPage: React.FC = () => {
     max_branches: number;
     features: string[];
   }>>([]);
+  const [eligibleAdmins, setEligibleAdmins] = useState<EligibleAdmin[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
 
   const form = useForm<ChurchFormData>({
     resolver: zodResolver(churchFormSchema),
@@ -151,9 +149,7 @@ const CreateChurchPage: React.FC = () => {
       state: '',
       zipcode: '',
       cnpj: '',
-      pastor_name: '',
-      pastor_email: '',
-      pastor_phone: '',
+      main_pastor: 0,
       subscription_plan: 'basic',
       max_members: 500,
       max_branches: 5,
@@ -180,6 +176,9 @@ const CreateChurchPage: React.FC = () => {
       
       setAvailableStates(states);
       setSubscriptionPlans(plans);
+      
+      // Carregar administradores elegíveis
+      await loadEligibleAdmins();
     } catch (error) {
       console.error('Erro ao carregar dados auxiliares:', error);
       toast({
@@ -187,6 +186,23 @@ const CreateChurchPage: React.FC = () => {
         description: 'Erro ao carregar dados do formulário. Tente novamente.',
         variant: 'destructive',
       });
+    }
+  };
+
+  const loadEligibleAdmins = async (denominationId?: number) => {
+    try {
+      setLoadingAdmins(true);
+      const response = await userService.getEligibleAdmins(denominationId);
+      setEligibleAdmins(response.results);
+    } catch (error) {
+      console.error('Erro ao carregar administradores:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao carregar lista de administradores.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingAdmins(false);
     }
   };
 
@@ -268,6 +284,28 @@ const CreateChurchPage: React.FC = () => {
     return numbers.replace(/(\d{5})(\d{3})/, '$1-$2');
   };
 
+  const handleZipcodeChange = async (value: string) => {
+    const formatted = formatZipcode(value);
+    form.setValue('zipcode', formatted);
+    
+    // Se CEP está completo, buscar endereço
+    if (formatted.length === 9) {
+      try {
+        const cep = formatted.replace('-', '');
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await response.json();
+        
+        if (!data.erro) {
+          form.setValue('address', data.logradouro || '');
+          form.setValue('city', data.localidade || '');
+          form.setValue('state', data.uf || '');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CEP:', error);
+      }
+    }
+  };
+
   const validateEmailUnique = async (email: string) => {
     if (!email || form.formState.errors.email) return;
     
@@ -310,6 +348,7 @@ const CreateChurchPage: React.FC = () => {
         max_members: data.max_members || 500,
         max_branches: data.max_branches || 5,
         subscription_plan: data.subscription_plan || 'basic',
+        main_pastor: data.main_pastor > 0 ? data.main_pastor : undefined,
       };
 
       const newChurch = await churchService.createChurch(churchData);
@@ -628,8 +667,7 @@ const CreateChurchPage: React.FC = () => {
                             placeholder="12345-678"
                             {...field}
                             onChange={(e) => {
-                              const formatted = formatZipcode(e.target.value);
-                              field.onChange(formatted);
+                              handleZipcodeChange(e.target.value);
                             }}
                           />
                         </FormControl>
@@ -682,75 +720,103 @@ const CreateChurchPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Pastor Principal */}
+            {/* Administrador Principal */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5 text-orange-600" />
-                  Pastor Principal
+                  Administrador Principal
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <FormField
                   control={form.control}
-                  name="pastor_name"
+                  name="main_pastor"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nome Completo *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Pastor João Silva"
-                          {...field}
-                        />
-                      </FormControl>
+                      <FormLabel>Selecionar Administrador</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange(Number(value))} 
+                        value={field.value > 0 ? field.value.toString() : ''}
+                        disabled={loadingAdmins}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um administrador..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {eligibleAdmins.map((admin) => (
+                            <SelectItem key={admin.id} value={admin.id.toString()}>
+                              <div className="flex items-center gap-3 w-full">
+                                {admin.avatar && (
+                                  <img 
+                                    src={admin.avatar} 
+                                    alt={admin.full_name}
+                                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                  />
+                                )}
+                                <div className="flex flex-col flex-1 min-w-0">
+                                  <span className="font-medium truncate">{admin.full_name}</span>
+                                  <span className="text-xs text-gray-500 truncate">{admin.email}</span>
+                                  
+                                  {/* Papéis de Sistema */}
+                                  {admin.current_system_roles && admin.current_system_roles.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      <span className="text-xs text-blue-600 font-medium">Sistema:</span>
+                                      {admin.current_system_roles.map((role, idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                          {role.role_display}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Função Ministerial */}
+                                  {admin.ministerial_function_display && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <span className="text-xs text-green-600 font-medium">Ministério:</span>
+                                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                        {admin.ministerial_function_display}
+                                      </Badge>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Explicação se não tem papéis */}
+                                  {(!admin.current_system_roles || admin.current_system_roles.length === 0) && !admin.ministerial_function_display && (
+                                    <span className="text-xs text-gray-400 mt-1">Usuário sem papéis definidos</span>
+                                  )}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Selecione o usuário que será o administrador principal desta igreja.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="pastor_email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="email"
-                            placeholder="pastor@igreja.com"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="pastor_phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Telefone</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="(11) 99999-9999"
-                            {...field}
-                            onChange={(e) => {
-                              const formatted = formatPhone(e.target.value);
-                              field.onChange(formatted);
-                            }}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Telefone do pastor (opcional)
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                
+                {loadingAdmins && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando administradores...
+                  </div>
+                )}
+                
+                {!loadingAdmins && eligibleAdmins.length === 0 && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Nenhum usuário elegível encontrado. Certifique-se de que existem usuários com papéis de liderança na denominação.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                <RoleExplanationCard />
               </CardContent>
             </Card>
 

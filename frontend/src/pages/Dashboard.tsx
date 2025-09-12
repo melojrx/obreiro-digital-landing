@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { api } from '@/config/api';
+import { useMainDashboard } from '@/hooks/useDashboard';
+import { useActivities } from '@/hooks/useActivities';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { RecentActivities } from '@/components/dashboard/RecentActivities';
@@ -12,40 +13,23 @@ import { VisitorStats } from '@/components/dashboard/VisitorStats';
 import { RecentVisitors } from '@/components/dashboard/RecentVisitors';
 import { Users, UserPlus, Calendar, DollarSign } from 'lucide-react';
 
-interface DashboardData {
-    members: { total: number; change: number };
-    visitors: { total: number; change: number };
-    events: { total: number; change: number };
-    tithes: { total: number; change: number };
-}
-
 const Dashboard = () => {
     const { user } = useAuth();
     const location = useLocation();
     const { toast } = useToast();
-    const [data, setData] = useState<DashboardData | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const { data, isLoading, error } = useMainDashboard();
+    const { data: activities = [], isLoading: activitiesLoading } = useActivities({});
 
     useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                setIsLoading(true);
-                const response = await api.get('/churches/main-dashboard/');
-                setData(response.data);
-            } catch (error) {
-                console.error("Erro ao buscar dados do dashboard:", error);
-                toast({
-                    title: "Erro",
-                    description: "Não foi possível carregar os dados do dashboard.",
-                    variant: "destructive",
-                });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchDashboardData();
-    }, [toast]);
+        if (error) {
+            console.error("Erro ao buscar dados do dashboard:", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível carregar os dados do dashboard.",
+                variant: "destructive",
+            });
+        }
+    }, [error, toast]);
 
     useEffect(() => {
         if (location.state?.successMessage) {
@@ -95,11 +79,11 @@ const Dashboard = () => {
                         color="bg-gradient-to-r from-green-500 to-emerald-400"
                     />
                     <StatsCard
-                        title="Eventos Ativos"
-                        value={data?.events.total ?? 0}
-                        change={data?.events.change}
+                        title="Atividades"
+                        value={activities.length}
+                        change={undefined}
                         icon={<Calendar className="h-5 w-5" />}
-                        isLoading={isLoading}
+                        isLoading={activitiesLoading}
                         color="bg-gradient-to-r from-yellow-500 to-amber-400"
                     />
                     <StatsCard

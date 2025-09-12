@@ -36,10 +36,15 @@ class MemberViewSet(viewsets.ModelViewSet):
         # Filtrar apenas membros da igreja do usuário logado
         queryset = Member.objects.select_related('church', 'spouse', 'responsible')
         
-        # Se o usuário tiver vínculo com igreja, filtrar por ela
-        if hasattr(self.request.user, 'church_users') and self.request.user.church_users.exists():
-            church_user = self.request.user.church_users.first()
-            queryset = queryset.filter(church=church_user.church)
+        # Usar igreja ativa do usuário
+        from apps.accounts.models import ChurchUser
+        active_church = ChurchUser.objects.get_active_church_for_user(self.request.user)
+        
+        if active_church:
+            queryset = queryset.filter(church=active_church)
+        else:
+            # Se não tem igreja ativa, retornar queryset vazio
+            queryset = queryset.none()
         
         # Filtrar apenas membros ativos por padrão
         if self.action != 'all':
@@ -48,15 +53,16 @@ class MemberViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        """Ao criar, associar à igreja do usuário"""
-        if hasattr(self.request.user, 'church_users') and self.request.user.church_users.exists():
-            church_user = self.request.user.church_users.first()
-            serializer.save(church=church_user.church)
+        """Ao criar, associar à igreja ativa do usuário"""
+        from apps.accounts.models import ChurchUser
+        from django.core.exceptions import ValidationError
+        
+        active_church = ChurchUser.objects.get_active_church_for_user(self.request.user)
+        
+        if active_church:
+            serializer.save(church=active_church)
         else:
-            # Se não tiver igreja, usar a primeira disponível (fallback)
-            from apps.churches.models import Church
-            church = Church.objects.first()
-            serializer.save(church=church)
+            raise ValidationError("Usuário não tem igreja ativa configurada")
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""
@@ -319,39 +325,45 @@ class MemberViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def leaders(self, request):
         """
-        Buscar membros que podem ser líderes de ministérios.
-        Filtra por funções ministeriais adequadas para liderança.
+        Buscar todos os membros da igreja que podem ser líderes de ministérios.
+        Qualquer membro pode ser líder de ministério.
         """
-        # Funções que podem liderar ministérios
-        leader_functions = ['leader', 'pastor', 'elder', 'deacon', 'deaconess']
+        from apps.accounts.models import ChurchUser
         
-        queryset = self.get_queryset().filter(
-            ministerial_function__in=leader_functions,
-            is_active=True
+        # Obter igreja ativa do usuário
+        active_church = ChurchUser.objects.get_active_church_for_user(request.user)
+        if not active_church:
+            return Response({'error': 'Usuário não tem igreja ativa configurada'}, status=400)
+        
+        church = active_church
+        
+        # Buscar todos os membros ativos da igreja que têm User associado
+        members_queryset = self.get_queryset().filter(
+            is_active=True,
+            church=church,
+            user__isnull=False  # Apenas membros com User associado
         )
         
         # Aplicar filtro de busca se fornecido
-        search = request.query_params.get('search')
+        search = request.query_params.get('search', '').strip()
         if search:
-            queryset = queryset.filter(
+            members_queryset = members_queryset.filter(
                 Q(full_name__icontains=search) |
                 Q(email__icontains=search)
             )
         
-        # Ordenar por nome
-        queryset = queryset.order_by('full_name')
-        
-        # Serializar apenas dados essenciais para o select
-        data = [
-            {
-                'id': member.id,
+        # Preparar dados
+        data = []
+        for member in members_queryset.order_by('full_name'):
+            data.append({
+                'id': member.user.id,  # User ID para o campo leader do Ministry
                 'name': member.full_name,
-                'role': member.get_ministerial_function_display(),
-                'ministerial_function': member.ministerial_function,
-                'email': member.email
-            }
-            for member in queryset
-        ]
+                'role': member.get_ministerial_function_display() or 'Membro',
+                'type': 'member',
+                'email': member.email,
+                'source': 'Member',
+                'member_id': member.id
+            })
         
         return Response({
             'count': len(data),

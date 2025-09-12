@@ -216,12 +216,14 @@ export interface CreateChurchFormData {
   state: string;
   zipcode: string;
   cnpj?: string;
-  pastor_name: string;
-  pastor_email: string;
-  pastor_phone?: string;
+  main_pastor?: number; // ID do usuário que será o administrador principal
   max_members?: number;
   max_branches?: number;
   subscription_plan?: string;
+  // Novos campos para delegação e status
+  is_active?: boolean;
+  responsible_member_id?: number; // ID do membro que será responsável
+  set_as_active_church?: boolean; // Se deve definir como igreja ativa do usuário atual
 }
 
 export interface CreateBranchFormData {

@@ -23,13 +23,14 @@ import {
   Ministry 
 } from '@/services/activityService';
 import { useAuth } from '@/hooks/useAuth';
+import { useActiveChurch } from '@/hooks/useActiveChurch';
 
 // Schema de validação
 const activityFormSchema = z.object({
   name: z.string().min(1, 'Nome da atividade é obrigatório').max(200, 'Nome muito longo'),
   description: z.string().optional(),
-  ministry_id: z.number().min(1, 'Selecione um ministério'),
-  branch_id: z.number().min(1, 'Selecione uma filial'),
+  ministry_id: z.number().min(1, 'Selecione um ministério').default(1),
+  branch_id: z.number().min(1, 'Selecione uma filial').default(1),
   activity_type: z.string().min(1, 'Selecione o tipo de atividade'),
   start_date: z.date({ required_error: 'Data de início é obrigatória' }),
   start_time: z.string().min(1, 'Horário de início é obrigatório'),
@@ -74,17 +75,21 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
   branches = [],
   isLoading = false,
 }) => {
-  const { userChurch } = useAuth();
-  const currentChurch = userChurch?.church;
+  const { user } = useAuth();
+  const { data: activeChurchData } = useActiveChurch();
+  const currentChurch = activeChurchData?.active_church;
   const isEditing = !!activity;
+  
+  console.log('🔍 ActivityForm - activeChurchData:', activeChurchData);
+  console.log('🔍 ActivityForm - currentChurch:', currentChurch);
 
   const form = useForm<ActivityFormData>({
     resolver: zodResolver(activityFormSchema),
     defaultValues: {
       name: '',
       description: '',
-      ministry_id: 0,
-      branch_id: 0,
+      ministry_id: ministries.length > 0 ? ministries[0].id : 1,
+      branch_id: branches.length > 0 ? branches[0].id : 1,
       activity_type: 'worship',
       start_date: new Date(),
       start_time: '19:00',
@@ -132,7 +137,15 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
   }, [activity, isOpen, isEditing, form]);
 
   const handleSubmit = (data: ActivityFormData) => {
-    if (!currentChurch) return;
+    console.log('🔍 ActivityForm handleSubmit - data recebida:', data);
+    console.log('🔍 ActivityForm handleSubmit - currentChurch:', currentChurch);
+    console.log('🔍 ActivityForm handleSubmit - ministries:', ministries);
+    console.log('🔍 ActivityForm handleSubmit - branches:', branches);
+    
+    if (!currentChurch) {
+      console.error('❌ Igreja atual não encontrada');
+      return;
+    }
 
     // Combinar data e hora
     const startDateTime = new Date(`${format(data.start_date, 'yyyy-MM-dd')}T${data.start_time}`);
@@ -140,8 +153,8 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
 
     const activityData: CreateActivityData = {
       church: currentChurch.id,
-      branch: data.branch_id,
-      ministry: data.ministry_id,
+      branch: data.branch_id || branches[0]?.id || 1,
+      ministry: data.ministry_id || ministries[0]?.id || 1,
       name: data.name,
       description: data.description || '',
       activity_type: data.activity_type,
@@ -157,6 +170,7 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
       notes: data.notes || '',
     };
 
+    console.log('📤 ActivityForm - Dados finais enviados:', activityData);
     onSubmit(activityData);
   };
 
