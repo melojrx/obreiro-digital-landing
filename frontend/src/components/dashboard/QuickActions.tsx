@@ -22,10 +22,10 @@ const actions = [
     link: '/pedidos-oracao'
   },
   {
-    label: 'Criar um novo evento',
+    label: 'Criar nova atividade',
     icon: CalendarPlus,
     color: 'from-green-500 to-emerald-500',
-    link: '/events/new'
+    link: '/atividades'
   },
 ];
 

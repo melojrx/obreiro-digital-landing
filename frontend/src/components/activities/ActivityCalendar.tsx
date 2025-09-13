@@ -115,13 +115,52 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
     return format(parseISO(datetime), 'HH:mm', { locale: ptBR });
   };
 
-  // Get ministry color
-  const getMinistryColor = (activity: Activity | PublicActivity) => {
-    if ('ministry_color' in activity) {
+  // Color mapping for different activity types
+  const activityTypeColors = {
+    'culto': '#8b5cf6', // purple
+    'reuniao': '#06b6d4', // cyan
+    'evento': '#10b981', // emerald
+    'conferencia': '#f59e0b', // amber
+    'ensaio': '#ec4899', // pink
+    'estudo': '#3b82f6', // blue
+    'evangelismo': '#ef4444', // red
+    'jejum': '#6b7280', // gray
+    'default': '#3b82f6'
+  };
+
+  // Get activity color based on type and ministry
+  const getActivityColor = (activity: Activity | PublicActivity) => {
+    // Priority 1: Ministry color if available
+    if ('ministry_color' in activity && activity.ministry_color) {
       return activity.ministry_color;
     }
-    return '#3b82f6'; // fallback color
+    
+    // Priority 2: Activity type color
+    const activityType = activity.activity_type?.toLowerCase() || 'default';
+    return activityTypeColors[activityType as keyof typeof activityTypeColors] || activityTypeColors.default;
   };
+
+  // Get unique activity types with colors for legend
+  const activityTypesLegend = useMemo(() => {
+    const typesMap = new Map<string, { color: string; count: number }>();
+    
+    activities.forEach(activity => {
+      const type = activity.activity_type_display || 'Outros';
+      const color = getActivityColor(activity);
+      
+      if (typesMap.has(type)) {
+        typesMap.get(type)!.count += 1;
+      } else {
+        typesMap.set(type, { color, count: 1 });
+      }
+    });
+    
+    return Array.from(typesMap.entries()).map(([type, data]) => ({
+      type,
+      color: data.color,
+      count: data.count
+    }));
+  }, [activities]);
 
   // Custom day content for calendar
   const renderDayContent = (date: Date) => {
@@ -138,12 +177,12 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
             {dayActivities.slice(0, 3).map((activity, index) => (
               <div
                 key={index}
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: getMinistryColor(activity) }}
+                className="w-2 h-2 rounded-full shadow-sm"
+                style={{ backgroundColor: getActivityColor(activity) }}
               />
             ))}
             {dayActivities.length > 3 && (
-              <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+              <div className="w-2 h-2 rounded-full bg-gray-400 shadow-sm" />
             )}
           </div>
         )}
@@ -226,7 +265,13 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
                   modifiersStyles={{
                     hasActivities: {
                       fontWeight: 'bold',
+                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                      borderRadius: '6px',
+                      border: '2px solid rgba(59, 130, 246, 0.3)'
                     }
+                  }}
+                  components={{
+                    DayContent: ({ date }) => renderDayContent(date)
                   }}
                 />
               ) : (
@@ -244,8 +289,8 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
                           onClick={() => handleActivityClick(activity)}
                         >
                           <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: getMinistryColor(activity) }}
+                            className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm"
+                            style={{ backgroundColor: getActivityColor(activity) }}
                           />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{activity.name}</p>
@@ -266,8 +311,33 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
           </Card>
         </div>
 
-        {/* Selected Date Activities */}
-        <div>
+        {/* Selected Date Activities and Legend */}
+        <div className="space-y-4">
+          {/* Activity Types Legend */}
+          {activityTypesLegend.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Legenda por Tipo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-2">
+                  {activityTypesLegend.map((item) => (
+                    <div key={item.type} className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full shadow-sm flex-shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-xs font-medium flex-1">{item.type}</span>
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                        {item.count}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">
@@ -290,8 +360,8 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
                       >
                         <div className="flex items-start gap-2">
                           <div
-                            className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
-                            style={{ backgroundColor: getMinistryColor(activity) }}
+                            className="w-3 h-3 rounded-full mt-1 flex-shrink-0 shadow-sm"
+                            style={{ backgroundColor: getActivityColor(activity) }}
                           />
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium text-sm leading-tight mb-1">
@@ -337,8 +407,8 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: getMinistryColor(detailsDialog.activity) }}
+                  className="w-3 h-3 rounded-full shadow-sm"
+                  style={{ backgroundColor: getActivityColor(detailsDialog.activity) }}
                 />
                 <span className="font-medium">{detailsDialog.activity.ministry_name}</span>
               </div>

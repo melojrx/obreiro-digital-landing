@@ -526,24 +526,34 @@ export const usePermissions = (): UserPermissions => {
       // Debug temporário
       console.log('🔍 usePermissions - userChurch.role:', userChurch.role);
       console.log('🔍 usePermissions - role (uppercase):', role);
+      console.log('🔍 usePermissions - userChurch full object:', userChurch);
       
       // Mapear roles do backend para permissões do frontend
+      // Backend usa underscore (denomination_admin) -> Frontend usa uppercase (DENOMINATION_ADMIN)
       switch (role) {
         case 'DENOMINATION_ADMIN':
+          console.log('🔍 usePermissions - Matched DENOMINATION_ADMIN');
           return ROLE_PERMISSIONS.DENOMINATION_ADMIN;
         case 'CHURCH_ADMIN':
+          console.log('🔍 usePermissions - Matched CHURCH_ADMIN');
           return ROLE_PERMISSIONS.CHURCH_ADMIN;
         case 'BRANCH_MANAGER':
+          console.log('🔍 usePermissions - Matched BRANCH_MANAGER');
           return ROLE_PERMISSIONS.BRANCH_MANAGER;
         case 'PASTOR':
+          console.log('🔍 usePermissions - Matched PASTOR');
           return ROLE_PERMISSIONS.PASTOR;
         case 'SECRETARY':
+          console.log('🔍 usePermissions - Matched SECRETARY');
           return ROLE_PERMISSIONS.SECRETARY;
         case 'LEADER':
+          console.log('🔍 usePermissions - Matched LEADER');
           return ROLE_PERMISSIONS.LEADER;
         case 'MEMBER':
+          console.log('🔍 usePermissions - Matched MEMBER');
           return ROLE_PERMISSIONS.MEMBER;
         default:
+          console.log('🔍 usePermissions - No match found, defaulting to MEMBER. Role was:', role);
           return ROLE_PERMISSIONS.MEMBER; // Default para member
       }
     }

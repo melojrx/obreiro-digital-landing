@@ -28,5 +28,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/melojrx/obreiro-digital-landing.git"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.55.0"
   }
-} 
+}

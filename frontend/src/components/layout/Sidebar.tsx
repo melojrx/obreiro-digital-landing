@@ -47,8 +47,9 @@ const Sidebar: React.FC = () => {
   console.log('🔍 Sidebar - user:', user?.email);
   console.log('🔍 Sidebar - userChurch:', userChurch);
   console.log('🔍 Sidebar - activeChurch:', activeChurch);
-  console.log('🔍 Sidebar - permissions.canManageDenomination:', permissions.canManageDenomination);
+  console.log('🔍 Sidebar - permissions.canViewHierarchyMenu:', permissions.canViewHierarchyMenu);
   console.log('🔍 Sidebar - permissions.canCreateChurches:', permissions.canCreateChurches);
+  console.log('🔍 Sidebar - permissions.canManageDenomination:', permissions.canManageDenomination);
 
   const navigation: NavItem[] = [
     {
