@@ -23,7 +23,7 @@ O sistema segue uma arquitetura multi-tenant onde:
 - **Uso**: Manutenção técnica, suporte, configurações globais, dashboard de faturamento
 - **⚠️ IMPORTANTE**: Este papel **NUNCA** pode ser atribuído via cadastro normal da aplicação
 
-### 2. **Denomination Admin (Administrador de Denominação)**
+### 2. **Church Admin (Administrador da Igrea/Igrejas dentro so Sistema)**
 - **Escopo**: Todas as igrejas de uma denominação
 - **Descrição**: Usuário que criou e paga pela conta da denominação
 - **Acesso**: Gestão completa de todas as igrejas sob sua denominação
@@ -33,7 +33,7 @@ O sistema segue uma arquitetura multi-tenant onde:
   - Visão consolidada de relatórios
   - Gerenciar assinaturas e pagamentos
 
-### 3. **Church Admin (Administrador de Igreja)**
+### 3. **Church Manager Admin (Administrador de Igreja)**
 - **Escopo**: Uma igreja específica e suas filiais
 - **Descrição**: Administrador designado para gerenciar uma igreja
 - **Acesso**: Gestão completa da igreja e todas as suas filiais
@@ -561,5 +561,6 @@ python manage.py create_platform_admin \
 - Configura automaticamente como `is_superuser=True`
 
 ---
+
 
 Esta documentação serve como guia completo para implementar e manter o sistema de permissões do Obreiro Virtual, garantindo segurança, escalabilidade e facilidade de manutenção. 
