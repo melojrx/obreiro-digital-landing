@@ -21,7 +21,7 @@ from .serializers import (
     ChurchDetailSerializer
 )
 from apps.core.permissions import (
-    IsChurchAdmin, IsDenominationAdmin, IsPlatformAdmin,
+    IsChurchAdmin, IsPlatformAdmin,
     CanCreateChurches, CanManageChurchAdmins
 )
 
@@ -160,7 +160,8 @@ class ChurchViewSet(viewsets.ModelViewSet):
         elif self.action in ['update', 'partial_update']:
             permission_classes = [permissions.IsAuthenticated, IsChurchAdmin]
         elif self.action == 'destroy':
-            permission_classes = [permissions.IsAuthenticated, IsDenominationAdmin]
+            # Apenas Church Admins podem deletar igrejas
+            permission_classes = [permissions.IsAuthenticated, IsChurchAdmin]
         elif self.action in ['assign_admin', 'remove_admin']:
             permission_classes = [permissions.IsAuthenticated, CanManageChurchAdmins]
         else:
@@ -942,8 +943,8 @@ class ChurchViewSet(viewsets.ModelViewSet):
         denomination_id = request.query_params.get('denomination_id')
         if denomination_id:
             eligible_users = eligible_users.filter(
-                models.Q(church_users__church__denomination_id=denomination_id) |
-                models.Q(church_users__isnull=True)
+                Q(church_users__church__denomination_id=denomination_id) |
+                Q(church_users__isnull=True)
             ).distinct()
         
         # Serializar dados dos usuários
@@ -1009,8 +1010,8 @@ class ChurchViewSet(viewsets.ModelViewSet):
         
         if church.denomination:
             eligible_users = eligible_users.filter(
-                models.Q(church_users__church__denomination=church.denomination) |
-                models.Q(church_users__isnull=True)
+                Q(church_users__church__denomination=church.denomination) |
+                Q(church_users__isnull=True)
             ).distinct()
         
         users_data = []
@@ -1075,7 +1076,7 @@ class DenominationChurchViewSet(viewsets.ReadOnlyModelViewSet):
     """
     
     serializer_class = ChurchListSerializer
-    permission_classes = [permissions.IsAuthenticated, IsDenominationAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsChurchAdmin]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ChurchFilter
     search_fields = ['name', 'short_name', 'city', 'state', 'email']

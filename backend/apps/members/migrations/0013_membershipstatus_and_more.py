@@ -28,6 +28,7 @@ class Migration(migrations.Migration):
                 ('ordination_date', models.DateField(blank=True, help_text='Data de início do status', null=True, verbose_name='Data de Ordenação')),
                 ('termination_date', models.DateField(blank=True, help_text='Data de fim do status (vazio se ainda ativo)', null=True, verbose_name='Data de Término')),
                 ('observation', models.TextField(blank=True, help_text='Observações sobre este status', verbose_name='Observações')),
+                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='membership_statuses', to='members.member', verbose_name='Membro')),
             ],
             options={
                 'verbose_name': 'Status de Membresia',
@@ -35,79 +36,6 @@ class Migration(migrations.Migration):
                 'ordering': ['-ordination_date', '-created_at'],
             },
         ),
-        # Add missing fields first
-        migrations.AddField(
-            model_name='member',
-            name='conversion_date',
-            field=models.DateField(blank=True, help_text='Data da conversão/aceitação de Jesus', null=True, verbose_name='Data de Conversão'),
-        ),
-        migrations.AddField(
-            model_name='member',
-            name='ministerial_function',
-            field=models.CharField(
-                blank=True,
-                choices=[('member', 'Membro'), ('deacon', 'Diácono'), ('deaconess', 'Diaconisa'), ('elder', 'Presbítero'), ('evangelist', 'Evangelista'), ('pastor', 'Pastor'), ('missionary', 'Missionário'), ('leader', 'Líder'), ('cooperator', 'Cooperador'), ('auxiliary', 'Auxiliar')],
-                default='member',
-                help_text='Função/cargo ministerial',
-                max_length=100,
-                verbose_name='Função Ministerial'
-            ),
-        ),
-        migrations.AddField(
-            model_name='member',
-            name='ordination_date',
-            field=models.DateField(blank=True, help_text='Data de ordenação ministerial (se aplicável)', null=True, verbose_name='Data de Ordenação'),
-        ),
-        migrations.AddField(
-            model_name='member',
-            name='membership_status',
-            field=models.CharField(
-                choices=[('active', 'Ativo'), ('inactive', 'Inativo'), ('transferred', 'Transferido'), ('disciplined', 'Disciplinado'), ('deceased', 'Falecido')],
-                default='active',
-                help_text='Status atual de membresia',
-                max_length=20,
-                verbose_name='Status de Membresia'
-            ),
-        ),
-        
-        # Remove old spouse fields
-        migrations.RemoveField(
-            model_name='member',
-            name='spouse_is_member',
-        ),
-        migrations.RemoveField(
-            model_name='member',
-            name='spouse_member',
-        ),
-        migrations.RemoveField(
-            model_name='member',
-            name='spouse_name',
-        ),
-        migrations.AddField(
-            model_name='member',
-            name='spouse',
-            field=models.ForeignKey(blank=True, help_text='Cônjuge (se for membro da igreja)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='spouse_of', to='members.member', verbose_name='Cônjuge'),
-        ),
-        migrations.AlterField(
-            model_name='membershipstatuslog',
-            name='new_status',
-            field=models.CharField(help_text='Novo status do membro', max_length=20, verbose_name='Novo Status'),
-        ),
-        migrations.AlterField(
-            model_name='membershipstatuslog',
-            name='old_status',
-            field=models.CharField(help_text='Status anterior do membro', max_length=20, verbose_name='Status Anterior'),
-        ),
-        migrations.AddIndex(
-            model_name='member',
-            index=models.Index(fields=['conversion_date'], name='members_mem_convers_b48af6_idx'),
-        ),
-        migrations.AddField(
-            model_name='membershipstatus',
-            name='member',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='membership_statuses', to='members.member', verbose_name='Membro'),
-        ),
-        # Skip deleting non-existent model
         migrations.AddIndex(
             model_name='membershipstatus',
             index=models.Index(fields=['member', '-ordination_date'], name='members_mem_member__cba717_idx'),

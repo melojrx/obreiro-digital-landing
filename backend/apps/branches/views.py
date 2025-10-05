@@ -50,8 +50,8 @@ class BranchViewSet(viewsets.ModelViewSet):
                 if not church_user.church:
                     continue
                     
-                # Denomination Admin: vê filiais de todas as igrejas da denominação
-                if church_user.role == RoleChoices.DENOMINATION_ADMIN:
+                # Church Admin: vê filiais de todas as igrejas da denominação (se houver)
+                if church_user.role == RoleChoices.CHURCH_ADMIN:
                     if church_user.church.denomination:
                         # Adicionar todas as igrejas da denominação
                         from apps.churches.models import Church
@@ -64,7 +64,7 @@ class BranchViewSet(viewsets.ModelViewSet):
                         # Se não tem denominação, adicionar apenas sua igreja
                         accessible_churches.add(church_user.church.id)
                 else:
-                    # Church Admin e outros: adicionar apenas sua igreja específica
+                    # Outros papéis: adicionar apenas sua igreja específica
                     accessible_churches.add(church_user.church.id)
             
             # Retornar filiais de todas as igrejas acessíveis

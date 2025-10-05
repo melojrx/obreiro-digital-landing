@@ -23,27 +23,21 @@ O sistema segue uma arquitetura multi-tenant onde:
 - **Uso**: Manutenção técnica, suporte, configurações globais, dashboard de faturamento
 - **⚠️ IMPORTANTE**: Este papel **NUNCA** pode ser atribuído via cadastro normal da aplicação
 
-### 2. **Church Admin (Administrador da Igrea/Igrejas dentro so Sistema)**
-- **Escopo**: Todas as igrejas de uma denominação
-- **Descrição**: Usuário que criou e paga pela conta da denominação
-- **Acesso**: Gestão completa de todas as igrejas sob sua denominação
+### 2. **Church Admin (Administrador da Igreja/Igrejas dentro do Sistema)**
+- **Escopo**: Todas as igrejas de uma denominação ou igreja específica
+- **Descrição**: Usuário que criou e paga pela conta da denominação/igreja
+- **Acesso**: Gestão completa de todas as igrejas sob sua denominação (se aplicável) ou da igreja específica
 - **Responsabilidades**:
-  - Criar e gerenciar igrejas
-  - Definir administradores de igreja
-  - Visão consolidada de relatórios
-  - Gerenciar assinaturas e pagamentos
-
-### 3. **Church Manager Admin (Administrador de Igreja)**
-- **Escopo**: Uma igreja específica e suas filiais
-- **Descrição**: Administrador designado para gerenciar uma igreja
-- **Acesso**: Gestão completa da igreja e todas as suas filiais
-- **Responsabilidades**:
+  - Criar e gerenciar igrejas (no caso de denominações)
   - Gerenciar membros e visitantes
   - Criar e administrar filiais
-  - Definir líderes e responsáveis
+  - Definir líderes e responsáveis (Branch Managers)
   - Configurar atividades e ministérios
+  - Visão consolidada de relatórios
+  - Gerenciar assinaturas e pagamentos
+- **Nota**: Este papel **substitui** o antigo `DENOMINATION_ADMIN`, centralizando a administração de igrejas
 
-### 4. **Branch Manager (Gestor de Filial)**
+### 3. **Branch Manager (Gestor de Filial)**
 - **Escopo**: Filiais específicas atribuídas
 - **Descrição**: Responsável por uma ou mais filiais específicas
 - **Acesso**: Gestão limitada às filiais designadas
@@ -53,7 +47,7 @@ O sistema segue uma arquitetura multi-tenant onde:
   - Organizar atividades locais
   - Relatórios da filial
 
-### 5. **Member User (Usuário Membro)**
+### 4. **Member User (Usuário Membro)**
 - **Escopo**: Dados da própria igreja
 - **Descrição**: Membro comum com acesso ao sistema
 - **Acesso**: Visualização de dados gerais da igreja
@@ -62,7 +56,7 @@ O sistema segue uma arquitetura multi-tenant onde:
   - Acessar calendário de atividades
   - Atualizar dados pessoais
 
-### 6. **Visitor (Visitante)**
+### 5. **Visitor (Visitante)**
 - **Escopo**: Dados próprios e atividades públicas
 - **Descrição**: Pessoa que visitou a igreja via QR Code
 - **Acesso**: Muito limitado, apenas dados próprios
@@ -95,23 +89,15 @@ class IsPlatformAdmin(BasePermission):
 - **Verificação**: `is_superuser` OU role `SUPER_ADMIN`
 - **Aplicação**: Endpoints de administração da plataforma SaaS
 
-#### `IsDenominationAdmin`
-```python
-class IsDenominationAdmin(BasePermission):
-    """Permite acesso a administradores de denominação."""
-```
-- **Uso**: Gestão de múltiplas igrejas
-- **Verificação**: Role `DENOMINATION_ADMIN` em qualquer ChurchUser
-- **Aplicação**: CRUD de igrejas, relatórios consolidados
-
 #### `IsChurchAdmin`
 ```python
 class IsChurchAdmin(BasePermission):
-    """Permite acesso a administradores de igreja específica."""
+    """Permite acesso a administradores de igreja(s)."""
 ```
-- **Uso**: Gestão completa de uma igreja
-- **Verificação**: Role `CHURCH_ADMIN` ou `DENOMINATION_ADMIN` na igreja do objeto
-- **Aplicação**: CRUD de membros, filiais, atividades
+- **Uso**: Gestão completa de uma ou múltiplas igrejas (dependendo do contexto)
+- **Verificação**: Role `CHURCH_ADMIN` na igreja do objeto
+- **Aplicação**: CRUD de membros, filiais, atividades, gestão de múltiplas igrejas
+- **Nota**: **Substitui** o antigo `IsDenominationAdmin`, centralizando toda gestão de igrejas
 
 #### `IsBranchManager`
 ```python
@@ -137,13 +123,12 @@ class IsMemberUser(BasePermission):
 
 ### Papéis de Sistema (Permissões)
 Controlam **o que o usuário pode fazer no sistema**:
-- `SUPER_ADMIN`
-- `DENOMINATION_ADMIN`
-- `CHURCH_ADMIN`
-- `PASTOR`
-- `SECRETARY`
-- `LEADER`
-- `MEMBER`
+- `SUPER_ADMIN` - Administrador da plataforma (desenvolvedores/donos)
+- `CHURCH_ADMIN` - Administrador de igreja(s) e denominação
+- `PASTOR` - Pastor com permissões específicas
+- `SECRETARY` - Secretário com permissões administrativas limitadas
+- `LEADER` - Líder de ministério ou departamento
+- `MEMBER` - Membro comum
 
 ### Papéis Funcionais (Ministeriais)
 Descrevem **a função na igreja** (campo `ministerial_function` no modelo Member):
@@ -258,27 +243,39 @@ class MemberViewSet(viewsets.ModelViewSet):
         return self.request.user.church_users.first().church
 ```
 
-#### 2. **Gestão de Igrejas (Denominação)**
+#### 2. **Gestão de Igrejas (Church Admin com Múltiplas Igrejas)**
 ```python
 class ChurchViewSet(viewsets.ModelViewSet):
     serializer_class = ChurchSerializer
-    permission_classes = [IsDenominationAdmin]
+    permission_classes = [IsChurchAdmin]
     
     def get_queryset(self):
-        # Apenas igrejas da denominação do admin
-        user_church = self.request.user.church_users.get(
-            role=RoleChoices.DENOMINATION_ADMIN
-        ).church
-        return Church.objects.filter(
-            denomination=user_church.denomination
-        )
+        # Church Admin pode gerenciar múltiplas igrejas da sua denominação
+        user = self.request.user
+        
+        # Buscar todas as igrejas onde o usuário é CHURCH_ADMIN
+        church_admins = user.church_users.filter(role=RoleChoices.CHURCH_ADMIN)
+        
+        # Se tem denominação, retorna todas as igrejas da denominação
+        churches_with_denomination = Church.objects.filter(
+            denomination__in=church_admins.values_list('church__denomination', flat=True)
+        ).distinct()
+        
+        # Senão, retorna apenas a igreja específica
+        return churches_with_denomination | Church.objects.filter(
+            id__in=church_admins.values_list('church_id', flat=True)
+        ).distinct()
     
     def perform_create(self, serializer):
-        # Associar nova igreja à denominação
-        user_church = self.request.user.church_users.get(
-            role=RoleChoices.DENOMINATION_ADMIN
-        ).church
-        serializer.save(denomination=user_church.denomination)
+        # Associar nova igreja à denominação do Church Admin
+        user_church = self.request.user.church_users.filter(
+            role=RoleChoices.CHURCH_ADMIN
+        ).first().church
+        
+        if user_church.denomination:
+            serializer.save(denomination=user_church.denomination)
+        else:
+            serializer.save()
 ```
 
 #### 3. **Gestão de Filiais**
@@ -292,7 +289,7 @@ class BranchViewSet(viewsets.ModelViewSet):
         
         # Se não é admin da igreja, filtrar apenas filiais gerenciadas
         church_user = self.request.user.church_users.get(church=church)
-        if church_user.role not in [RoleChoices.CHURCH_ADMIN, RoleChoices.DENOMINATION_ADMIN]:
+        if church_user.role != RoleChoices.CHURCH_ADMIN:
             if church_user.can_manage_branches:
                 queryset = queryset.filter(
                     id__in=church_user.managed_branches.values_list('id', flat=True)
@@ -324,7 +321,7 @@ class VisitorViewSet(viewsets.ModelViewSet):
         
         # Filtrar por filiais se usuário não é admin
         church_user = self.request.user.church_users.get(church=church)
-        if church_user.role not in [RoleChoices.CHURCH_ADMIN, RoleChoices.DENOMINATION_ADMIN]:
+        if church_user.role != RoleChoices.CHURCH_ADMIN:
             if church_user.can_manage_visitors:
                 managed_branches = church_user.managed_branches.all()
                 queryset = queryset.filter(branch__in=managed_branches)
@@ -417,25 +414,22 @@ def get_permissions(self):
 
 ## Casos de Uso Comuns
 
-### 1. **Dashboard do Denomination Admin**
-- Ver estatísticas de todas as igrejas
-- Criar novas igrejas
-- Designar admins de igreja
-- Relatórios consolidados
+### 1. **Dashboard do Church Admin**
+- Ver estatísticas de todas as igrejas (se gerencia múltiplas) ou da igreja específica
+- Criar novas igrejas (se gerencia denominação)
+- Designar gestores de filiais (Branch Managers)
+- Gerenciar membros, visitantes e atividades
+- Criar e configurar filiais
+- Relatórios consolidados e individuais
+- Gerenciar assinaturas e pagamentos
 
-### 2. **Dashboard do Church Admin**
-- Gerenciar membros e visitantes
-- Criar filiais
-- Configurar atividades
-- Relatórios da igreja
-
-### 3. **Dashboard do Branch Manager**
+### 2. **Dashboard do Branch Manager**
 - Acompanhar visitantes da filial
 - Gerenciar atividades locais
 - Relatórios de conversão
 - Follow-up de visitantes
 
-### 4. **Área do Member User**
+### 3. **Área do Member User**
 - Ver informações da igreja
 - Atualizar dados pessoais
 - Acessar calendário de atividades

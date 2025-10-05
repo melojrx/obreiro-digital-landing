@@ -19,7 +19,7 @@ class Command(BaseCommand):
         
         # Mapear emails para papéis de sistema adequados
         user_role_mapping = {
-            'denominacao.admin@teste.com': RoleChoices.DENOMINATION_ADMIN,
+            'denominacao.admin@teste.com': RoleChoices.CHURCH_ADMIN,  # Atualizado para CHURCH_ADMIN
             'igreja.admin@teste.com': RoleChoices.CHURCH_ADMIN,
             'igreja.filha.admin@teste.com': RoleChoices.CHURCH_ADMIN,
             'pastor@teste.com': RoleChoices.PASTOR,

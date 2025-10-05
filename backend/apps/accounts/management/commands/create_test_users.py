@@ -63,17 +63,18 @@ class Command(BaseCommand):
                 # 5. Criar usuários para cada papel
                 users_created = []
                 
-                # DENOMINATION_ADMIN
-                denomination_admin = self.create_test_user(
+                # CHURCH_ADMIN (Administrador Principal - substitui DENOMINATION_ADMIN)
+                # Este é o usuário pagante que pode gerenciar múltiplas igrejas
+                church_admin_principal = self.create_test_user(
                     email='denominacao.admin@teste.com',
-                    name='Admin Denominação',
+                    name='Admin Principal (Church Admin)',
                     phone='(11) 91111-1111',
                     password=password,
                     church=church_sede,
-                    role=RoleChoices.DENOMINATION_ADMIN,
-                    description='Administrador da denominação - pode gerenciar todas as igrejas'
+                    role=RoleChoices.CHURCH_ADMIN,
+                    description='Administrador principal - pode gerenciar todas as igrejas da denominação'
                 )
-                users_created.append(denomination_admin)
+                users_created.append(church_admin_principal)
                 
                 # CHURCH_ADMIN (Igreja Sede)
                 church_admin_sede = self.create_test_user(

@@ -227,9 +227,14 @@ class SubscriptionStatusChoices(models.TextChoices):
 
 
 class RoleChoices(models.TextChoices):
-    """Papéis de usuário no sistema"""
+    """
+    Papéis de usuário no sistema.
+    
+    CHURCH_ADMIN: Papel do usuário pagante que gerencia uma ou múltiplas igrejas.
+                  Este papel substitui o antigo DENOMINATION_ADMIN e centraliza
+                  toda a administração de igrejas e denominações.
+    """
     SUPER_ADMIN = 'super_admin', 'Super Administrador'
-    DENOMINATION_ADMIN = 'denomination_admin', 'Administrador de Denominação'
     CHURCH_ADMIN = 'church_admin', 'Administrador da Igreja'
     PASTOR = 'pastor', 'Pastor'
     SECRETARY = 'secretary', 'Secretário(a)'

@@ -34,29 +34,27 @@ class IsPlatformAdmin(BasePermission):
             ).exists()
         )
 
-class IsDenominationAdmin(BasePermission):
-    """
-    Allows access to users who are denomination administrators.
-    This is determined by their role in any of their associated churches.
-    """
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-        # Check if the user has the 'denomination_admin' role in any of their ChurchUser links
-        return request.user.church_users.filter(role=RoleChoices.DENOMINATION_ADMIN, is_active=True).exists()
-
 class IsChurchAdmin(BasePermission):
     """
-    Allows access to users who are administrators of a specific church.
-    This includes denomination admins and church admins.
+    Allows access to users who are administrators of a church or multiple churches.
+    
+    This is the primary administrative role for paying customers who can:
+    - Manage one or multiple churches (if they have a denomination)
+    - Create and configure churches
+    - Manage members, visitors, and activities
+    - Designate branch managers
+    - Access consolidated reports
+    
+    Note: This role replaces the old DENOMINATION_ADMIN role, centralizing
+          all church and denomination administration.
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         
-        # Verifica se o usuário tem papel de admin em qualquer igreja
+        # Verifica se o usuário tem papel de CHURCH_ADMIN em qualquer igreja
         return request.user.church_users.filter(
-            role__in=[RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN],
+            role=RoleChoices.CHURCH_ADMIN,
             is_active=True
         ).exists()
     
@@ -73,9 +71,10 @@ class IsChurchAdmin(BasePermission):
         else:
             return False # Cannot determine the church from the object
 
+        # Verifica se o usuário é CHURCH_ADMIN da igreja
         return request.user.church_users.filter(
             church=church,
-            role__in=[RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN],
+            role=RoleChoices.CHURCH_ADMIN,
             is_active=True
         ).exists()
 
@@ -108,8 +107,8 @@ class IsBranchManager(BasePermission):
         except request.user.church_users.model.DoesNotExist:
             return False
 
-        # Church admins and higher can manage any branch in their church
-        if church_user.role in [RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN]:
+        # Church admins can manage any branch in their church
+        if church_user.role == RoleChoices.CHURCH_ADMIN:
             return True
 
         # Check if the user has specific permission and is assigned to the branch

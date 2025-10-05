@@ -30,7 +30,7 @@ def reverse_populate_missing_data(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('members', '0014_add_membership_status_field'),
+        ('members', '0013_membershipstatus_and_more'),
     ]
 
     operations = [

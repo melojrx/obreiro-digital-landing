@@ -15,7 +15,7 @@ from .serializers import (
     DenominationSummarySerializer, DenominationStatsSerializer
 )
 from apps.core.permissions import (
-    IsDenominationAdmin, IsPlatformAdmin, CanManageDenomination,
+    IsChurchAdmin, IsPlatformAdmin, CanManageDenomination,
     CanCreateChurches, CanViewFinancialReports, IsHierarchicallyAuthorized
 )
 
@@ -53,7 +53,8 @@ class DenominationViewSet(viewsets.ModelViewSet):
             # APENAS PLATFORM ADMINS podem criar denominações
             permission_classes = [IsPlatformAdmin]
         elif self.action in ['update', 'partial_update', 'destroy']:
-            permission_classes = [permissions.IsAuthenticated, IsDenominationAdmin]
+            # Church Admins podem atualizar suas denominações
+            permission_classes = [permissions.IsAuthenticated, IsChurchAdmin]
         elif self.action == 'available_for_registration':
             permission_classes = [permissions.AllowAny]  # Público
         elif self.action == 'platform_stats':
@@ -238,10 +239,10 @@ class DenominationViewSet(viewsets.ModelViewSet):
         from apps.accounts.models import ChurchUser, RoleChoices
         from apps.accounts.serializers import ChurchUserSummarySerializer
         
-        # Buscar todos os usuários com papel de denominação admin
+        # Buscar todos os usuários com papel de CHURCH_ADMIN na denominação
         admin_users = ChurchUser.objects.filter(
             church__denomination=denomination,
-            role__in=[RoleChoices.SUPER_ADMIN, RoleChoices.DENOMINATION_ADMIN],
+            role__in=[RoleChoices.SUPER_ADMIN, RoleChoices.CHURCH_ADMIN],
             is_active=True
         ).select_related('user', 'church')
         
@@ -315,16 +316,16 @@ class DenominationViewSet(viewsets.ModelViewSet):
         last_month = now - timedelta(days=30)
         this_year = now.replace(month=1, day=1)
         
-        # Para denomination admin, contar todas as igrejas que ele tem acesso
-        # através de ChurchUser, não apenas igrejas da denominação que ele administra
+        # Para Church Admin, contar todas as igrejas que ele tem acesso
+        # através de ChurchUser
         from apps.accounts.models import ChurchUser
         
         user_churches = ChurchUser.objects.filter(
             user=user, 
-            role__in=['denomination_admin', 'church_admin', 'pastor']
+            role__in=['church_admin', 'pastor']
         ).select_related('church')
         
-        # Para denomination admin, incluir todas as igrejas (ativas e inativas)
+        # Para Church Admin, incluir todas as igrejas (ativas e inativas)
         # pois ele precisa ver estatísticas consolidadas de toda sua rede
         churches = [cu.church for cu in user_churches]
         
