@@ -201,7 +201,8 @@ class MemberCreateSerializer(serializers.ModelSerializer):
     
     def validate_email(self, value):
         """Validação de email"""
-        if value:
+        # Apenas validar se email foi fornecido e não é string vazia
+        if value and value.strip():
             # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
             existing = Member.objects.all().filter(
                 email=value,
@@ -210,7 +211,9 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             
             if existing:
                 raise serializers.ValidationError("Este e-mail já está cadastrado.")
-        return value
+        
+        # Se email é string vazia, retornar None para salvar como NULL no banco
+        return value if value and value.strip() else None
     
     def validate(self, attrs):
         """Validações gerais"""
@@ -327,7 +330,8 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
     
     def validate_email(self, value):
         """Validação de email na atualização"""
-        if value:
+        # Apenas validar se email foi fornecido e não é string vazia
+        if value and value.strip():
             # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
             existing = Member.objects.all().filter(
                 email=value,
@@ -336,7 +340,9 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             
             if existing:
                 raise serializers.ValidationError("Este e-mail já está cadastrado.")
-        return value
+        
+        # Se email é string vazia, retornar None para salvar como NULL no banco
+        return value if value and value.strip() else None
     
 
 

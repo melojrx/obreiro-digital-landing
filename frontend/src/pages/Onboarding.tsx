@@ -21,13 +21,14 @@ const Onboarding = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<'welcome' | 'create-church'>('welcome');
+  const [isCreatingChurch, setIsCreatingChurch] = useState(false);
 
-  // Redirecionar se não precisar de setup
+  // Redirecionar se não precisar de setup (mas não durante a criação da igreja)
   useEffect(() => {
-    if (user && !user.needs_church_setup) {
+    if (user && !user.needs_church_setup && !isCreatingChurch) {
       navigate('/dashboard');
     }
-  }, [user, navigate]);
+  }, [user, navigate, isCreatingChurch]);
 
   if (!user) {
     return null;
@@ -47,6 +48,7 @@ const Onboarding = () => {
           user={user}
           onBack={() => setCurrentStep('welcome')}
           toast={toast}
+          setIsCreatingChurch={setIsCreatingChurch}
         />
       )}
     </AppLayout>
@@ -161,11 +163,12 @@ interface CreateChurchStepProps {
   user: any;
   onBack: () => void;
   toast: any;
+  setIsCreatingChurch: (value: boolean) => void;
 }
 
-const CreateChurchStep: React.FC<CreateChurchStepProps> = ({ user, onBack, toast }) => {
+const CreateChurchStep: React.FC<CreateChurchStepProps> = ({ user, onBack, toast, setIsCreatingChurch }) => {
   const navigate = useNavigate();
-  const { getUserChurch } = useAuth();
+  const { refreshUserData } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -266,6 +269,7 @@ const CreateChurchStep: React.FC<CreateChurchStepProps> = ({ user, onBack, toast
     }
 
     setIsLoading(true);
+    setIsCreatingChurch(true);  // Marcar que está criando igreja
     setError('');
 
     try {
@@ -298,28 +302,32 @@ const CreateChurchStep: React.FC<CreateChurchStepProps> = ({ user, onBack, toast
           duration: 3000,
         });
         
-        // Recarregar dados da igreja antes de navegar
+        // Recarregar todos os dados do usuário (incluindo igreja e needs_church_setup)
         try {
-          await getUserChurch();
-          console.log('✅ Dados da igreja recarregados após criação');
+          await refreshUserData();
+          console.log('✅ Dados do usuário e igreja recarregados após criação');
         } catch (error) {
-          console.error('⚠️ Erro ao recarregar igreja, mas continuando navegação:', error);
+          console.error('⚠️ Erro ao recarregar dados, mas continuando navegação:', error);
         }
         
-        // Aguardar um pouco e redirecionar
+        // Aguardar um momento para garantir que os dados foram atualizados
+        // e então redirecionar para o dashboard
         setTimeout(() => {
           navigate('/dashboard', { 
             state: { 
               message: 'Igreja criada com sucesso! Bem-vindo ao Obreiro Virtual.'
-            }
+            },
+            replace: true  // Adicionar replace para não voltar para onboarding
           });
         }, 1500);
       } else {
         setError(data.error || 'Erro ao criar igreja. Tente novamente.');
+        setIsCreatingChurch(false);  // Desmarcar em caso de erro
       }
     } catch (err) {
       console.error('Erro ao criar igreja:', err);
       setError('Erro ao conectar com o servidor. Tente novamente.');
+      setIsCreatingChurch(false);  // Desmarcar em caso de erro
     } finally {
       setIsLoading(false);
     }

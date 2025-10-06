@@ -172,25 +172,16 @@ const CadastroEtapa3 = () => {
       
       setSuccess(true);
       
-      // Redirecionar baseado no plano
+      // Redirecionar para onboarding para configurar a igreja
+      // Independente do plano, usuário precisa criar a igreja primeiro
       setTimeout(() => {
-        if (selectedPlan.id === 'basic') {
-          // Plano gratuito - vai direto para dashboard
-          navigate('/dashboard', { 
-            state: { 
-              successMessage: 'Cadastro finalizado com sucesso! Bem-vindo ao sistema.' 
-            },
-            replace: true
-          });
-        } else {
-          // Planos pagos - vai para interface de pagamento (futuro)
-          navigate('/pagamento', { 
-            state: { 
-              plan: selectedPlan,
-              registrationData: finalRegistrationData 
-            } 
-          });
-        }
+        navigate('/onboarding', { 
+          state: { 
+            successMessage: 'Cadastro finalizado com sucesso! Agora vamos configurar sua igreja.',
+            plan: selectedPlan.id
+          },
+          replace: true
+        });
       }, 2000);
     } catch (error) {
       console.error("Erro ao finalizar cadastro", error);
