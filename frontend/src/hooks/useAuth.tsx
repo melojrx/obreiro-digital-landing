@@ -34,6 +34,7 @@ interface AuthContextType {
   getAvailableChurches: () => Promise<Church[]>;
   getAvailableDenominations: () => Promise<Denomination[]>;
   getUserChurch: () => Promise<void>;
+  refreshUserData: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
   updatePersonalData: (data: {
     full_name?: string;
@@ -295,6 +296,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  const refreshUserData = useCallback(async (): Promise<void> => {
+    try {
+      console.log('🔄 Atualizando dados do usuário e igreja...');
+      setError(null);
+      
+      // Recarregar dados do usuário
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
+      console.log('✅ Dados do usuário atualizados');
+      
+      // Recarregar dados da igreja
+      if (currentUser.is_profile_complete) {
+        const churchData = await authService.getUserChurch();
+        setUserChurch(churchData);
+        console.log('✅ Dados da igreja atualizados');
+      }
+    } catch (err) {
+      console.error('❌ Erro ao atualizar dados:', err);
+      if (err instanceof AuthError) {
+        setError(err.message);
+      } else {
+        setError('Erro ao atualizar dados.');
+      }
+    }
+  }, []);
+
   const updateUser = useCallback(async (data: Partial<User>) => {
     try {
       setIsLoading(true);
@@ -438,12 +465,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     getAvailableChurches,
     getAvailableDenominations,
     getUserChurch,
+    refreshUserData,
     updateUser,
     updatePersonalData,
     updateChurchData,
     uploadAvatar,
     deleteAccount,
-  }), [user, userChurch, isAuthenticated, isInitializing, isLoading, error, login, register, savePartialProfile, completeProfile, finalizeRegistration, logout, clearError, getAvailableChurches, getAvailableDenominations, getUserChurch, updateUser, updatePersonalData, updateChurchData, uploadAvatar, deleteAccount]);
+  }), [user, userChurch, isAuthenticated, isInitializing, isLoading, error, login, register, savePartialProfile, completeProfile, finalizeRegistration, logout, clearError, getAvailableChurches, getAvailableDenominations, getUserChurch, refreshUserData, updateUser, updatePersonalData, updateChurchData, uploadAvatar, deleteAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

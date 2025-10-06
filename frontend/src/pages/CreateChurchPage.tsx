@@ -51,6 +51,7 @@ import { toast } from '@/hooks/use-toast';
 import { churchService } from '@/services/churchService';
 import { userService, EligibleAdmin } from '@/services/userService';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuth } from '@/hooks/useAuth';
 import { CreateChurchFormData } from '@/types/hierarchy';
 import RoleExplanationCard from '@/components/ui/role-explanation-card';
 
@@ -119,6 +120,7 @@ type ChurchFormData = z.infer<typeof churchFormSchema>;
 const CreateChurchPage: React.FC = () => {
   const navigate = useNavigate();
   const permissions = usePermissions();
+  const { refreshUserData } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
@@ -366,6 +368,11 @@ const CreateChurchPage: React.FC = () => {
       if (uploadPromises.length > 0) {
         await Promise.all(uploadPromises);
       }
+
+      // Atualizar dados do usuário para incluir a nova igreja
+      console.log('🔄 Atualizando dados do usuário após criar igreja...');
+      await refreshUserData();
+      console.log('✅ Dados atualizados, usuário pode ver a nova igreja');
 
       toast({
         title: 'Sucesso!',
