@@ -584,18 +584,20 @@ const ChurchDetailsPage: React.FC = () => {
                       </div>
                     )}
 
-                    {church.main_pastor && (
+                    {church.main_pastor && church.main_pastor.full_name && (
                       <div>
                         <h4 className="font-medium text-gray-900 mb-2">Pastor Principal</h4>
                         <div className="flex items-center gap-3">
                           <Avatar>
                             <AvatarFallback>
-                              {church.main_pastor.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              {church.main_pastor.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           <div>
                             <p className="font-medium">{church.main_pastor.full_name}</p>
-                            <p className="text-sm text-gray-600">{church.main_pastor.email}</p>
+                            {church.main_pastor.email && (
+                              <p className="text-sm text-gray-600">{church.main_pastor.email}</p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -869,16 +871,16 @@ const ChurchDetailsPage: React.FC = () => {
                           <div className="flex items-center gap-3">
                             <Avatar>
                               <AvatarFallback>
-                                {admin.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                {admin.full_name ? admin.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'AD'}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium">{admin.full_name}</span>
+                            <span className="font-medium">{admin.full_name || 'Sem nome'}</span>
                           </div>
                         </TableCell>
-                        <TableCell>{admin.email}</TableCell>
+                        <TableCell>{admin.email || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {admin.role_label}
+                            {admin.role_label || admin.role}
                           </Badge>
                         </TableCell>
                         <TableCell>

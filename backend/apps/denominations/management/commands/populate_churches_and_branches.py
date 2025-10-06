@@ -165,7 +165,7 @@ class Command(BaseCommand):
                     user=admin_user,
                     church=church,
                     defaults={
-                        'role': RoleChoices.DENOMINATION_ADMIN,
+                        'role': RoleChoices.CHURCH_ADMIN,
                         'can_manage_denomination': True,
                         'can_create_churches': True,
                         'can_view_financial_reports': True,
@@ -230,7 +230,7 @@ class Command(BaseCommand):
                                 user=admin_user,
                                 church=branch,
                                 defaults={
-                                    'role': RoleChoices.DENOMINATION_ADMIN,
+                                    'role': RoleChoices.CHURCH_ADMIN,
                                     'can_manage_denomination': True,
                                     'can_create_churches': True,
                                     'can_view_financial_reports': True,

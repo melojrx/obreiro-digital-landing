@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import CadastroEtapa2 from "./pages/CadastroEtapa2";
 import CadastroEtapa3 from "./pages/CadastroEtapa3";
+import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Perfil from "./pages/Perfil";
 import Membros from "./pages/Membros";
@@ -28,6 +29,7 @@ import CalendarPage from "./pages/CalendarPage";
 import PrayerRequestsPage from "./pages/PrayerRequestsPage";
 import MinistryManagementPage from "./pages/MinistryManagementPage";
 import GerenciarQRCodes from "./pages/GerenciarQRCodes";
+import QRCodesPage from "./pages/QRCodesPage";
 import RegistroVisitante from "./pages/RegistroVisitante";
 import RegistroSucesso from "./pages/RegistroSucesso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
@@ -104,6 +106,14 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="public">
             <CadastroEtapa3 />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/onboarding" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <Onboarding />
           </ProtectedRoute>
         } 
       />
@@ -228,6 +238,14 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="auth_complete">
             <GerenciarQRCodes />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/qr-codes" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <QRCodesPage />
           </ProtectedRoute>
         } 
       />

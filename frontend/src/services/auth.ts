@@ -49,19 +49,15 @@ export interface FinalizeRegistrationData {
   birth_date?: string;
   gender?: string;
   
-  // Dados da igreja (etapa 2)
+  // Dados de endereço do usuário (etapa 2)
   denomination_id?: number;
-  church_name: string;
-  church_cnpj?: string;
-  church_email: string;
-  church_phone: string;
-  branch_name?: string;
-  church_address: string;
-  pastor_name: string;
-  cpf?: string;
-  bio?: string;
-  email_notifications?: boolean;
-  sms_notifications?: boolean;
+  user_zipcode?: string;
+  user_address?: string;
+  user_city?: string;
+  user_state?: string;
+  user_neighborhood?: string;
+  user_number?: string;
+  user_complement?: string;
   
   // Plano (etapa 3)
   subscription_plan: string;
@@ -75,12 +71,20 @@ export interface User {
   first_name: string;
   last_name: string;
   phone?: string;
+  subscription_plan?: string;
   profile?: {
     bio?: string;
     birth_date?: string;
     gender?: string;
     avatar?: string;
   };
+  intended_role?: string;
+  intended_denomination?: {
+    id: number;
+    name: string;
+  };
+  has_church?: boolean;
+  needs_church_setup?: boolean;
   is_active: boolean;
   date_joined: string;
   is_profile_complete: boolean;
@@ -253,11 +257,11 @@ export const authService = {
 
   /**
    * Finalizar registro completo (Etapa 3 - Final)
-   * Cria usuário DENOMINATION_ADMIN com igreja e plano
+   * Cria usuário com todos os dados coletados nas 3 etapas
    */
   async finalizeRegistration(data: FinalizeRegistrationData): Promise<{ user: User; token: string }> {
     try {
-      const response = await api.post<{ user: User; token: string; message: string }>('/users/finalize_registration/', data);
+      const response = await api.post<{ user: User; token: string; message: string }>('/auth/finalize-registration/', data);
       
       // Salvar token e usuário
       localStorage.setItem('auth_token', response.data.token);

@@ -7,6 +7,7 @@ from django.db import models
 from django.conf import settings
 from apps.core.models import BaseModel, ActiveManager
 from apps.core.models import validate_cnpj, phone_validator, cep_validator
+from apps.accounts.models import LEGACY_DENOMINATION_ROLE
 
 
 class Denomination(BaseModel):
@@ -181,7 +182,7 @@ class Denomination(BaseModel):
             user.is_superuser or
             user.church_users.filter(
                 church__denomination=self,
-                role__in=['denomination_admin', 'church_admin']
+                role__in=[LEGACY_DENOMINATION_ROLE, 'church_admin']
             ).exists()
         )
     

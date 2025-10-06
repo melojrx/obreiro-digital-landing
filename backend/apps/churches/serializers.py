@@ -5,6 +5,7 @@ Gerencia serialização de igrejas
 
 from rest_framework import serializers
 from django.db import models
+from django.db import transaction
 from .models import Church
 
 
@@ -148,6 +149,69 @@ class ChurchCreateSerializer(serializers.ModelSerializer):
             })
         
         return attrs
+    
+    def create(self, validated_data):
+        """
+        Cria a igreja e automaticamente vincula o usuário criador como CHURCH_ADMIN
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Obter usuário da requisição
+        user = self.context['request'].user
+        
+        # Criar a igreja
+        church = super().create(validated_data)
+        logger.info(f"✅ Igreja '{church.name}' criada (ID: {church.id})")
+        
+        # Criar ChurchUser vinculando o usuário criador como CHURCH_ADMIN
+        from apps.accounts.models import ChurchUser, RoleChoices
+        
+        # Verificar se já existe ChurchUser para este usuário e igreja
+        church_user, created = ChurchUser.objects.get_or_create(
+            user=user,
+            church=church,
+            defaults={
+                'role': RoleChoices.CHURCH_ADMIN,
+                'is_active': True,
+                'can_access_admin': True,
+                'can_manage_members': True,
+                'can_manage_visitors': True,
+                'can_manage_activities': True,
+                'can_view_reports': True,
+                'can_manage_branches': True,
+            }
+        )
+        
+        if created:
+            logger.info(f"✅ ChurchUser criado: {user.email} como CHURCH_ADMIN da igreja '{church.name}'")
+        else:
+            logger.info(f"⚠️ ChurchUser já existia: {user.email} na igreja '{church.name}'")
+        
+        # Criar filial matriz automaticamente com QR Code
+        try:
+            from apps.branches.models import Branch
+            
+            main_branch = Branch.objects.create(
+                church=church,
+                name=f"{church.name} - Matriz",
+                short_name=church.short_name or "Matriz",
+                address=church.address,
+                city=church.city,
+                state=church.state,
+                zipcode=church.zipcode,
+                phone=church.phone,
+                email=church.email,
+                qr_code_active=True,
+                is_active=True
+            )
+            logger.info(f"✅ Filial matriz criada com QR Code para igreja '{church.name}'")
+            logger.info(f"   QR Code UUID: {main_branch.qr_code_uuid}")
+            
+        except Exception as branch_error:
+            logger.warning(f"⚠️ Erro ao criar filial matriz: {str(branch_error)}")
+        
+        return church
 
 
 class ChurchSummarySerializer(serializers.ModelSerializer):
@@ -444,4 +508,138 @@ class ChurchDetailSerializer(serializers.ModelSerializer):
             'is_subscription_active', 'is_trial_active', 'days_until_expiration', 
             'subscription_expired', 'can_add_members', 'can_add_branches', 
             'created_at', 'updated_at', 'is_active'
-        ] 
+        ]
+
+
+class FirstChurchSerializer(serializers.Serializer):
+    """Serializer para criação da primeira igreja de um usuário CHURCH_ADMIN"""
+    
+    name = serializers.CharField(max_length=200, help_text="Nome completo da igreja")
+    short_name = serializers.CharField(
+        max_length=100, 
+        required=False, 
+        allow_blank=True,
+        help_text="Nome abreviado (opcional)"
+    )
+    cnpj = serializers.CharField(
+        max_length=18, 
+        required=False, 
+        allow_blank=True,
+        help_text="CNPJ da igreja (opcional)"
+    )
+    email = serializers.EmailField(help_text="Email da igreja")
+    phone = serializers.CharField(max_length=20, help_text="Telefone da igreja")
+    
+    # Denominação (opcional - usa do perfil se não fornecida)
+    denomination_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="ID da denominação (opcional - usa intended_denomination do perfil se não fornecido)"
+    )
+    
+    # Endereço
+    zipcode = serializers.CharField(max_length=9, help_text="CEP")
+    address = serializers.CharField(max_length=255, help_text="Endereço completo")
+    number = serializers.CharField(max_length=10, required=False, allow_blank=True, help_text="Número")
+    complement = serializers.CharField(
+        max_length=100, 
+        required=False, 
+        allow_blank=True,
+        help_text="Complemento (opcional)"
+    )
+    neighborhood = serializers.CharField(max_length=100, help_text="Bairro")
+    city = serializers.CharField(max_length=100, help_text="Cidade")
+    state = serializers.CharField(max_length=2, help_text="Estado (UF)")
+    
+    def validate(self, data):
+        """Validações customizadas"""
+        # Verificar se o usuário já tem igreja
+        request = self.context.get('request')
+        if request and request.user:
+            from apps.accounts.models import ChurchUser
+            existing_churches = ChurchUser.objects.filter(
+                user=request.user,
+                role='CHURCH_ADMIN',
+                is_active=True
+            ).exists()
+            
+            if existing_churches:
+                raise serializers.ValidationError(
+                    "Você já possui uma igreja cadastrada. Use o menu 'Igrejas' para gerenciar."
+                )
+        
+        return data
+    
+    def create(self, validated_data):
+        """Cria a primeira igreja e vincula o usuário como CHURCH_ADMIN"""
+        request = self.context.get('request')
+        user = request.user
+        
+        # Buscar denominação: primeiro do payload, depois do perfil
+        denomination = None
+        denomination_id = validated_data.get('denomination_id')
+        
+        if denomination_id:
+            # Denominação fornecida no payload
+            from apps.denominations.models import Denomination
+            try:
+                denomination = Denomination.objects.get(id=denomination_id)
+            except Denomination.DoesNotExist:
+                raise serializers.ValidationError({
+                    'denomination_id': 'Denominação não encontrada.'
+                })
+        elif hasattr(user, 'profile') and user.profile.intended_denomination:
+            # Usar denominação pretendida do perfil
+            denomination = user.profile.intended_denomination
+        
+        if not denomination:
+            raise serializers.ValidationError({
+                'denomination': 'É necessário fornecer uma denominação ou ter uma denominação cadastrada no perfil.'
+            })
+        
+        with transaction.atomic():
+            # Criar endereço completo
+            address_parts = [validated_data.get('address', '')]
+            if validated_data.get('number'):
+                address_parts.append(f"nº {validated_data['number']}")
+            if validated_data.get('complement'):
+                address_parts.append(validated_data['complement'])
+            
+            full_address = ', '.join(filter(None, address_parts))
+            
+            # Criar igreja com a denominação obtida
+            church = Church.objects.create(
+                denomination=denomination,
+                name=validated_data['name'],
+                short_name=validated_data.get('short_name') or validated_data['name'][:50],
+                email=validated_data['email'],
+                phone=validated_data['phone'],
+                cnpj=validated_data.get('cnpj', ''),
+                address=full_address,
+                city=validated_data['city'],
+                state=validated_data['state'],
+                zipcode=validated_data['zipcode'],
+                main_pastor=user,
+                subscription_plan=user.subscription_plan or 'basic',
+                subscription_status='trial',
+                is_active=True
+            )
+            
+            # Criar vínculo ChurchUser com papel CHURCH_ADMIN
+            from apps.accounts.models import ChurchUser
+            from apps.core.models import RoleChoices
+            
+            ChurchUser.objects.create(
+                user=user,
+                church=church,
+                role=RoleChoices.CHURCH_ADMIN,  # Usar constante do enum
+                is_active=True,
+                is_user_active_church=True  # Definir como igreja ativa
+            )
+            
+            # Limpar papel pretendido do perfil (já foi usado)
+            if hasattr(user, 'profile'):
+                user.profile.intended_role = None
+                user.profile.save(update_fields=['intended_role'])
+            
+            return church 

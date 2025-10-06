@@ -414,17 +414,18 @@ const EditChurchPage: React.FC = () => {
   const validateEmailUnique = async (email: string) => {
     if (!email || !church || form.formState.errors.email) return;
     
-    try {
-      const validation = await churchService.validateEmail(email, church.denomination_id || 1, church.id);
-      if (!validation.valid) {
-        form.setError('email', {
-          type: 'custom',
-          message: validation.message || 'Email já está em uso',
-        });
-      }
-    } catch (error) {
-      console.error('Erro na validação do email:', error);
-    }
+    // TODO: Implementar endpoint de validação de email no backend
+    // try {
+    //   const validation = await churchService.validateEmail(email, church.denomination_id || 1, church.id);
+    //   if (!validation.valid) {
+    //     form.setError('email', {
+    //       type: 'custom',
+    //       message: validation.message || 'Email já está em uso',
+    //     });
+    //   }
+    // } catch (error) {
+    //   console.error('Erro na validação do email:', error);
+    // }
   };
 
   const validateCNPJUnique = async (cnpj: string) => {

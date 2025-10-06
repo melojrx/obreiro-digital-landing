@@ -194,6 +194,25 @@ class VisitorViewSet(viewsets.ModelViewSet):
             
         return Response(serializer.data)
     
+    def create(self, request, *args, **kwargs):
+        """Override create para adicionar logs e debug"""
+        print(f"\n🔍 [DEBUG] Create visitor - request.data: {request.data}")
+        print(f"🔍 [DEBUG] Create visitor - user: {request.user.email}")
+        
+        serializer = self.get_serializer(data=request.data)
+        
+        if not serializer.is_valid():
+            print(f"❌ [DEBUG] Validation errors: {serializer.errors}")
+            return Response({
+                'error': 'Dados inválidos',
+                'details': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
     def perform_create(self, serializer):
         """Associa igreja e filial automaticamente ao criar visitante"""
         user = self.request.user
@@ -211,6 +230,8 @@ class VisitorViewSet(viewsets.ModelViewSet):
                 print(f"💾 Criando visitante para igreja: {church.name} (ID: {church.id})")
                 if branch:
                     print(f"💾 Branch: {branch.name} (ID: {branch.id})")
+                else:
+                    print(f"⚠️ Igreja {church.name} não tem filiais ativas!")
                 
                 serializer.save(
                     church=church,
@@ -229,6 +250,8 @@ class VisitorViewSet(viewsets.ModelViewSet):
                 )
         except Exception as e:
             print(f"❌ Erro ao buscar igreja do usuário: {e}")
+            import traceback
+            traceback.print_exc()
             # Em caso de erro, salvar apenas com campos obrigatórios
             serializer.save(
                 registration_source='admin_manual',

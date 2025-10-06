@@ -10,6 +10,9 @@ from apps.core.models import BaseModel, ActiveManager, RoleChoices, GenderChoice
 from apps.core.models import validate_cpf, phone_validator
 
 
+LEGACY_DENOMINATION_ROLE = 'denomination_admin'
+
+
 class CustomUserManager(BaseUserManager):
     """
     Manager personalizado para CustomUser que usa email como campo de login.
@@ -106,7 +109,7 @@ class CustomUser(AbstractUser):
         help_text="Indica se o usuário completou todas as etapas do cadastro."
     )
     
-    # Campo para plano de assinatura (apenas para DENOMINATION_ADMIN)
+    # Campo para plano de assinatura (apenas para CHURCH_ADMIN)
     subscription_plan = models.CharField(
         "Plano de Assinatura",
         max_length=20,
@@ -217,9 +220,11 @@ class ChurchUserManager(models.Manager):
             
             # Se não há igreja ativa marcada, usar a primeira igreja onde é admin
             fallback_church_user = self.get_queryset().filter(
-                user=user, 
-                is_active=True,
-                role__in=[RoleChoices.DENOMINATION_ADMIN, RoleChoices.CHURCH_ADMIN]
+                user=user,
+                is_active=True
+            ).filter(
+                models.Q(role=RoleChoices.CHURCH_ADMIN) |
+                models.Q(role=LEGACY_DENOMINATION_ROLE)
             ).first()
             
             if fallback_church_user:
@@ -319,6 +324,84 @@ class UserProfile(BaseModel):
         help_text="Biografia ou descrição do usuário"
     )
     
+    # Campos de endereço do usuário
+    zipcode = models.CharField(
+        "CEP",
+        max_length=9,
+        blank=True,
+        null=True,
+        help_text="CEP do endereço do usuário"
+    )
+    
+    address = models.CharField(
+        "Endereço",
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Rua/Avenida do usuário"
+    )
+    
+    number = models.CharField(
+        "Número",
+        max_length=10,
+        blank=True,
+        null=True,
+        help_text="Número do endereço"
+    )
+    
+    complement = models.CharField(
+        "Complemento",
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Complemento do endereço"
+    )
+    
+    neighborhood = models.CharField(
+        "Bairro",
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Bairro"
+    )
+    
+    city = models.CharField(
+        "Cidade",
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Cidade"
+    )
+    
+    state = models.CharField(
+        "Estado",
+        max_length=2,
+        blank=True,
+        null=True,
+        help_text="Estado (UF)"
+    )
+    
+    # Papel pretendido no sistema (antes de ter igreja vinculada)
+    intended_role = models.CharField(
+        "Papel Pretendido",
+        max_length=20,
+        choices=RoleChoices.choices,
+        blank=True,
+        null=True,
+        help_text="Papel que o usuário terá quando criar/vincular a uma igreja"
+    )
+    
+    # Denominação escolhida no cadastro (antes de criar igreja)
+    intended_denomination = models.ForeignKey(
+        'denominations.Denomination',
+        on_delete=models.SET_NULL,
+        related_name='intended_users',
+        blank=True,
+        null=True,
+        verbose_name="Denominação Pretendida",
+        help_text="Denominação escolhida pelo usuário no cadastro"
+    )
+    
     # Managers
     objects = models.Manager()
     active = ActiveManager()
@@ -352,6 +435,29 @@ class ChurchUser(BaseModel):
     Relacionamento entre usuário e igreja com papéis específicos.
     Um usuário pode ter diferentes papéis em diferentes igrejas.
     """
+
+    ROLE_ALIASES = {
+        LEGACY_DENOMINATION_ROLE: RoleChoices.CHURCH_ADMIN,
+    }
+
+    @classmethod
+    def normalize_role_value(cls, role_value):
+        """Normaliza valores de papel para contemplar aliases legados."""
+        return cls.ROLE_ALIASES.get(role_value, role_value)
+
+    @property
+    def role_effective(self):
+        """Retorna o papel atual considerando conversões de valores legados."""
+        return self.normalize_role_value(self.role)
+
+    def has_role(self, *role_values):
+        """Compara o papel do usuário considerando aliases herdados."""
+        normalized_role = self.role_effective
+        normalized_targets = {
+            self.normalize_role_value(value)
+            for value in role_values
+        }
+        return normalized_role in normalized_targets
     
     user = models.ForeignKey(
         'accounts.CustomUser',  # Atualizado para usar CustomUser
@@ -464,6 +570,10 @@ class ChurchUser(BaseModel):
     
     def save(self, *args, **kwargs):
         """Override save para configurar permissões automáticas baseadas no papel"""
+        # Converter qualquer valor legado antes de validar ou salvar
+        if self.role == LEGACY_DENOMINATION_ROLE:
+            self.role = RoleChoices.CHURCH_ADMIN
+
         # Validar que SUPER_ADMIN não pode ser atribuído via aplicação
         if self.role == RoleChoices.SUPER_ADMIN:
             # Permitir apenas se for um superuser do Django fazendo a operação
@@ -500,8 +610,10 @@ class ChurchUser(BaseModel):
         self.can_view_reports = False
         self.can_manage_branches = False
         
+        role = self.role_effective
+
         # Set permissions based on role
-        if self.role == RoleChoices.SUPER_ADMIN:
+        if role == RoleChoices.SUPER_ADMIN:
             # Super admin têm todas as permissões
             self.can_access_admin = True
             self.can_manage_members = True
@@ -510,16 +622,7 @@ class ChurchUser(BaseModel):
             self.can_view_reports = True
             self.can_manage_branches = True
             
-        elif self.role == RoleChoices.DENOMINATION_ADMIN:
-            # Admin de Denominação tem permissões específicas de denominação
-            self.can_access_admin = True
-            self.can_manage_members = True
-            self.can_manage_visitors = True
-            self.can_manage_activities = True
-            self.can_view_reports = True
-            self.can_manage_branches = True
-            
-        elif self.role == RoleChoices.CHURCH_ADMIN:
+        elif role == RoleChoices.CHURCH_ADMIN:
             # Admin da igreja tem quase todas as permissões
             self.can_access_admin = True
             self.can_manage_members = True
@@ -528,7 +631,7 @@ class ChurchUser(BaseModel):
             self.can_view_reports = True
             self.can_manage_branches = True
             
-        elif self.role == RoleChoices.PASTOR:
+        elif role == RoleChoices.PASTOR:
             # Pastor tem permissões administrativas
             self.can_access_admin = True
             self.can_manage_members = True
@@ -537,7 +640,7 @@ class ChurchUser(BaseModel):
             self.can_view_reports = True
             self.can_manage_branches = False  # Não gerencia filiais por padrão
             
-        elif self.role == RoleChoices.SECRETARY:
+        elif role == RoleChoices.SECRETARY:
             # Secretário gerencia dados básicos
             self.can_access_admin = True
             self.can_manage_members = True
@@ -546,7 +649,7 @@ class ChurchUser(BaseModel):
             self.can_view_reports = True
             self.can_manage_branches = False
             
-        elif self.role == RoleChoices.LEADER:
+        elif role == RoleChoices.LEADER:
             # Líder gerencia atividades e visitantes
             self.can_access_admin = False
             self.can_manage_members = False
@@ -555,7 +658,7 @@ class ChurchUser(BaseModel):
             self.can_view_reports = False
             self.can_manage_branches = False
             
-        elif self.role == RoleChoices.MEMBER:
+        elif role == RoleChoices.MEMBER:
             # Membro comum não tem permissões administrativas
             pass  # Todas as permissões já estão False
     
@@ -605,7 +708,7 @@ class ChurchUser(BaseModel):
     @property
     def is_admin(self):
         """Verifica se o usuário é administrador"""
-        return self.role in [
+        return self.role_effective in [
             RoleChoices.SUPER_ADMIN,
             RoleChoices.CHURCH_ADMIN,
             RoleChoices.PASTOR
@@ -614,7 +717,7 @@ class ChurchUser(BaseModel):
     @property
     def is_leader(self):
         """Verifica se o usuário é líder (tem algum nível de liderança)"""
-        return self.role in [
+        return self.role_effective in [
             RoleChoices.SUPER_ADMIN,
             RoleChoices.CHURCH_ADMIN,
             RoleChoices.PASTOR,
@@ -632,7 +735,7 @@ class ChurchUser(BaseModel):
             RoleChoices.LEADER: '#0dcaf0',  # Azul claro
             RoleChoices.MEMBER: '#6c757d',  # Cinza
         }
-        return colors.get(self.role, '#6c757d')
+        return colors.get(self.role_effective, '#6c757d')
     
     # Métodos específicos para gestão hierárquica de denominação
     def can_manage_church(self, church):
@@ -647,23 +750,27 @@ class ChurchUser(BaseModel):
         """
         if not self.is_active:
             return False
-            
+
+        role = self.role_effective
+        legacy_role = self.role == LEGACY_DENOMINATION_ROLE
+        can_manage_denomination = getattr(self, 'can_manage_denomination', False) or legacy_role
+
         # Super Admin pode gerenciar qualquer igreja
-        if self.role == RoleChoices.SUPER_ADMIN:
+        if role == RoleChoices.SUPER_ADMIN:
             return True
-            
-        # Denomination Admin pode gerenciar igrejas da sua denominação
-        if self.role == RoleChoices.DENOMINATION_ADMIN:
-            return (
-                self.church.denomination and 
-                church.denomination and
-                self.church.denomination == church.denomination
-            )
-            
-        # Church Admin só pode gerenciar sua própria igreja
-        if self.role == RoleChoices.CHURCH_ADMIN:
-            return self.church == church
-            
+
+        # Church Admin centraliza antiga lógica de denominação
+        if role == RoleChoices.CHURCH_ADMIN:
+            if self.church == church:
+                return True
+
+            if can_manage_denomination:
+                return (
+                    self.church.denomination and
+                    church.denomination and
+                    self.church.denomination == church.denomination
+                )
+
         return False
     
     def can_access_denomination_dashboard(self, denomination):
@@ -676,20 +783,26 @@ class ChurchUser(BaseModel):
         Returns:
             bool: True se pode acessar
         """
-        if not self.is_active or not self.can_manage_denomination:
+        can_manage_denomination = getattr(self, 'can_manage_denomination', False) or (
+            self.role == LEGACY_DENOMINATION_ROLE
+        )
+
+        if not self.is_active or not can_manage_denomination:
             return False
-            
+
+        role = self.role_effective
+
         # Super Admin pode acessar qualquer denominação
-        if self.role == RoleChoices.SUPER_ADMIN:
+        if role == RoleChoices.SUPER_ADMIN:
             return True
-            
-        # Denomination Admin só pode acessar sua denominação
-        if self.role == RoleChoices.DENOMINATION_ADMIN:
+
+        # Church Admin com permissão ou papel legado acessa denominações relacionadas
+        if role == RoleChoices.CHURCH_ADMIN:
             return (
                 self.church.denomination and
                 self.church.denomination == denomination
             )
-            
+
         return False
     
     def get_manageable_churches(self):
@@ -703,40 +816,45 @@ class ChurchUser(BaseModel):
         
         if not self.is_active:
             return Church.objects.none()
-            
+
+        role = self.role_effective
+        legacy_role = self.role == LEGACY_DENOMINATION_ROLE
+        can_manage_denomination = getattr(self, 'can_manage_denomination', False) or legacy_role
+
         # Super Admin pode gerenciar todas as igrejas
-        if self.role == RoleChoices.SUPER_ADMIN:
+        if role == RoleChoices.SUPER_ADMIN:
             return Church.objects.filter(is_active=True)
-            
-        # Denomination Admin pode gerenciar igrejas da sua denominação
-        if self.role == RoleChoices.DENOMINATION_ADMIN and self.church.denomination:
-            return Church.objects.filter(
-                denomination=self.church.denomination,
-                is_active=True
-            )
-            
-        # Church Admin só pode gerenciar sua própria igreja
-        if self.role == RoleChoices.CHURCH_ADMIN:
+
+        # Church Admin concentra gestão local e de denominação
+        if role == RoleChoices.CHURCH_ADMIN:
+            if can_manage_denomination and self.church.denomination:
+                return Church.objects.filter(
+                    denomination=self.church.denomination,
+                    is_active=True
+                )
+
             return Church.objects.filter(id=self.church.id, is_active=True)
-            
+
         return Church.objects.none()
     
     @property
     def is_denomination_admin(self):
         """Verifica se é administrador de denominação"""
-        return self.role in [RoleChoices.SUPER_ADMIN, RoleChoices.DENOMINATION_ADMIN]
+        return self.role_effective in [
+            RoleChoices.SUPER_ADMIN,
+            RoleChoices.CHURCH_ADMIN
+        ]
     
     @property
     def role_hierarchy_level(self):
         """Retorna o nível hierárquico do papel (0 = mais alto)"""
         hierarchy = {
             RoleChoices.SUPER_ADMIN: 0,
-            RoleChoices.DENOMINATION_ADMIN: 1,
-            RoleChoices.CHURCH_ADMIN: 2,
-            RoleChoices.PASTOR: 3,
-            RoleChoices.SECRETARY: 4,
-            RoleChoices.LEADER: 5,
-            RoleChoices.MEMBER: 6,
-            RoleChoices.READ_ONLY: 7,
+            RoleChoices.CHURCH_ADMIN: 1,
+            RoleChoices.PASTOR: 2,
+            RoleChoices.SECRETARY: 3,
+            RoleChoices.LEADER: 4,
+            RoleChoices.MEMBER: 5,
+            RoleChoices.READ_ONLY: 6,
         }
-        return hierarchy.get(self.role, 10)
+        return hierarchy.get(self.role_effective, 10)

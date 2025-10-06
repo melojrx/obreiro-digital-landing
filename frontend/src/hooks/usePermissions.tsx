@@ -75,61 +75,9 @@ export interface UserPermissions {
 // Mapeamento de papéis para permissões (baseado no sistema do backend)
 // IMPORTANTE: SUPER_ADMIN é APENAS para desenvolvedores da plataforma!
 const ROLE_PERMISSIONS = {
-  // SUPER_ADMIN: Removido - apenas para desenvolvedores via comando Django
-  DENOMINATION_ADMIN: {
-    canViewMembers: true,
-    canCreateMembers: true,
-    canEditMembers: true,
-    canDeleteMembers: true,
-    canManageMembers: true,
-    canViewVisitors: true,
-    canCreateVisitors: true,
-    canEditVisitors: true,
-    canDeleteVisitors: true,
-    canManageVisitors: true,
-    canViewActivities: true,
-    canCreateActivities: true,
-    canEditActivities: true,
-    canDeleteActivities: true,
-    canManageActivities: true,
-    canViewBranches: true,
-    canCreateBranches: true,
-    canEditBranches: true,
-    canDeleteBranches: true,
-    canManageBranches: true,
-    // Permissões hierárquicas
-    canViewDenominations: true,
-    canCreateDenominations: true,
-    canEditDenominations: true,
-    canDeleteDenominations: true,
-    canManageDenominations: true,
-    canManageDenomination: true, // Permissão específica backend
-    canViewDenominationStats: true,
-    canManageDenominationChurches: true,
-    canViewChurches: true,
-    canCreateChurches: true,
-    canEditChurches: true,
-    canDeleteChurches: true,
-    canManageChurches: true,
-    canViewChurchStats: true,
-    canViewHierarchy: true,
-    canManageHierarchy: true,
-    canNavigateHierarchy: true,
-    canViewHierarchyMenu: true, // Denomination Admin pode ver menu hierárquico
-    // Outras permissões
-    canViewReports: true,
-    canViewDashboard: true,
-    canManageChurch: true,
-    canManageUsers: true,
-    canManageSettings: true,
-    isAdmin: true,
-    isChurchAdmin: true,
-    isPastor: false,
-    isSecretary: false,
-    isLeader: false,
-    isMember: false,
-  },
-  
+  // CHURCH_ADMIN: Administrador principal do SaaS (usuário pagante)
+  // Escolhe UMA denominação e pode criar múltiplas igrejas dentro dela
+  // Tem controle total sobre todas as igrejas, filiais, membros e atividades
   CHURCH_ADMIN: {
     canViewMembers: true,
     canCreateMembers: true,
@@ -151,33 +99,89 @@ const ROLE_PERMISSIONS = {
     canEditBranches: true,
     canDeleteBranches: true,
     canManageBranches: true,
-    // Permissões hierárquicas - Admin de igreja tem acesso limitado
+    // Permissões hierárquicas - Church Admin é o papel PRINCIPAL
     canViewDenominations: true,
-    canCreateDenominations: false,
+    canCreateDenominations: false, // Não cria denominações (escolhe uma existente)
     canEditDenominations: false,
     canDeleteDenominations: false,
     canManageDenominations: false,
-    canManageDenomination: false, // Singular para compatibilidade backend
+    canManageDenomination: true, // Pode gerenciar SUA denominação escolhida
     canViewDenominationStats: true,
-    canManageDenominationChurches: false,
+    canManageDenominationChurches: true, // Gerencia igrejas da sua denominação
     canViewChurches: true,
-    canCreateChurches: false, // Só denominação cria igrejas
-    canEditChurches: true, // Pode editar sua própria igreja
-    canDeleteChurches: false,
-    canManageChurches: false,
+    canCreateChurches: true, // PODE criar múltiplas igrejas na denominação
+    canEditChurches: true,
+    canDeleteChurches: true,
+    canManageChurches: true, // Gerencia todas as suas igrejas
     canViewChurchStats: true,
     canViewHierarchy: true,
-    canManageHierarchy: false,
+    canManageHierarchy: true,
     canNavigateHierarchy: true,
-    canViewHierarchyMenu: true, // Church Admin pode ver menu hierárquico
+    canViewHierarchyMenu: true, // Vê menu hierárquico completo
     // Outras permissões
     canViewReports: true,
     canViewDashboard: true,
     canManageChurch: true,
     canManageUsers: true,
     canManageSettings: true,
-    isAdmin: false,
+    isAdmin: true, // É o admin principal do sistema
     isChurchAdmin: true,
+    isPastor: false,
+    isSecretary: false,
+    isLeader: false,
+    isMember: false,
+  },
+  
+  // BRANCH_MANAGER: Gerente de filiais específicas
+  // Designado por Church Admin para gerenciar uma ou mais filiais
+  BRANCH_MANAGER: {
+    canViewMembers: true,
+    canCreateMembers: true,
+    canEditMembers: true,
+    canDeleteMembers: false, // Não pode deletar
+    canManageMembers: true,
+    canViewVisitors: true,
+    canCreateVisitors: true,
+    canEditVisitors: true,
+    canDeleteVisitors: false,
+    canManageVisitors: true,
+    canViewActivities: true,
+    canCreateActivities: true,
+    canEditActivities: true,
+    canDeleteActivities: false,
+    canManageActivities: true,
+    canViewBranches: true,
+    canCreateBranches: false, // Não cria novas filiais
+    canEditBranches: true, // Pode editar suas filiais designadas
+    canDeleteBranches: false,
+    canManageBranches: false, // Gestão limitada
+    // Permissões hierárquicas limitadas
+    canViewDenominations: true,
+    canCreateDenominations: false,
+    canEditDenominations: false,
+    canDeleteDenominations: false,
+    canManageDenominations: false,
+    canManageDenomination: false,
+    canViewDenominationStats: false,
+    canManageDenominationChurches: false,
+    canViewChurches: true,
+    canCreateChurches: false,
+    canEditChurches: false,
+    canDeleteChurches: false,
+    canManageChurches: false,
+    canViewChurchStats: true,
+    canViewHierarchy: true,
+    canManageHierarchy: false,
+    canNavigateHierarchy: true,
+    canViewHierarchyMenu: true,
+    // Outras permissões
+    canViewReports: true,
+    canViewDashboard: true,
+    canManageChurch: false,
+    canManageUsers: false,
+    canManageSettings: false,
+    isAdmin: false,
+    isChurchAdmin: false,
     isPastor: false,
     isSecretary: false,
     isLeader: false,
@@ -319,7 +323,7 @@ const ROLE_PERMISSIONS = {
     canEditDenominations: false,
     canDeleteDenominations: false,
     canManageDenominations: false,
-    canManageDenomination: false, // Singular para compatibilidade backend
+    canManageDenomination: false,
     canViewDenominationStats: false,
     canManageDenominationChurches: false,
     canViewChurches: false,
@@ -343,60 +347,6 @@ const ROLE_PERMISSIONS = {
     isPastor: false,
     isSecretary: false,
     isLeader: true,
-    isMember: false,
-  },
-  
-  BRANCH_MANAGER: {
-    canViewMembers: true,
-    canCreateMembers: true,
-    canEditMembers: true,
-    canDeleteMembers: false,
-    canManageMembers: true,
-    canViewVisitors: true,
-    canCreateVisitors: true,
-    canEditVisitors: true,
-    canDeleteVisitors: false,
-    canManageVisitors: true,
-    canViewActivities: true,
-    canCreateActivities: true,
-    canEditActivities: true,
-    canDeleteActivities: true,
-    canManageActivities: true,
-    canViewBranches: true,
-    canCreateBranches: false,
-    canEditBranches: true, // Pode editar sua própria filial
-    canDeleteBranches: false,
-    canManageBranches: true, // Gerencia apenas sua filial
-    // Permissões hierárquicas - Gerente de filial tem acesso limitado
-    canViewDenominations: false,
-    canCreateDenominations: false,
-    canEditDenominations: false,
-    canDeleteDenominations: false,
-    canManageDenominations: false,
-    canManageDenomination: false,
-    canViewDenominationStats: false,
-    canManageDenominationChurches: false,
-    canViewChurches: true,
-    canCreateChurches: false,
-    canEditChurches: false,
-    canDeleteChurches: false,
-    canManageChurches: false,
-    canViewChurchStats: true,
-    canViewHierarchy: true,
-    canManageHierarchy: false,
-    canNavigateHierarchy: true,
-    // Outras permissões
-    canViewReports: true,
-    canViewDashboard: true,
-    canManageChurch: false,
-    canManageUsers: false,
-    canManageSettings: true, // Configurações da filial
-    canViewHierarchyMenu: true,
-    isAdmin: false,
-    isChurchAdmin: false,
-    isPastor: false,
-    isSecretary: false,
-    isLeader: false,
     isMember: false,
   },
 
@@ -520,83 +470,75 @@ export const usePermissions = (): UserPermissions => {
     }
 
     // Usar dados reais do backend via userChurch
-    if (userChurch && userChurch.role) {
-      const role = userChurch.role.toUpperCase();
+    // IMPORTANTE: userChurch.user_role contém o código do papel (CHURCH_ADMIN, PASTOR, etc.)
+    // enquanto userChurch.role contém o label legível (Admin de Igreja, Pastor, etc.)
+    if (userChurch && userChurch.user_role) {
+      const role = userChurch.user_role.toUpperCase();
       
       // Debug temporário
-      console.log('🔍 usePermissions - userChurch.role:', userChurch.role);
+      console.log('🔍 usePermissions - userChurch.user_role:', userChurch.user_role);
       console.log('🔍 usePermissions - role (uppercase):', role);
       console.log('🔍 usePermissions - userChurch full object:', userChurch);
       
       // Mapear roles do backend para permissões do frontend
-      // Backend usa underscore (denomination_admin) -> Frontend usa uppercase (DENOMINATION_ADMIN)
       switch (role) {
-        case 'DENOMINATION_ADMIN':
-          console.log('🔍 usePermissions - Matched DENOMINATION_ADMIN');
-          return ROLE_PERMISSIONS.DENOMINATION_ADMIN;
         case 'CHURCH_ADMIN':
-          console.log('🔍 usePermissions - Matched CHURCH_ADMIN');
+          console.log('✅ usePermissions - Matched CHURCH_ADMIN (papel principal)');
           return ROLE_PERMISSIONS.CHURCH_ADMIN;
         case 'BRANCH_MANAGER':
-          console.log('🔍 usePermissions - Matched BRANCH_MANAGER');
+          console.log('✅ usePermissions - Matched BRANCH_MANAGER');
           return ROLE_PERMISSIONS.BRANCH_MANAGER;
         case 'PASTOR':
-          console.log('🔍 usePermissions - Matched PASTOR');
+          console.log('✅ usePermissions - Matched PASTOR');
           return ROLE_PERMISSIONS.PASTOR;
         case 'SECRETARY':
-          console.log('🔍 usePermissions - Matched SECRETARY');
+          console.log('✅ usePermissions - Matched SECRETARY');
           return ROLE_PERMISSIONS.SECRETARY;
         case 'LEADER':
-          console.log('🔍 usePermissions - Matched LEADER');
+          console.log('✅ usePermissions - Matched LEADER');
           return ROLE_PERMISSIONS.LEADER;
         case 'MEMBER':
-          console.log('🔍 usePermissions - Matched MEMBER');
+          console.log('✅ usePermissions - Matched MEMBER');
           return ROLE_PERMISSIONS.MEMBER;
         default:
-          console.log('🔍 usePermissions - No match found, defaulting to MEMBER. Role was:', role);
+          console.log('⚠️ usePermissions - No match found, defaulting to MEMBER. Role was:', role);
           return ROLE_PERMISSIONS.MEMBER; // Default para member
       }
     }
     
     // Fallback: Lógica baseada no email para desenvolvimento/casos especiais
-    // Verificar se é admin de denominação
-    if (user.email?.includes('denominacao.admin')) {
-      return ROLE_PERMISSIONS.DENOMINATION_ADMIN;
-    }
-    
     // Verificar se é admin de igreja
-    if (user.email?.includes('igreja.admin') || user.email?.includes('church.admin')) {
+    if (user.email?.includes('igreja.admin') || user.email?.includes('church.admin') || user.email?.includes('admin')) {
+      console.log('🔍 usePermissions - Email contém admin, usando CHURCH_ADMIN');
       return ROLE_PERMISSIONS.CHURCH_ADMIN;
     }
     
     // Verificar se é gerente de filial
     if (user.email?.includes('filial.admin') || user.email?.includes('branch.manager')) {
+      console.log('🔍 usePermissions - Email contém filial/branch, usando BRANCH_MANAGER');
       return ROLE_PERMISSIONS.BRANCH_MANAGER;
     }
     
     // Verificar se é pastor
     if (user.email?.includes('pastor')) {
+      console.log('🔍 usePermissions - Email contém pastor, usando PASTOR');
       return ROLE_PERMISSIONS.PASTOR;
     }
     
     // Verificar se é secretário
     if (user.email?.includes('secretario') || user.email?.includes('secretary')) {
+      console.log('🔍 usePermissions - Email contém secretario/secretary, usando SECRETARY');
       return ROLE_PERMISSIONS.SECRETARY;
     }
     
     // Verificar se é líder
     if (user.email?.includes('lider') || user.email?.includes('leader')) {
+      console.log('🔍 usePermissions - Email contém lider/leader, usando LEADER');
       return ROLE_PERMISSIONS.LEADER;
     }
-    
-    // Verificar se é admin geral (fallback)
-    const isAdmin = user.email?.includes('admin') || false;
-    
-    if (isAdmin) {
-      return ROLE_PERMISSIONS.CHURCH_ADMIN;
-    }
 
-    // Para membros comuns
+    // Para membros comuns (fallback final)
+    console.log('🔍 usePermissions - Nenhuma correspondência, usando MEMBER');
     return ROLE_PERMISSIONS.MEMBER;
   }, [user, userChurch]);
 

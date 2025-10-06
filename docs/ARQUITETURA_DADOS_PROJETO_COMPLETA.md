@@ -404,10 +404,174 @@ Chaves primárias (PK) em **negrito**, chaves estrangeiras (FK) indicadas com *a
 |       |                           | start_datetime / end_datetime (timestamp)                   |                                                                             |
 |       |                           | created_at (timestamp)                                      |                                                                             |
 | 7     | **auth_user**             | (padrão Django)                                             | Gerado por django.contrib.auth.                                            |
-| 8     | **church_user**           | **user_id*** (int)                                          | **PK composta** (user_id, church_id). Permite que um mesmo login acesse vários tenants com papéis distintos. |
+| 8     | **accounts_customuser**   | **id** (int, auto)                                          | **Tabela principal de usuários da plataforma**. Substitui auth_user do Django. |
+|       |                           | email (varchar 254, unique para ativos)                     | Campo usado para login (USERNAME_FIELD). Unique constraint condicional.    |
+|       |                           | username (varchar 150, unique)                              | Gerado automaticamente a partir do email. Mantido por compatibilidade Django. |
+|       |                           | password (varchar 128)                                      | Senha criptografada (PBKDF2).                                              |
+|       |                           | full_name (varchar 200)                                     | Nome completo do usuário (REQUIRED_FIELD).                                 |
+|       |                           | phone (varchar 20)                                          | Telefone com validação de formato brasileiro.                              |
+|       |                           | is_profile_complete (bool, default False)                   | Indica se completou todas as etapas do cadastro.                           |
+|       |                           | subscription_plan (varchar 20, nullable)                    | Plano SaaS: 'basic', 'professional', 'premium', 'enterprise'. Apenas para CHURCH_ADMIN. |
+|       |                           | is_active (bool, default True)                              | Indica se usuário está ativo no sistema.                                   |
+|       |                           | is_staff (bool, default False)                              | Acesso ao Django Admin.                                                    |
+|       |                           | is_superuser (bool, default False)                          | Superusuário Django (apenas desenvolvedores/donos).                        |
+|       |                           | date_joined (timestamp)                                     | Data de criação da conta.                                                  |
+|       |                           | last_login (timestamp, nullable)                            | Último acesso ao sistema.                                                  |
+|       |                           | created_at, updated_at (timestamp)                          | Auditoria automática via BaseModel.                                        |
+| 9     | **accounts_userprofile**  | **user_id*** (int, PK e FK → accounts_customuser)          | Dados complementares do perfil (1:1 com CustomUser).                       |
+|       |                           | bio (text, nullable)                                        | Biografia/descrição do usuário.                                            |
+|       |                           | birth_date (date, nullable)                                 | Data de nascimento.                                                        |
+|       |                           | gender (char 1, nullable)                                   | 'M', 'F', 'O', 'N' (Não informar).                                        |
+|       |                           | cpf (char 14, nullable, unique)                             | CPF formatado (XXX.XXX.XXX-XX).                                           |
+|       |                           | avatar (varchar 100, nullable)                              | Caminho para foto de perfil (ImageField).                                  |
+|       |                           | email_notifications (bool, default True)                    | Preferência de notificações por email.                                     |
+|       |                           | sms_notifications (bool, default False)                     | Preferência de notificações por SMS.                                       |
+|       |                           | created_at, updated_at (timestamp)                          |                                                                             |
+| 10    | **church_user**           | **user_id*** (int)                                          | **PK composta** (user_id, church_id). Permite que um mesmo login acesse vários tenants com papéis distintos. |
 |       |                           | **church_id*** (int)                                        |                                                                             |
 |       |                           | branch_id* (int, nullable)                                  |                                                                             |
-|       |                           | role (varchar 50)                                           |                                                                             |
+|       |                           | role (varchar 50)                                           | Papel do usuário: SUPER_ADMIN, CHURCH_ADMIN, PASTOR, SECRETARY, LEADER, MEMBER, READ_ONLY, VISITOR. |
+|       |                           | can_manage_members (bool, default False)                    | Permissão para gerenciar membros.                                          |
+|       |                           | can_manage_visitors (bool, default False)                   | Permissão para gerenciar visitantes.                                       |
+|       |                           | can_manage_activities (bool, default False)                 | Permissão para gerenciar atividades.                                       |
+|       |                           | can_manage_branches (bool, default False)                   | Permissão para gerenciar filiais.                                          |
+|       |                           | managed_branches (M2M → Branch)                             | Filiais específicas que o usuário pode gerenciar (Branch Managers).        |
+|       |                           | is_user_active_church (bool, default False)                 | Indica se esta é a igreja ativa do usuário (contexto atual).               |
+|       |                           | is_active (bool, default True)                              | Indica se o vínculo usuário-igreja está ativo.                             |
+|       |                           | created_at, updated_at (timestamp)                          |                                                                             |
+
+### 3.1.1 Detalhamento: Tabela `accounts_customuser`
+
+Esta é a **tabela principal de autenticação e usuários** da plataforma. Ela substitui o modelo padrão `auth_user` do Django, utilizando **email como campo de login**.
+
+#### Características Principais:
+
+1. **Herda de `AbstractUser`**: Mantém compatibilidade com o sistema de autenticação do Django
+2. **Email como USERNAME_FIELD**: Login é feito por email, não por username
+3. **Unique Constraint Condicional**: Email é único apenas para usuários ativos (`is_active=True`)
+4. **Manager Customizado** (`CustomUserManager`): Gera username automaticamente a partir do email
+5. **Multi-tenant Support**: Um usuário pode ter acesso a múltiplas igrejas via `ChurchUser`
+
+#### Campos Críticos:
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `email` | EmailField | ✅ Sim | Campo de login. Único para usuários ativos. |
+| `full_name` | CharField(200) | ✅ Sim | Nome completo do usuário. |
+| `phone` | CharField(20) | ✅ Sim | Telefone formatado (XX) XXXXX-XXXX. |
+| `password` | CharField(128) | ✅ Sim | Senha criptografada (PBKDF2). |
+| `is_profile_complete` | BooleanField | ❌ Não | Indica conclusão do cadastro (etapas 1, 2 e 3). |
+| `subscription_plan` | CharField(20) | ❌ Não | Plano SaaS do Church Admin (basic/professional/premium/enterprise). |
+
+#### Fluxo de Criação:
+
+**1. Cadastro via Plataforma (Etapas 1, 2, 3):**
+```python
+# Etapa 1 - Dados Pessoais
+user = CustomUser.objects.create_user(
+    email="usuario@email.com",
+    password="senha_segura",
+    full_name="João Silva",
+    phone="(11) 99999-9999"
+)
+# is_profile_complete = False
+
+# Etapa 2 - Denominação e Endereço (salvo no UserProfile)
+profile = user.profile
+profile.birth_date = "1990-01-01"
+profile.gender = "M"
+profile.save()
+
+# Etapa 3 - Escolha de Plano
+user.subscription_plan = "basic"  # ou professional/premium/enterprise
+user.is_profile_complete = True
+user.save()
+
+# Criar vínculo com igreja
+ChurchUser.objects.create(
+    user=user,
+    church=church,
+    role=RoleChoices.CHURCH_ADMIN  # Papel após mudança de nomenclatura
+)
+```
+
+**2. Criação de Super Admin (Apenas via Command):**
+```bash
+python manage.py create_platform_admin \
+  --email admin@obreirovirtual.com \
+  --name "Administrador Principal" \
+  --phone "(11) 99999-9999"
+```
+
+#### Segurança e Validações:
+
+- ✅ **Email único condicional**: Constraint garante email único apenas para `is_active=True`
+- ✅ **Password hashing**: Usa PBKDF2 via Django
+- ✅ **Username auto-gerado**: Evita conflitos, gerado automaticamente pelo manager
+- ✅ **Role SUPER_ADMIN protegido**: Apenas via command `create_platform_admin`
+- ✅ **Validação de telefone**: Regex para formato brasileiro
+- ✅ **Audit trail**: Campos `created_at` e `updated_at` automáticos
+
+#### Relacionamentos:
+
+```
+accounts_customuser (1) ──── (1) accounts_userprofile
+                      ↓
+                     (N)
+                church_user (N) ──── (1) churches_church
+                      ↓
+                     (1)
+                branches_branch
+```
+
+#### Queries Comuns:
+
+```python
+# Buscar usuário por email
+user = CustomUser.objects.get(email='usuario@email.com')
+
+# Listar usuários Church Admin com plano premium
+admins = CustomUser.objects.filter(
+    subscription_plan='premium',
+    church_users__role=RoleChoices.CHURCH_ADMIN
+).distinct()
+
+# Buscar todas as igrejas de um usuário
+churches = Church.objects.filter(
+    church_users__user=user,
+    church_users__is_active=True
+)
+
+# Usuários que completaram o cadastro
+complete_users = CustomUser.objects.filter(
+    is_profile_complete=True,
+    is_active=True
+)
+```
+
+#### Índices Recomendados (Performance):
+
+```sql
+CREATE INDEX idx_customuser_email_active 
+ON accounts_customuser(email) 
+WHERE is_active = true;
+
+CREATE INDEX idx_customuser_subscription 
+ON accounts_customuser(subscription_plan) 
+WHERE subscription_plan IS NOT NULL;
+
+CREATE INDEX idx_customuser_profile_complete 
+ON accounts_customuser(is_profile_complete) 
+WHERE is_profile_complete = false;
+```
+
+#### Migrations Críticas:
+
+- **0001_initial.py**: Criação do modelo CustomUser
+- **0002_userprofile.py**: Criação do perfil complementar
+- **0017_convert_denomination_admin_to_church_admin.py**: Migração de papéis (DENOMINATION_ADMIN → CHURCH_ADMIN)
+
+---
 
 ### 3.2 Notas de Implementação no Django
 

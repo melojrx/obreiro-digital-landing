@@ -3,6 +3,7 @@ Views para o app Branches
 Sistema de gestão de filiais com QR codes
 """
 
+from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -29,8 +30,17 @@ class BranchViewSet(viewsets.ModelViewSet):
     ordering = ['name']
     
     def get_queryset(self):
-        """Filtra filiais baseado no papel do usuário"""
+        """
+        Filtra filiais baseado no papel do usuário:
+        - CHURCH_ADMIN: vê todas as filiais da denominação (se houver) ou apenas sua igreja
+        - BRANCH_MANAGER: vê apenas filiais onde é gestor (através de ChurchUser.branches)
+        - PASTOR, SECRETARY, LEADER, MEMBER: vêem filiais de sua igreja
+        """
         user = self.request.user
+        
+        print(f"\n🔍 === GET QUERYSET BRANCHES ===")
+        print(f"📧 User: {user.email}")
+        print(f"🔐 Is Superuser: {user.is_superuser}")
         
         if user.is_superuser:
             return Branch.objects.all()
@@ -40,41 +50,88 @@ class BranchViewSet(viewsets.ModelViewSet):
             from apps.accounts.models import ChurchUser, RoleChoices
             church_users = ChurchUser.objects.filter(user=user, is_active=True)
             
+            print(f"👥 Total ChurchUsers: {church_users.count()}")
+            for cu in church_users:
+                print(f"  - Church: {cu.church.name if cu.church else 'None'}, Role: {cu.role}")
+            
             if not church_users.exists():
+                print("❌ Nenhum ChurchUser encontrado")
                 return Branch.objects.none()
             
-            # Coletar todas as igrejas que o usuário tem acesso
-            accessible_churches = set()
+            # Coletar todas as filiais acessíveis
+            accessible_branch_ids = set()
+            accessible_church_ids = set()
             
             for church_user in church_users:
                 if not church_user.church:
                     continue
-                    
-                # Church Admin: vê filiais de todas as igrejas da denominação (se houver)
+                
+                print(f"\n🏛️ Processando ChurchUser: Role={church_user.role}, Church={church_user.church.name}")
+                
+                # CHURCH_ADMIN: vê filiais de todas as igrejas da denominação
                 if church_user.role == RoleChoices.CHURCH_ADMIN:
+                    print(f"  ✅ É CHURCH_ADMIN")
                     if church_user.church.denomination:
-                        # Adicionar todas as igrejas da denominação
                         from apps.churches.models import Church
                         denomination_churches = Church.objects.filter(
                             denomination=church_user.church.denomination,
                             is_active=True
                         )
-                        accessible_churches.update(denomination_churches.values_list('id', flat=True))
+                        church_ids = list(denomination_churches.values_list('id', flat=True))
+                        accessible_church_ids.update(church_ids)
+                        print(f"  📋 Denominação encontrada, churches: {church_ids}")
                     else:
-                        # Se não tem denominação, adicionar apenas sua igreja
-                        accessible_churches.add(church_user.church.id)
+                        accessible_church_ids.add(church_user.church.id)
+                        print(f"  📋 Sem denominação, church_id: {church_user.church.id}")
+                
+                # BRANCH_MANAGER: vê apenas filiais específicas atribuídas
+                elif church_user.role == 'branch_manager':  # RoleChoices não tem BRANCH_MANAGER ainda
+                    print(f"  ✅ É BRANCH_MANAGER")
+                    if hasattr(church_user, 'branches') and church_user.branches.exists():
+                        # Se tem filiais específicas atribuídas
+                        branch_ids = list(church_user.branches.filter(is_active=True).values_list('id', flat=True))
+                        accessible_branch_ids.update(branch_ids)
+                        print(f"  📋 Branches atribuídas: {branch_ids}")
+                    else:
+                        # Se não tem filiais atribuídas, vê filiais da igreja
+                        accessible_church_ids.add(church_user.church.id)
+                        print(f"  📋 Sem branches atribuídas, usando church_id: {church_user.church.id}")
+                
+                # Outros papéis: vêem filiais de sua igreja
                 else:
-                    # Outros papéis: adicionar apenas sua igreja específica
-                    accessible_churches.add(church_user.church.id)
+                    accessible_church_ids.add(church_user.church.id)
+                    print(f"  📋 Outro papel, usando church_id: {church_user.church.id}")
             
-            # Retornar filiais de todas as igrejas acessíveis
-            return Branch.objects.filter(
-                church_id__in=accessible_churches,
-                is_active=True
-            )
+            print(f"\n🎯 Resumo de acessos:")
+            print(f"  - accessible_branch_ids: {accessible_branch_ids}")
+            print(f"  - accessible_church_ids: {accessible_church_ids}")
+            
+            # Construir queryset final
+            queryset = Branch.objects.filter(is_active=True)
+            print(f"  - Total branches ativas no banco: {queryset.count()}")
+            
+            # Filtrar por filiais específicas OU por igrejas
+            if accessible_branch_ids:
+                queryset = queryset.filter(
+                    Q(id__in=accessible_branch_ids) | 
+                    Q(church_id__in=accessible_church_ids)
+                )
+            elif accessible_church_ids:
+                queryset = queryset.filter(church_id__in=accessible_church_ids)
+            else:
+                print("❌ Nenhum acesso definido")
+                return Branch.objects.none()
+            
+            print(f"  - Branches após filtro: {queryset.count()}")
+            for branch in queryset:
+                print(f"    * {branch.name} (Church: {branch.church.name})")
+            
+            return queryset.distinct()
                 
         except Exception as e:
             print(f"❌ Erro ao filtrar filiais por papel do usuário: {e}")
+            import traceback
+            traceback.print_exc()
             return Branch.objects.none()
     
     def get_serializer_class(self):

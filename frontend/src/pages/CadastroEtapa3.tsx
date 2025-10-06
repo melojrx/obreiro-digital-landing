@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Edit2, CheckCircle, AlertCircle, Building, User, Check, Crown, Star, Zap } from 'lucide-react';
+import { ArrowLeft, Edit2, CheckCircle, AlertCircle, User, Check, Crown, Star, Zap } from 'lucide-react';
 import { getSubscriptionPlans, SubscriptionPlan } from '@/services/utils';
 
 // Tipos para os dados, podemos mover para um arquivo de tipos depois
 interface ChurchData {
   denomination_id?: number;
-  church_name: string;
+  user_zipcode?: string;
+  user_address?: string;
+  user_city?: string;
+  user_state?: string;
+  user_neighborhood?: string;
+  user_number?: string;
+  user_complement?: string;
   subscription_plan?: string;
-  // ... outros campos ...
 }
 
 const CadastroEtapa3 = () => {
@@ -24,6 +29,24 @@ const CadastroEtapa3 = () => {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [success, setSuccess] = useState(false);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
+
+  // Função para formatar data de YYYY-MM-DD para DD/MM/YYYY
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return '-';
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
+  // Função para formatar gênero
+  const formatGender = (gender?: string): string => {
+    if (!gender) return '-';
+    const genderMap: { [key: string]: string } = {
+      'M': 'Masculino',
+      'F': 'Feminino',
+      'O': 'Outro'
+    };
+    return genderMap[gender] || gender;
+  };
 
   // Redirecionar se não houver dados das etapas anteriores
   useEffect(() => {
@@ -52,13 +75,18 @@ const CadastroEtapa3 = () => {
       return;
     }
     
-    if (!step2Data || !step2Data.church_name || !step2Data.denomination_id) {
+    if (!step2Data || !step2Data.denomination_id) {
       console.log('❌ CadastroEtapa3: Dados da etapa 2 não encontrados, redirecionando...');
+      console.log('📦 step2Data recebido:', step2Data);
       navigate('/cadastro/etapa-2', { 
         state: { personalData: step1Data }
       });
       return;
     }
+    
+    console.log('✅ CadastroEtapa3: Dados validados!');
+    console.log('📦 step1Data:', step1Data);
+    console.log('📦 step2Data:', step2Data);
   }, [personalData, churchData, navigate]);
 
   // Buscar planos da API
@@ -107,7 +135,7 @@ const CadastroEtapa3 = () => {
     }
     
     try {
-      // Combinar TODOS os dados (pessoais + igreja + plano) para o novo endpoint
+      // Combinar TODOS os dados (pessoais + endereço + plano) para o novo endpoint
       const finalRegistrationData = {
         // Dados pessoais (etapa 1)
         email: step1Data.email,
@@ -117,24 +145,22 @@ const CadastroEtapa3 = () => {
         birth_date: step1Data.birth_date,
         gender: step1Data.gender,
         
-        // Dados da igreja (etapa 2)
+        // Dados de endereço do usuário (etapa 2)
         denomination_id: step2Data.denomination_id,
-        church_name: step2Data.church_name,
-        church_cnpj: step2Data.church_cnpj,
-        church_email: step2Data.church_email,
-        church_phone: step2Data.church_phone,
-        branch_name: step2Data.branch_name,
-        church_address: step2Data.church_address,
-        pastor_name: step2Data.pastor_name,
-        cpf: step2Data.cpf,
-        bio: step2Data.bio,
-        email_notifications: step2Data.email_notifications,
-        sms_notifications: step2Data.sms_notifications,
+        user_zipcode: step2Data.user_zipcode,
+        user_address: step2Data.user_address,
+        user_city: step2Data.user_city,
+        user_state: step2Data.user_state,
+        user_neighborhood: step2Data.user_neighborhood,
+        user_number: step2Data.user_number,
+        user_complement: step2Data.user_complement,
         
         // Plano (etapa 3)
         subscription_plan: selectedPlan.id,
-        role: 'DENOMINATION_ADMIN'
+        role: 'CHURCH_ADMIN'
       };
+      
+      console.log('📦 Dados finais para registro:', finalRegistrationData);
       
       await finalizeRegistration(finalRegistrationData);
       
@@ -341,14 +367,14 @@ const CadastroEtapa3 = () => {
               <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-semibold">
                 ✓
               </div>
-              <span className="ml-2 text-sm text-green-600 font-medium">Dados da Igreja</span>
+              <span className="ml-2 text-sm text-green-600 font-medium">Denominação</span>
             </div>
             <div className="w-12 h-px bg-blue-600"></div>
             <div className="flex items-center">
               <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">
                 3
               </div>
-              <span className="ml-2 text-sm font-medium text-blue-600">Confirmação</span>
+              <span className="ml-2 text-sm font-medium text-blue-600">Plano</span>
             </div>
           </div>
         </div>
@@ -415,7 +441,7 @@ const CadastroEtapa3 = () => {
                   </div>
                 </summary>
                 
-                <div className="mt-6 space-y-6">
+                <div className="mt-6">
                   {/* Dados Pessoais */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
@@ -434,30 +460,11 @@ const CadastroEtapa3 = () => {
                       </button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200 text-sm">
-                      <DataItem label="Nome" value={personalData?.full_name} />
+                      <DataItem label="Nome Completo" value={personalData?.full_name} />
                       <DataItem label="E-mail" value={personalData?.email} />
                       <DataItem label="Telefone" value={personalData?.phone} />
-                    </div>
-                  </div>
-
-                  {/* Dados da Igreja */}
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-semibold text-slate-800 flex items-center">
-                        <Building className="h-4 w-4 mr-2" />
-                        Dados da Igreja
-                      </h4>
-                      <button 
-                        onClick={handleBack}
-                        className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
-                      >
-                        <Edit2 size={12} /> Editar
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200 text-sm">
-                      <DataItem label="Igreja" value={churchData?.church_name} />
-                      <DataItem label="E-mail" value={churchData?.church_email} />
-                      <DataItem label="Pastor" value={churchData?.pastor_name} />
+                      <DataItem label="Data de Nascimento" value={formatDate(personalData?.birth_date)} />
+                      <DataItem label="Gênero" value={formatGender(personalData?.gender)} />
                     </div>
                   </div>
                 </div>

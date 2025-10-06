@@ -24,6 +24,7 @@ from apps.core.permissions import (
     IsChurchAdmin, IsPlatformAdmin,
     CanCreateChurches, CanManageChurchAdmins
 )
+from apps.accounts.models import LEGACY_DENOMINATION_ROLE
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -128,9 +129,9 @@ class ChurchViewSet(viewsets.ModelViewSet):
             logger.info(f"Denomination admin {user.email} acessando igrejas das denominações {list(denomination_ids)}")
             return queryset.filter(denomination_id__in=denomination_ids)
         
-        # Verificar se é denomination_admin via ChurchUser
+    # Verificar se há papéis legados de denominação via ChurchUser
         denomination_admin_churches = user.church_users.filter(
-            role='denomination_admin',
+            role=LEGACY_DENOMINATION_ROLE,
             is_active=True
         ).values_list('church__denomination_id', flat=True).distinct()
         
@@ -140,7 +141,7 @@ class ChurchViewSet(viewsets.ModelViewSet):
         
         # Administradores de igreja veem igrejas onde são admins
         admin_church_ids = user.church_users.filter(
-            role__in=['denomination_admin', 'church_admin'],
+            role__in=[LEGACY_DENOMINATION_ROLE, 'church_admin'],
             is_active=True
         ).values_list('church_id', flat=True)
         
@@ -218,6 +219,91 @@ class ChurchViewSet(viewsets.ModelViewSet):
     # ============================================
     # CUSTOM ACTIONS - ESTATÍSTICAS E RELATÓRIOS
     # ============================================
+    
+    @action(detail=False, methods=['post'], url_path='create-first-church', permission_classes=[permissions.IsAuthenticated])
+    def create_first_church(self, request):
+        """
+        Cria a primeira igreja para um usuário CHURCH_ADMIN recém-cadastrado.
+        Este endpoint é usado no onboarding após o cadastro.
+        Também cria automaticamente uma filial matriz com QR Code.
+        """
+        from .serializers import FirstChurchSerializer, ChurchDetailSerializer
+        from apps.branches.models import Branch
+        user = request.user
+        
+        # Verificar se o usuário tem papel pretendido válido para criar igreja
+        allowed_roles = {'church_admin', LEGACY_DENOMINATION_ROLE}  # legado convertido posteriormente
+        if not (hasattr(user, 'profile') and user.profile.intended_role in allowed_roles):
+            return Response(
+                {'error': 'Este endpoint é apenas para usuários Church Admin sem igreja cadastrada'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Usar o serializer para validar e criar
+        serializer = FirstChurchSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            church = serializer.save()
+            logger.info(f"✅ Primeira igreja '{church.name}' criada para {user.email} via onboarding")
+            
+            # Criar filial matriz automaticamente com QR Code
+            try:
+                main_branch = Branch.objects.create(
+                    church=church,
+                    name=f"{church.name} - Matriz",
+                    short_name=church.short_name or "Matriz",
+                    address=church.address,
+                    number=request.data.get('number', ''),
+                    complement=request.data.get('complement', ''),
+                    neighborhood=request.data.get('neighborhood', ''),
+                    city=church.city,
+                    state=church.state,
+                    zipcode=church.zipcode,
+                    phone=church.phone,
+                    email=church.email,
+                    qr_code_active=True,  # QR Code ativo por padrão
+                    is_active=True
+                )
+                logger.info(f"✅ Filial matriz criada com QR Code para igreja '{church.name}'")
+                logger.info(f"   QR Code UUID: {main_branch.qr_code_uuid}")
+                logger.info(f"   URL de registro: {main_branch.get_visitor_registration_url()}")
+                
+            except Exception as branch_error:
+                logger.warning(f"⚠️ Erro ao criar filial matriz: {str(branch_error)}")
+                # Não falhar a criação da igreja se houver erro na filial
+                # O admin pode criar a filial manualmente depois
+            
+            # Retornar dados completos da igreja criada
+            response_serializer = ChurchDetailSerializer(church)
+            
+            return Response({
+                'message': 'Igreja criada com sucesso! Bem-vindo ao Obreiro Virtual.',
+                'church': response_serializer.data,
+                'onboarding_completed': True,
+                'main_branch_created': True,  # Informar que filial foi criada
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"❌ Erro ao criar primeira igreja para {user.email}:")
+            logger.error(f"   Mensagem: {str(e)}")
+            logger.error(f"   Tipo: {type(e).__name__}")
+            logger.error(f"   Traceback:\n{error_trace}")
+            return Response(
+                {'error': f'Erro ao criar igreja: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     
     @action(detail=True, methods=['get'])
     def statistics(self, request, pk=None):
@@ -561,16 +647,21 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 total_members = church.total_members or 0
                 
             try:
-                # Contar todos os visitantes da igreja (não apenas do mês)
-                real_visitors_total = Visitor.objects.filter(church=church).count()
-                # Visitantes do mês atual
+                # Contar todos os visitantes da igreja (card mostra total, não apenas do mês)
+                real_visitors_total = Visitor.objects.filter(church=church, is_active=True).count()
+                # Visitantes do mês atual para cálculo de variação
                 real_visitors_this_month = Visitor.objects.filter(
-                    church=church, created_at__gte=start_of_this_month
+                    church=church, 
+                    is_active=True,
+                    created_at__gte=start_of_this_month
                 ).count()
-                # Usar total de visitantes se houver, senão usar do campo da igreja
-                total_visitors_this_month = real_visitors_total if real_visitors_total > 0 else (church.total_visitors or 0)
-            except:
-                total_visitors_this_month = church.total_visitors or 0
+                print(f"📊 Dashboard Visitantes - Total: {real_visitors_total}, Este mês: {real_visitors_this_month}")
+                # Mostrar total geral de visitantes
+                total_visitors_display = real_visitors_total
+            except Exception as e:
+                print(f"❌ Erro ao contar visitantes: {e}")
+                total_visitors_display = church.total_visitors or 0
+                real_visitors_this_month = 0
                 
             try:
                 active_events = Activity.objects.filter(
@@ -594,12 +685,14 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 
             try:
                 real_visitors_last_month = Visitor.objects.filter(
-                    church=church, created_at__range=(start_of_last_month, end_of_last_month)
+                    church=church, 
+                    is_active=True,
+                    created_at__range=(start_of_last_month, end_of_last_month)
                 ).count()
-                # Estimar: 85% dos visitantes atuais  
-                total_visitors_last_month = real_visitors_last_month if real_visitors_last_month > 0 else int(total_visitors_this_month * 0.85)
+                # Estimar: 85% dos visitantes deste mês
+                total_visitors_last_month = real_visitors_last_month if real_visitors_last_month > 0 else int(real_visitors_this_month * 0.85)
             except:
-                total_visitors_last_month = int(total_visitors_this_month * 0.85)
+                total_visitors_last_month = int(real_visitors_this_month * 0.85)
                 
             tithes_last_month = total_members_last_month * 140 # R$ 140 por membro no mês passado
             
@@ -614,8 +707,8 @@ class ChurchViewSet(viewsets.ModelViewSet):
                     'change': calculate_percentage_change(total_members, total_members_last_month)
                 },
                 'visitors': {
-                    'total': total_visitors_this_month,
-                    'change': calculate_percentage_change(total_visitors_this_month, total_visitors_last_month)
+                    'total': total_visitors_display,  # Total geral de visitantes
+                    'change': calculate_percentage_change(real_visitors_this_month, total_visitors_last_month)  # Mudança baseada no mês
                 },
                 'events': {
                     'total': active_events,
@@ -930,8 +1023,8 @@ class ChurchViewSet(viewsets.ModelViewSet):
     def eligible_admins(self, request):
         """Lista usuários elegíveis para serem administradores de igreja"""
         from django.contrib.auth import get_user_model
-        from apps.accounts.models import RoleChoices
-        
+        from apps.accounts.models import RoleChoices, LEGACY_DENOMINATION_ROLE
+
         User = get_user_model()
         
         # Buscar usuários que podem ser administradores
@@ -957,7 +1050,7 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 RoleChoices.CHURCH_ADMIN,
                 RoleChoices.PASTOR,
                 RoleChoices.SECRETARY,
-                RoleChoices.DENOMINATION_ADMIN
+                LEGACY_DENOMINATION_ROLE
             ]
             
             # Verificar se pode ser admin baseado nos papéis de sistema
@@ -1000,7 +1093,7 @@ class ChurchViewSet(viewsets.ModelViewSet):
         church = self.get_object()
         
         from django.contrib.auth import get_user_model
-        from apps.accounts.models import RoleChoices
+        from apps.accounts.models import RoleChoices, LEGACY_DENOMINATION_ROLE
         
         User = get_user_model()
         
@@ -1023,7 +1116,7 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 RoleChoices.CHURCH_ADMIN,
                 RoleChoices.PASTOR,
                 RoleChoices.SECRETARY,
-                RoleChoices.DENOMINATION_ADMIN
+                LEGACY_DENOMINATION_ROLE
             ]
             
             # Verificar se pode ser admin baseado nos papéis de sistema

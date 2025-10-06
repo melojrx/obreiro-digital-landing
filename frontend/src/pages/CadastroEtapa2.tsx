@@ -8,19 +8,13 @@ import { getAddressByCEP, CEPAddress, APIError } from '@/services/utils';
 const CadastroEtapa2 = () => {
   const [formData, setFormData] = useState({
     denomination_id: '',
-    church_name: '',
-    church_cnpj: '',
-    church_email: '',
-    church_phone: '',
-    branch_name: '',
-    church_address: '',
-    pastor_name: '',
-    church_zipcode: '',
-    church_city: '',
-    church_state: '',
-    church_neighborhood: '',
-    church_number: '',
-    church_complement: ''
+    user_zipcode: '',
+    user_address: '',
+    user_city: '',
+    user_state: '',
+    user_neighborhood: '',
+    user_number: '',
+    user_complement: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
@@ -67,19 +61,13 @@ const CadastroEtapa2 = () => {
       setFormData(prev => ({
         ...prev,
         denomination_id: source.denomination_id?.toString() || source.denomination_id || '',
-        church_name: source.church_name || '',
-        church_cnpj: source.church_cnpj || '',
-        church_email: source.church_email || '',
-        church_phone: source.church_phone || '',
-        branch_name: source.branch_name || '',
-        church_address: source.church_address || '',
-        pastor_name: source.pastor_name || '',
-        church_zipcode: source.church_zipcode || '',
-        church_city: source.church_city || '',
-        church_state: source.church_state || '',
-        church_neighborhood: source.church_neighborhood || '',
-        church_number: source.church_number || '',
-        church_complement: source.church_complement || ''
+        user_zipcode: source.user_zipcode || source.church_zipcode || '',
+        user_address: source.user_address || source.church_address || '',
+        user_city: source.user_city || source.church_city || '',
+        user_state: source.user_state || source.church_state || '',
+        user_neighborhood: source.user_neighborhood || source.church_neighborhood || '',
+        user_number: source.user_number || source.church_number || '',
+        user_complement: source.user_complement || source.church_complement || ''
       }));
     }
   }, [savedChurchData]);
@@ -137,98 +125,40 @@ const CadastroEtapa2 = () => {
       newErrors.denomination_id = 'Denominação é obrigatória';
     }
 
-    if (!formData.church_name) {
-      newErrors.church_name = 'Nome da igreja é obrigatório';
-    } else if (formData.church_name.length < 3) {
-      newErrors.church_name = 'Nome da igreja deve ter pelo menos 3 caracteres';
+    if (!formData.user_zipcode) {
+      newErrors.user_zipcode = 'CEP é obrigatório';
+    } else if (formData.user_zipcode.replace(/\D/g, '').length !== 8) {
+      newErrors.user_zipcode = 'CEP inválido';
     }
 
-    if (formData.church_cnpj && formData.church_cnpj.trim() !== '') {
-      // Só valida se o CNPJ foi preenchido
-      if (!/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(formData.church_cnpj)) {
-        newErrors.church_cnpj = 'CNPJ deve estar no formato XX.XXX.XXX/XXXX-XX';
-      }
+    if (!formData.user_address) {
+      newErrors.user_address = 'Endereço é obrigatório';
+    } else if (formData.user_address.length < 3) {
+      newErrors.user_address = 'Endereço deve ter pelo menos 3 caracteres';
     }
 
-    if (!formData.church_email) {
-      newErrors.church_email = 'E-mail da igreja é obrigatório';
-    } else if (!/\S+@\S+\.\S+/.test(formData.church_email)) {
-      newErrors.church_email = 'E-mail inválido';
+    if (!formData.user_number) {
+      newErrors.user_number = 'Número é obrigatório';
     }
 
-    if (!formData.church_phone) {
-      newErrors.church_phone = 'Telefone da igreja é obrigatório';
-    } else if (!/^\(\d{2}\)\s\d{4,5}-\d{4}$/.test(formData.church_phone)) {
-      newErrors.church_phone = 'Telefone deve estar no formato (XX) XXXXX-XXXX';
+    if (!formData.user_neighborhood) {
+      newErrors.user_neighborhood = 'Bairro é obrigatório';
     }
 
-    if (!formData.church_address) {
-      newErrors.church_address = 'Endereço é obrigatório';
-    } else if (formData.church_address.length < 10) {
-      newErrors.church_address = 'Endereço deve ser mais detalhado';
+    if (!formData.user_city) {
+      newErrors.user_city = 'Cidade é obrigatória';
     }
 
-    if (!formData.pastor_name) {
-      newErrors.pastor_name = 'Nome do pastor responsável é obrigatório';
-    } else if (formData.pastor_name.length < 3) {
-      newErrors.pastor_name = 'Nome deve ter pelo menos 3 caracteres';
+    if (!formData.user_state) {
+      newErrors.user_state = 'Estado é obrigatório';
+    } else if (formData.user_state.length !== 2) {
+      newErrors.user_state = 'Estado inválido (use sigla UF)';
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const formatCNPJ = (value: string) => {
-    // Remove caracteres não numéricos
-    const numbers = value.replace(/\D/g, '');
-    
-    // Aplica formatação CNPJ
-    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-  };
-
-  const handleCNPJChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatCNPJ(e.target.value);
-    setFormData(prev => ({
-      ...prev,
-      church_cnpj: formatted
-    }));
-    try { localStorage.setItem('registration_step2_data', JSON.stringify({ ...formData, church_cnpj: formatted })); } catch {}
-    
-    if (errors.church_cnpj) {
-      setErrors(prev => ({
-        ...prev,
-        church_cnpj: ''
-      }));
-    }
-  };
-
-  const formatPhone = (value: string) => {
-    // Remove caracteres não numéricos
-    const numbers = value.replace(/\D/g, '');
-    
-    // Aplica formatação
-    if (numbers.length <= 10) {
-      return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-    } else {
-      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-    }
-  };
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhone(e.target.value);
-    setFormData(prev => ({
-      ...prev,
-      church_phone: formatted
-    }));
-    try { localStorage.setItem('registration_step2_data', JSON.stringify({ ...formData, church_phone: formatted })); } catch {}
-    
-    if (errors.church_phone) {
-      setErrors(prev => ({
-        ...prev,
-        church_phone: ''
-      }));
-    }
-  };
 
   const handleCepSearch = useCallback(async (cep: string) => {
     const onlyDigits = cep.replace(/\D/g, '');
@@ -240,25 +170,32 @@ const CadastroEtapa2 = () => {
     setCepError(null);
     try {
       const address = await getAddressByCEP(onlyDigits);
+      
+      // Atualiza campos de endereço do usuário
       setFormData(prev => {
         const updated = {
           ...prev,
-          church_address: address.logradouro,
-          church_city: address.localidade,
-          church_state: address.uf,
-          church_neighborhood: address.bairro,
+          user_address: address.logradouro || prev.user_address,
+          user_city: address.localidade || prev.user_city,
+          user_state: address.uf || prev.user_state,
+          user_neighborhood: address.bairro || prev.user_neighborhood
         };
         try { localStorage.setItem('registration_step2_data', JSON.stringify(updated)); } catch {}
         return updated;
       });
-      // Focar no campo de número após a busca
-      document.getElementById('church_number')?.focus();
-    } catch (err) {
-      if (err instanceof APIError) {
-        setCepError(err.message);
-      } else {
-        setCepError('Erro desconhecido ao buscar CEP.');
-      }
+
+      // Remove erros dos campos preenchidos
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        if (address.logradouro) delete newErrors.user_address;
+        if (address.localidade) delete newErrors.user_city;
+        if (address.uf) delete newErrors.user_state;
+        if (address.bairro) delete newErrors.user_neighborhood;
+        return newErrors;
+      });
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      setCepError('CEP não encontrado ou inválido');
     } finally {
       setIsCepLoading(false);
     }
@@ -273,7 +210,7 @@ const CadastroEtapa2 = () => {
       .slice(0, 9);
 
     setFormData(prev => {
-      const updated = { ...prev, church_zipcode: formattedCep };
+      const updated = { ...prev, user_zipcode: formattedCep };
       try { localStorage.setItem('registration_step2_data', JSON.stringify(updated)); } catch {}
       return updated;
     });
@@ -287,36 +224,47 @@ const CadastroEtapa2 = () => {
     e.preventDefault();
     
     console.log('🔥 handleSubmit Etapa 2 iniciado');
+    console.log('📋 Dados do formulário:', formData);
     
     if (!validateForm()) {
-      console.log('❌ Validação falhou');
+      console.log('❌ Validação falhou. Erros:', errors);
       return;
     }
 
+    console.log('✅ Validação passou!');
+
     const profileData = {
       denomination_id: formData.denomination_id ? parseInt(formData.denomination_id) : undefined,
-      church_name: formData.church_name,
-      church_cnpj: formData.church_cnpj || undefined,
-      church_email: formData.church_email,
-      church_phone: formData.church_phone,
-      branch_name: formData.branch_name || undefined,
-      church_address: formData.church_address,
-      church_city: formData.church_city || undefined,
-      church_state: formData.church_state || undefined,
-      church_zipcode: formData.church_zipcode || undefined,
-      pastor_name: formData.pastor_name,
-      role: 'pastor'
+      user_zipcode: formData.user_zipcode || undefined,
+      user_address: formData.user_address,
+      user_city: formData.user_city || undefined,
+      user_state: formData.user_state || undefined,
+      user_neighborhood: formData.user_neighborhood || undefined,
+      user_number: formData.user_number,
+      user_complement: formData.user_complement || undefined
     };
 
+    console.log('📦 Profile data preparado:', profileData);
+
     try {
-      console.log('💾 Validando e persistindo dados da etapa 2...');
+      console.log('💾 Persistindo dados da etapa 2 no localStorage...');
       
       // Persistir dados da etapa 2 para usar na finalização
       try { 
         localStorage.setItem('registration_step2_data', JSON.stringify(formData)); 
-      } catch {}
+        console.log('✅ Dados salvos no localStorage');
+      } catch (storageErr) {
+        console.error('⚠️ Erro ao salvar no localStorage:', storageErr);
+      }
       
-      console.log('✅ Dados da etapa 2 validados e persistidos, navegando para Etapa 3');
+      console.log('🚀 Navegando para Etapa 3...');
+      console.log('📍 Rota: /cadastro/etapa-3');
+      console.log('📦 State:', { 
+        personalData: personalData,
+        churchData: profileData,
+        rawFormData: formData,
+        validated: true
+      });
       
       // Navegar para etapa 3 com todos os dados
       navigate('/cadastro/etapa-3', { 
@@ -328,27 +276,27 @@ const CadastroEtapa2 = () => {
         } 
       });
       
+      console.log('✅ Navigate executado!');
+      
     } catch (err) {
-      console.error('❌ Erro ao validar dados:', err);
+      console.error('❌ Erro ao processar dados:', err);
+      alert('Erro ao processar dados. Verifique o console para detalhes.');
     }
   };
 
 
   const handleBack = async () => {
     // Salvar progresso atual antes de voltar
-    if (Object.values(formData).some(value => value.trim() !== '')) {
+    if (Object.values(formData).some(value => typeof value === 'string' && value.trim() !== '')) {
       const profileData = {
         denomination_id: formData.denomination_id ? parseInt(formData.denomination_id) : undefined,
-        church_name: formData.church_name || undefined,
-        church_cnpj: formData.church_cnpj || undefined,
-        church_email: formData.church_email || undefined,
-        church_phone: formData.church_phone || undefined,
-        branch_name: formData.branch_name || undefined,
-        church_address: formData.church_address || undefined,
-        church_city: formData.church_city || undefined,
-        church_state: formData.church_state || undefined,
-        church_zipcode: formData.church_zipcode || undefined,
-        pastor_name: formData.pastor_name || undefined,
+        user_zipcode: formData.user_zipcode || undefined,
+        user_address: formData.user_address || undefined,
+        user_city: formData.user_city || undefined,
+        user_state: formData.user_state || undefined,
+        user_neighborhood: formData.user_neighborhood || undefined,
+        user_number: formData.user_number || undefined,
+        user_complement: formData.user_complement || undefined
       };
       
       try {
@@ -411,7 +359,7 @@ const CadastroEtapa2 = () => {
           </div>
           <div className="bg-blue-600 text-white py-6 px-8 rounded-t-2xl">
             <h1 className="text-2xl font-bold mb-2">Cadastro - Etapa 2 de 3</h1>
-            <p className="text-blue-100">Informações de Igreja</p>
+            <p className="text-blue-100">Denominação e Endereço</p>
           </div>
         </div>
 
@@ -487,319 +435,182 @@ const CadastroEtapa2 = () => {
               )}
             </div>
 
-            {/* Nome da Igreja */}
+            {/* Divider */}
+            <div className="border-t border-slate-200 my-6">
+              <h3 className="text-lg font-semibold text-slate-800 mt-6 mb-4">Seu Endereço</h3>
+            </div>
+
+            {/* CEP com busca automática */}
             <div>
-              <label htmlFor="church_name" className="block text-sm font-semibold text-slate-700 mb-2">
-                Nome da Igreja*
+              <label htmlFor="user_zipcode" className="block text-sm font-semibold text-slate-700 mb-2">
+                CEP*
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building className="h-5 w-5 text-slate-400" />
+                  <MapPin className="h-5 w-5 text-slate-400" />
                 </div>
                 <input
-                  id="church_name"
-                  name="church_name"
+                  id="user_zipcode"
+                  name="user_zipcode"
                   type="text"
                   required
-                  value={formData.church_name}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    errors.church_name ? 'border-red-300' : 'border-gray-200'
+                  value={formData.user_zipcode}
+                  onChange={handleCEPChange}
+                  disabled={isLoading || isCepLoading}
+                  className={`block w-full pl-10 pr-10 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    errors.user_zipcode ? 'border-red-300' : 'border-gray-200'
                   }`}
-                  placeholder="Nome completo da igreja"
+                  placeholder="00000-000"
+                  maxLength={9}
                 />
+                {isCepLoading && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    <Loader2 className="h-5 w-5 text-slate-400 animate-spin" />
+                  </div>
+                )}
               </div>
-              {errors.church_name && (
-                <p className="mt-1 text-sm text-red-600">{errors.church_name}</p>
+              {errors.user_zipcode && (
+                <p className="mt-1 text-sm text-red-600">{errors.user_zipcode}</p>
               )}
+              {cepError && <p className="mt-1 text-sm text-red-600">{cepError}</p>}
             </div>
 
-            {/* CNPJ da Igreja */}
-            <div>
-              <label htmlFor="church_cnpj" className="block text-sm font-semibold text-slate-700 mb-2">
-                CNPJ da Igreja
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FileText className="h-5 w-5 text-slate-400" />
-                </div>
+            {/* Endereço e Número */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label htmlFor="user_address" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Logradouro (Rua, Av.)*
+                </label>
                 <input
-                  id="church_cnpj"
-                  name="church_cnpj"
+                  id="user_address"
+                  name="user_address"
                   type="text"
-                  value={formData.church_cnpj}
-                  onChange={handleCNPJChange}
-                  disabled={isLoading}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    errors.church_cnpj ? 'border-red-300' : 'border-gray-200'
+                  required
+                  value={formData.user_address}
+                  onChange={handleInputChange}
+                  disabled={isLoading || isCepLoading}
+                  className={`block w-full py-3 px-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:bg-slate-50 disabled:opacity-70 ${
+                    errors.user_address ? 'border-red-300' : 'border-gray-200'
                   }`}
-                  placeholder="00.000.000/0000-00 (opcional)"
-                  maxLength={18}
+                  placeholder="Preenchido automaticamente pelo CEP"
                 />
+                {errors.user_address && (
+                  <p className="mt-1 text-sm text-red-600">{errors.user_address}</p>
+                )}
               </div>
-              {errors.church_cnpj && (
-                <p className="mt-1 text-sm text-red-600">{errors.church_cnpj}</p>
-              )}
-              <p className="mt-1 text-xs text-slate-500">Campo opcional</p>
+              <div>
+                <label htmlFor="user_number" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Número*
+                </label>
+                <input
+                  id="user_number"
+                  name="user_number"
+                  type="text"
+                  required
+                  value={formData.user_number}
+                  onChange={handleInputChange}
+                  disabled={isLoading || isCepLoading}
+                  className={`block w-full py-3 px-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 ${
+                    errors.user_number ? 'border-red-300' : 'border-gray-200'
+                  }`}
+                  placeholder="Nº"
+                />
+                {errors.user_number && (
+                  <p className="mt-1 text-sm text-red-600">{errors.user_number}</p>
+                )}
+              </div>
             </div>
 
-            {/* E-mail e Telefone da Igreja */}
+            {/* Bairro e Complemento */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* E-mail da Igreja */}
               <div>
-                <label htmlFor="church_email" className="block text-sm font-semibold text-slate-700 mb-2">
-                  E-mail da Igreja*
+                <label htmlFor="user_neighborhood" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Bairro*
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-slate-400" />
-                  </div>
-                  <input
-                    id="church_email"
-                    name="church_email"
-                    type="email"
-                    required
-                    value={formData.church_email}
-                    onChange={handleInputChange}
-                    disabled={isLoading}
-                    className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      errors.church_email ? 'border-red-300' : 'border-gray-200'
-                    }`}
-                    placeholder="igreja@email.com"
-                  />
-                </div>
-                {errors.church_email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.church_email}</p>
-                )}
-              </div>
-
-              {/* Telefone da Igreja */}
-              <div>
-                <label htmlFor="church_phone" className="block text-sm font-semibold text-slate-700 mb-2">
-                  Telefone da Igreja*
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Phone className="h-5 w-5 text-slate-400" />
-                  </div>
-                  <input
-                    id="church_phone"
-                    name="church_phone"
-                    type="tel"
-                    required
-                    value={formData.church_phone}
-                    onChange={handlePhoneChange}
-                    disabled={isLoading}
-                    className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      errors.church_phone ? 'border-red-300' : 'border-gray-200'
-                    }`}
-                    placeholder="(00) 0000-0000"
-                    maxLength={15}
-                  />
-                </div>
-                {errors.church_phone && (
-                  <p className="mt-1 text-sm text-red-600">{errors.church_phone}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Nome da Filial/Campus */}
-            <div>
-              <label htmlFor="branch_name" className="block text-sm font-semibold text-slate-700 mb-2">
-                Nome da Filial/Campus
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building className="h-5 w-5 text-slate-400" />
-                </div>
                 <input
-                  id="branch_name"
-                  name="branch_name"
-                  type="text"
-                  value={formData.branch_name}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    errors.branch_name ? 'border-red-300' : 'border-gray-200'
-                  }`}
-                  placeholder="Sede ou nome da filial"
-                />
-              </div>
-              <p className="mt-1 text-xs text-slate-500">Deixe em branco se for a sede principal</p>
-              {errors.branch_name && (
-                <p className="mt-1 text-sm text-red-600">{errors.branch_name}</p>
-              )}
-            </div>
-
-            {/* Endereço com busca por CEP */}
-            <div className="space-y-4 rounded-lg border border-slate-200 p-4">
-              <h3 className="font-semibold text-slate-800">Endereço da Igreja</h3>
-              
-              {/* CEP */}
-              <div>
-                <label htmlFor="church_zipcode" className="block text-sm font-semibold text-slate-700 mb-2">
-                  CEP*
-                </label>
-                <div className="relative">
-                  <input
-                    id="church_zipcode"
-                    name="church_zipcode"
-                    type="text"
-                    required
-                    value={formData.church_zipcode}
-                    onChange={handleCEPChange}
-                    disabled={isLoading || isCepLoading}
-                    className={`block w-full pr-10 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    placeholder="Digite o CEP"
-                    maxLength={9}
-                  />
-                  {isCepLoading && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <Loader2 className="h-5 w-5 text-slate-400 animate-spin" />
-                    </div>
-                  )}
-                </div>
-                {cepError && <p className="mt-1 text-sm text-red-600">{cepError}</p>}
-              </div>
-
-              {/* Logradouro e Número */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label htmlFor="church_address" className="block text-sm font-semibold text-slate-700 mb-2">
-                    Logradouro (Rua, Av.)*
-                  </label>
-                  <input
-                    id="church_address"
-                    name="church_address"
-                    type="text"
-                    required
-                    value={formData.church_address}
-                    onChange={handleInputChange}
-                    disabled={isLoading || isCepLoading}
-                    className="block w-full py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:bg-slate-50 disabled:opacity-70"
-                    placeholder="Preenchido automaticamente"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="church_number" className="block text-sm font-semibold text-slate-700 mb-2">
-                    Número*
-                  </label>
-                  <input
-                    id="church_number"
-                    name="church_number"
-                    type="text"
-                    required
-                    value={formData.church_number}
-                    onChange={handleInputChange}
-                    disabled={isLoading || isCepLoading}
-                    className="block w-full py-3 border rounded-xl"
-                  />
-                </div>
-              </div>
-              
-              {/* Bairro e Complemento */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                   <label htmlFor="church_neighborhood" className="block text-sm font-semibold text-slate-700 mb-2">
-                    Bairro*
-                  </label>
-                  <input
-                    id="church_neighborhood"
-                    name="church_neighborhood"
-                    type="text"
-                    required
-                    value={formData.church_neighborhood}
-                    onChange={handleInputChange}
-                    disabled={isLoading || isCepLoading}
-                    className="block w-full py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:bg-slate-50 disabled:opacity-70"
-                    placeholder="Preenchido automaticamente"
-                  />
-                </div>
-                <div>
-                   <label htmlFor="church_complement" className="block text-sm font-semibold text-slate-700 mb-2">
-                    Complemento
-                  </label>
-                  <input
-                    id="church_complement"
-                    name="church_complement"
-                    type="text"
-                    value={formData.church_complement}
-                    onChange={handleInputChange}
-                    disabled={isLoading || isCepLoading}
-                    className="block w-full py-3 border rounded-xl"
-                  />
-                </div>
-              </div>
-
-              {/* Cidade e UF */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label htmlFor="church_city" className="block text-sm font-semibold text-slate-700 mb-2">
-                    Cidade*
-                  </label>
-                  <input
-                    id="church_city"
-                    name="church_city"
-                    type="text"
-                    required
-                    value={formData.church_city}
-                    onChange={handleInputChange}
-                    disabled={isLoading || isCepLoading}
-                    className="block w-full py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:bg-slate-50 disabled:opacity-70"
-                    placeholder="Preenchido automaticamente"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="church_state" className="block text-sm font-semibold text-slate-700 mb-2">
-                    UF*
-                  </label>
-                  <input
-                    id="church_state"
-                    name="church_state"
-                    type="text"
-                    required
-                    value={formData.church_state}
-                    onChange={handleInputChange}
-                    disabled={isLoading || isCepLoading}
-                    className="block w-full py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:bg-slate-50 disabled:opacity-70"
-                    placeholder="UF"
-                    maxLength={2}
-                  />
-                </div>
-              </div>
-
-            </div>
-
-            {/* Pastor Responsável */}
-            <div>
-              <label htmlFor="pastor_name" className="block text-sm font-semibold text-slate-700 mb-2">
-                Pastor Responsável*
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  id="pastor_name"
-                  name="pastor_name"
+                  id="user_neighborhood"
+                  name="user_neighborhood"
                   type="text"
                   required
-                  value={formData.pastor_name}
+                  value={formData.user_neighborhood}
                   onChange={handleInputChange}
-                  disabled={isLoading}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    errors.pastor_name ? 'border-red-300' : 'border-gray-200'
+                  disabled={isLoading || isCepLoading}
+                  className={`block w-full py-3 px-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:bg-slate-50 disabled:opacity-70 ${
+                    errors.user_neighborhood ? 'border-red-300' : 'border-gray-200'
                   }`}
-                  placeholder="Nome do pastor responsável"
+                  placeholder="Preenchido automaticamente pelo CEP"
                 />
+                {errors.user_neighborhood && (
+                  <p className="mt-1 text-sm text-red-600">{errors.user_neighborhood}</p>
+                )}
               </div>
-              {errors.pastor_name && (
-                <p className="mt-1 text-sm text-red-600">{errors.pastor_name}</p>
-              )}
+              <div>
+                <label htmlFor="user_complement" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Complemento
+                </label>
+                <input
+                  id="user_complement"
+                  name="user_complement"
+                  type="text"
+                  value={formData.user_complement}
+                  onChange={handleInputChange}
+                  disabled={isLoading || isCepLoading}
+                  className="block w-full py-3 px-3 border border-gray-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70"
+                  placeholder="Apto, Bloco, etc. (opcional)"
+                />
+                <p className="mt-1 text-xs text-slate-500">Campo opcional</p>
+              </div>
             </div>
 
-            {/* Buttons */}
+            {/* Cidade e Estado */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="user_city" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Cidade*
+                </label>
+                <input
+                  id="user_city"
+                  name="user_city"
+                  type="text"
+                  required
+                  value={formData.user_city}
+                  onChange={handleInputChange}
+                  disabled={isLoading || isCepLoading}
+                  className={`block w-full py-3 px-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:bg-slate-50 disabled:opacity-70 ${
+                    errors.user_city ? 'border-red-300' : 'border-gray-200'
+                  }`}
+                  placeholder="Preenchido automaticamente pelo CEP"
+                />
+                {errors.user_city && (
+                  <p className="mt-1 text-sm text-red-600">{errors.user_city}</p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="user_state" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Estado (UF)*
+                </label>
+                <input
+                  id="user_state"
+                  name="user_state"
+                  type="text"
+                  required
+                  value={formData.user_state}
+                  onChange={handleInputChange}
+                  disabled={isLoading || isCepLoading}
+                  maxLength={2}
+                  className={`block w-full py-3 px-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:bg-slate-50 disabled:opacity-70 ${
+                    errors.user_state ? 'border-red-300' : 'border-gray-200'
+                  }`}
+                  placeholder="UF"
+                />
+                {errors.user_state && (
+                  <p className="mt-1 text-sm text-red-600">{errors.user_state}</p>
+                )}
+              </div>
+            </div>
+
+
+            {/* Botões de ação */}
             <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 pt-6">
               <button
                 type="button"

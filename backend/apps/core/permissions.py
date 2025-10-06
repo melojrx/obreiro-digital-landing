@@ -212,40 +212,52 @@ class IsChurchAdminOrCanManageMembers(BasePermission):
 # Permissões específicas para gestão de denominação
 class CanManageDenomination(BasePermission):
     """
-    Verifica se o usuário pode gerenciar denominação
+    Verifica se o usuário pode gerenciar denominação.
+    Apenas CHURCH_ADMIN pode gerenciar a denominação.
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         
+        from apps.accounts.models import RoleChoices
+        
+        # CHURCH_ADMIN pode gerenciar a denominação
         return request.user.church_users.filter(
-            can_manage_denomination=True,
+            role=RoleChoices.CHURCH_ADMIN,
             is_active=True
         ).exists()
 
 class CanCreateChurches(BasePermission):
     """
-    Verifica se o usuário pode criar igrejas
+    Verifica se o usuário pode criar igrejas.
+    Apenas CHURCH_ADMIN pode criar novas igrejas.
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         
+        from apps.accounts.models import RoleChoices
+        
+        # CHURCH_ADMIN pode criar igrejas na sua denominação
         return request.user.church_users.filter(
-            can_create_churches=True,
+            role=RoleChoices.CHURCH_ADMIN,
             is_active=True
         ).exists()
 
 class CanManageChurchAdmins(BasePermission):
     """
-    Verifica se o usuário pode gerenciar administradores de igreja
+    Verifica se o usuário pode gerenciar administradores de igreja.
+    Apenas CHURCH_ADMIN pode gerenciar outros admins.
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         
+        from apps.accounts.models import RoleChoices
+        
+        # Apenas CHURCH_ADMIN pode gerenciar outros admins
         return request.user.church_users.filter(
-            can_manage_church_admins=True,
+            role=RoleChoices.CHURCH_ADMIN,
             is_active=True
         ).exists()
 

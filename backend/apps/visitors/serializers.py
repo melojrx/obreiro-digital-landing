@@ -55,6 +55,12 @@ class VisitorSerializer(serializers.ModelSerializer):
         read_only=True
     )
     
+    # Campos obrigatórios com valores padrão
+    full_name = serializers.CharField(required=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    city = serializers.CharField(required=True)
+    state = serializers.CharField(required=True, max_length=2)
+    
     # Campos opcionais que podem ser vazios
     phone = serializers.CharField(required=False, allow_blank=True)
     cpf = serializers.CharField(required=False, allow_blank=True)
@@ -63,6 +69,17 @@ class VisitorSerializer(serializers.ModelSerializer):
     neighborhood = serializers.CharField(required=False, allow_blank=True)
     ministry_interest = serializers.CharField(required=False, allow_blank=True)
     observations = serializers.CharField(required=False, allow_blank=True)
+    birth_date = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    
+    # Campos booleanos com valores padrão
+    first_visit = serializers.BooleanField(required=False, default=True)
+    wants_prayer = serializers.BooleanField(required=False, default=False)
+    wants_growth_group = serializers.BooleanField(required=False, default=False)
+    
+    # Campos de relacionamento
+    church = serializers.PrimaryKeyRelatedField(required=False, allow_null=True, read_only=True)
+    branch = serializers.PrimaryKeyRelatedField(required=False, allow_null=True, read_only=True)
     
     def validate(self, data):
         """Validações customizadas para atualização"""
@@ -72,6 +89,15 @@ class VisitorSerializer(serializers.ModelSerializer):
         # Se não há dados, retornar erro
         if not data:
             raise serializers.ValidationError("Nenhum dado foi enviado para atualização")
+        
+        # Validar campos obrigatórios básicos (apenas em criação, não em atualização)
+        if not self.instance:  # Apenas em criação
+            required_fields = ['full_name', 'city', 'state']
+            missing_fields = [field for field in required_fields if not data.get(field)]
+            if missing_fields:
+                raise serializers.ValidationError(
+                    f"Campos obrigatórios ausentes: {', '.join(missing_fields)}"
+                )
         
         return data
     
@@ -89,7 +115,7 @@ class VisitorSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'is_active'
         ]
         read_only_fields = [
-            'id', 'uuid', 'church_name', 'branch_name', 'age', 
+            'id', 'uuid', 'church', 'church_name', 'branch', 'branch_name', 'age', 
             'converted_member_name', 'follow_up_status_display',
             'qr_code_used', 'registration_source', 'user_agent', 'ip_address',
             'created_at', 'updated_at'

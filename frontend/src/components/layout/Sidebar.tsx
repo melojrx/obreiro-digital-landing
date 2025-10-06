@@ -63,20 +63,20 @@ const Sidebar: React.FC = () => {
         { title: 'Atividades', icon: Calendar, href: '/atividades' },
       ]
     },
-    // Seção hierárquica - Para Denomination Admins E Church Admins
-    // Church Admin vê o menu hierárquico mas apenas suas filiais/igrejas
+    // Seção hierárquica - Para Church Admins (papel principal do SaaS)
+    // Church Admin pode criar múltiplas igrejas, filiais e gerenciar tudo
     ...(permissions.canViewHierarchyMenu ? [{
       title: 'GESTÃO HIERÁRQUICA',
       icon: TreePine,
       href: '#',
       children: [
-        // Gerenciar Igrejas - APENAS para Denomination Admins
+        // Gerenciar Igrejas - Church Admin pode criar múltiplas igrejas na denominação
         ...(permissions.canCreateChurches ? [
           { title: 'Gerenciar Igrejas', icon: Church, href: '/denominacao/churches' }
         ] : []),
         // Ministérios - Para todos que têm acesso à gestão hierárquica
         { title: 'Ministérios', icon: Church, href: '/ministerios' },
-        // Visão Hierárquica - Para ambos (Church Admin vê apenas suas filiais)
+        // Visão Hierárquica - Denominação → Igrejas → Filiais
         { title: 'Visão Hierárquica', icon: TreePine, href: '/denominacao/hierarchy' },
       ]
     }] : []),

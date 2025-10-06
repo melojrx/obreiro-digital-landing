@@ -1,9 +1,16 @@
 # Documentação Técnica - Módulo de Visitantes
 
 **Projeto:** Obreiro Digital  
-**Data:** 31 de agosto de 2025  
-**Versão:** 1.0  
+**Data:** 6 de outubro de 2025  
+**Versão:** 2.0  
 **Autores:** Análise gerada por IA com revisão técnica
+
+**Changelog v2.0:**
+- Atualizado sistema de permissões para refletir novo modelo hierárquico
+- CHURCH_ADMIN substitui DENOMINATION_ADMIN como papel principal
+- Adicionado controle de acesso hierárquico aos QR Codes
+- Documentado filtro automático de branches baseado em papéis
+- QR Codes agora acessados via menu Visitantes
 
 ## 1. Arquitetura e Fluxo de Dados
 
@@ -197,12 +204,56 @@ Requerem autenticação e permissões adequadas. A maioria é gerenciada pelo `V
 
 ## 5. Sistema de Permissões
 
+O sistema de permissões segue a arquitetura definida no documento **Sistema de Permissões e Papéis - Guia Completo**.
+
+### 5.1. Hierarquia de Papéis
+
+- **SUPER_ADMIN (Platform Admin):** Administrador da plataforma SaaS - acesso técnico total. Exclusivo para desenvolvedores/donos.
+- **CHURCH_ADMIN:** Administrador de igreja(s) - papel principal do sistema. Pode gerenciar uma ou múltiplas igrejas (se fizerem parte de uma denominação). Este papel **substitui** o antigo `DENOMINATION_ADMIN`.
+- **BRANCH_MANAGER:** Gestor de filiais específicas atribuídas.
+- **PASTOR, SECRETARY, LEADER:** Papéis com permissões específicas dentro da igreja.
+- **MEMBER:** Membro comum com acesso de visualização.
+- **VISITOR:** Acesso muito limitado, apenas dados próprios.
+
+### 5.2. Controle de Acesso
+
 - **Endpoints Públicos:** Acesso liberado via `permission_classes = [AllowAny]` nas views `validate_qr_code` e `register_visitor`.
 - **Endpoints Administrativos:** O `VisitorViewSet` utiliza `permission_classes = [permissions.IsAuthenticated, IsMemberUser]`.
   - `IsAuthenticated`: Garante que o usuário esteja logado.
   - `IsMemberUser`: Uma permissão customizada (`apps.core.permissions`) que verifica se o usuário está associado a pelo menos uma igreja.
-- **Isolamento de Dados (Tenant):** A filtragem de dados por igreja não é feita na classe de permissão, mas sim no método `get_queryset` do `VisitorViewSet`. Ele inspeciona o `request.user` e filtra o queryset de visitantes para retornar apenas aqueles da igreja do usuário (`Visitor.objects.filter(church=user_church)`). Isso garante o isolamento dos dados de forma robusta.
+- **Isolamento de Dados (Multi-tenant):** A filtragem de dados por igreja não é feita na classe de permissão, mas sim no método `get_queryset` dos ViewSets. Ele inspeciona o `request.user` e filtra o queryset para retornar apenas dados da(s) igreja(s) do usuário. Isso garante o isolamento dos dados de forma robusta.
+  - **CHURCH_ADMIN:** Acessa todas as filiais e visitantes de igrejas em sua denominação (ou apenas sua igreja se não houver denominação).
+  - **BRANCH_MANAGER:** Acessa apenas filiais e visitantes das filiais atribuídas a ele.
+  - **Outros papéis:** Acessam apenas dados de sua igreja.
 - **Permissões de Ação:** Ações como criar ou deletar um visitante são controladas no frontend pelo hook `usePermissions`, que verifica se o usuário tem o papel (`role`) ou a flag de permissão (`canManageVisitors`) necessários.
+
+### 5.3. Acesso aos QR Codes
+
+O acesso aos QR Codes é filtrado hierarquicamente no backend:
+
+```python
+# Em BranchViewSet.get_queryset()
+if church_user.role == RoleChoices.CHURCH_ADMIN:
+    # Vê todas as filiais da denominação
+    if church_user.church.denomination:
+        denomination_churches = Church.objects.filter(
+            denomination=church_user.church.denomination
+        )
+        # Retorna branches de todas essas igrejas
+    else:
+        # Retorna apenas branches de sua igreja
+        
+elif church_user.role == 'branch_manager':
+    # Vê apenas branches atribuídas através de church_user.branches
+    
+else:
+    # Outros papéis veem apenas branches de sua igreja
+```
+
+**Navegação no Frontend:**
+- QR Codes são acessados através do menu **Visitantes → Gerenciar QR Codes**
+- A visualização é automaticamente filtrada pelo backend baseada no papel do usuário
+- Usuários com `canManageVisitors` podem ativar/desativar e baixar QR Codes
 
 ---
 
@@ -464,9 +515,9 @@ docker-compose -f docker-compose.dev.yml exec backend coverage report
 
 ## Conclusão
 
-O Módulo de Visitantes é uma peça fundamental do sistema Obreiro Digital, proporcionando uma experiência moderna e eficiente para captura e gestão de informações de novos frequentadores. 
+O Módulo de Visitantes é uma peça fundamental do sistema Obreiro Digital, proporcionando uma experiência moderna e eficiente para captura e gestão de informações de novos frequentadores.
 
 Esta documentação deve ser atualizada sempre que houver mudanças significativas no módulo. Para dúvidas específicas ou problemas não cobertos aqui, consulte os logs do sistema ou entre em contato com a equipe de desenvolvimento.
 
-**Última atualização:** 31 de agosto de 2025  
-**Próxima revisão recomendada:** 31 de novembro de 2025
+**Última atualização:** 6 de outubro de 2025  
+**Próxima revisão recomendada:** 6 de janeiro de 2026

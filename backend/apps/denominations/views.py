@@ -41,7 +41,12 @@ class DenominationViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Denomination.objects.all()
         
-        # Administradores veem suas denominações
+        # Para listagem simples (GET list), qualquer usuário autenticado pode ver denominações ativas
+        # Isso é necessário para o onboarding de criação de igreja
+        if self.action == 'list':
+            return Denomination.objects.filter(is_active=True)
+        
+        # Para outras ações (retrieve, update, delete), apenas administradores da denominação
         return user.administered_denominations.all()
     
     def get_permissions(self):
@@ -121,10 +126,13 @@ class DenominationViewSet(viewsets.ModelViewSet):
         """
         denomination = self.get_object()
         
+        from apps.accounts.models import RoleChoices
+        
         # Verificar permissões específicas de acesso
+        # CHURCH_ADMIN pode acessar dashboard da denominação
         if not self.request.user.church_users.filter(
             church__denomination=denomination,
-            can_manage_denomination=True,
+            role=RoleChoices.CHURCH_ADMIN,
             is_active=True
         ).exists() and not self.request.user.is_superuser:
             return Response(
@@ -171,10 +179,13 @@ class DenominationViewSet(viewsets.ModelViewSet):
         """
         denomination = self.get_object()
         
+        from apps.accounts.models import RoleChoices
+        
         # Verificar se usuário pode criar igrejas nesta denominação
+        # Apenas CHURCH_ADMIN pode criar igrejas
         if not self.request.user.church_users.filter(
             church__denomination=denomination,
-            can_create_churches=True,
+            role=RoleChoices.CHURCH_ADMIN,
             is_active=True
         ).exists() and not self.request.user.is_superuser:
             return Response(

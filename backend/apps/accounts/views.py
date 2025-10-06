@@ -2,19 +2,29 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
+from django.db import transaction
 from .auth_serializers import CustomAuthTokenSerializer
-from .models import ChurchUser
+from .models import ChurchUser, CustomUser, UserProfile
 
 class CustomAuthToken(ObtainAuthToken):
     serializer_class = CustomAuthTokenSerializer
     
     def post(self, request, *args, **kwargs):
+        print('🔍 DEBUG - Login Request Data:', request.data)
+        print('🔍 DEBUG - Content Type:', request.content_type)
+        
         serializer = self.serializer_class(data=request.data, context={'request': request})
+        
+        if not serializer.is_valid():
+            print('❌ DEBUG - Serializer Errors:', serializer.errors)
+        
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         token, created = Token.objects.get_or_create(user=user)
+        
+        print('✅ DEBUG - Login successful for user:', user.email)
         
         return Response({
             'token': token.key,
@@ -139,6 +149,9 @@ def me(request):
     
     # Buscar perfil se existir
     profile_data = {}
+    intended_role = None
+    intended_denomination = None
+    
     if hasattr(user, 'profile') and user.profile:
         profile_data = {
             'bio': user.profile.bio,
@@ -148,6 +161,32 @@ def me(request):
             'email_notifications': user.profile.email_notifications,
             'sms_notifications': user.profile.sms_notifications,
         }
+        intended_role = user.profile.intended_role
+        if user.profile.intended_denomination:
+            intended_denomination = {
+                'id': user.profile.intended_denomination.id,
+                'name': user.profile.intended_denomination.name
+            }
+    
+    # Buscar vínculo com igrejas (ChurchUser)
+    church_users = ChurchUser.objects.filter(user=user, is_active=True)
+    has_church = church_users.exists()
+    
+    # Determinar se precisa criar igreja:
+    # 1. Usuário recém-cadastrado como CHURCH_ADMIN sem igreja (intended_role)
+    # 2. Usuário existente que ficou sem igreja ativa (has_church=False)
+    # 3. Usuário com subscription_plan mas sem igreja vinculada
+    needs_church_setup = False
+    
+    if intended_role == 'CHURCH_ADMIN' and not has_church:
+        # Caso 1: Recém-cadastrado com papel pretendido
+        needs_church_setup = True
+    elif not has_church and user.subscription_plan:
+        # Caso 2: Tem plano mas não tem igreja (removido ou desvinculado)
+        needs_church_setup = True
+    elif not has_church and user.is_profile_complete:
+        # Caso 3: Perfil completo mas sem igreja (edge case)
+        needs_church_setup = True
     
     return Response({
         'id': user.id,
@@ -159,7 +198,12 @@ def me(request):
         'is_active': user.is_active,
         'date_joined': user.date_joined,
         'is_profile_complete': user.is_profile_complete,
-        'profile': profile_data
+        'subscription_plan': user.subscription_plan,
+        'profile': profile_data,
+        'intended_role': intended_role,
+        'intended_denomination': intended_denomination,
+        'has_church': has_church,
+        'needs_church_setup': needs_church_setup
     })
 
 @api_view(['GET'])
@@ -196,9 +240,9 @@ def my_church(request):
         'state': active_church.state,
         'zipcode': active_church.zipcode or '',
         'subscription_plan': active_church.subscription_plan,
-        'role': church_user.get_role_display(),
-        'role_label': church_user.get_role_display(),
-        'user_role': church_user.role,
+        'role': church_user.get_role_display(),  # Label legível (ex: "Admin de Igreja")
+        'role_label': church_user.get_role_display(),  # Mantido para compatibilidade
+        'user_role': church_user.role,  # Código do papel (ex: "CHURCH_ADMIN")
     })
 
 @api_view(['POST'])
@@ -269,5 +313,129 @@ def upload_avatar(request):
     except Exception as e:
         return Response(
             {'error': f'Erro ao salvar avatar: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def finalize_registration(request):
+    """
+    Endpoint para finalizar o cadastro completo de um novo usuário.
+    Cria o usuário com todos os dados coletados nas 3 etapas do cadastro.
+    """
+    try:
+        data = request.data
+        
+        # Validar campos obrigatórios
+        required_fields = ['email', 'full_name', 'password', 'subscription_plan']
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            return Response(
+                {'error': f'Campos obrigatórios faltando: {", ".join(missing_fields)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar se email já existe
+        if CustomUser.objects.filter(email=data['email']).exists():
+            return Response(
+                {'error': 'Email já cadastrado no sistema'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Criar usuário e perfil em uma transação
+        with transaction.atomic():
+            # Criar usuário
+            user = CustomUser.objects.create_user(
+                email=data['email'],
+                password=data['password'],
+                full_name=data['full_name'],
+                phone=data.get('phone', ''),
+                subscription_plan=data['subscription_plan'],
+                is_profile_complete=True
+            )
+            
+            # Criar perfil complementar
+            from apps.core.models import RoleChoices
+            
+            # Normalizar role: se vier 'CHURCH_ADMIN', converte para 'church_admin'
+            intended_role = data.get('role', 'CHURCH_ADMIN')
+            if intended_role == 'CHURCH_ADMIN':
+                intended_role = RoleChoices.CHURCH_ADMIN  # 'church_admin'
+            elif intended_role == 'DENOMINATION_ADMIN':
+                # Papel legado removido: converte para CHURCH_ADMIN
+                intended_role = RoleChoices.CHURCH_ADMIN
+            
+            profile = UserProfile.objects.create(
+                user=user,
+                birth_date=data.get('birth_date'),
+                gender=data.get('gender'),
+                cpf=data.get('cpf'),
+                bio=data.get('bio', ''),
+                email_notifications=data.get('email_notifications', True),
+                sms_notifications=data.get('sms_notifications', False),
+                intended_role=intended_role  # Salvar papel pretendido no formato correto
+            )
+            
+            # Salvar denominação pretendida se fornecida
+            if data.get('denomination_id'):
+                from apps.denominations.models import Denomination
+                try:
+                    denomination = Denomination.objects.get(id=data['denomination_id'])
+                    profile.intended_denomination = denomination
+                except Denomination.DoesNotExist:
+                    pass
+            
+            # Salvar dados de endereço do usuário no perfil (se fornecidos)
+            if data.get('user_zipcode'):
+                profile.zipcode = data['user_zipcode']
+            if data.get('user_address'):
+                profile.address = data['user_address']
+            if data.get('user_city'):
+                profile.city = data['user_city']
+            if data.get('user_state'):
+                profile.state = data['user_state']
+            if data.get('user_neighborhood'):
+                profile.neighborhood = data['user_neighborhood']
+            if data.get('user_number'):
+                profile.number = data['user_number']
+            if data.get('user_complement'):
+                profile.complement = data['user_complement']
+            
+            profile.save()
+            
+            # Criar token de autenticação
+            token, _ = Token.objects.get_or_create(user=user)
+            
+            # Preparar resposta
+            user_data = {
+                'id': user.id,
+                'email': user.email,
+                'full_name': user.full_name,
+                'phone': user.phone,
+                'is_profile_complete': user.is_profile_complete,
+                'subscription_plan': user.subscription_plan,
+                'profile': {
+                    'birth_date': str(profile.birth_date) if profile.birth_date else None,
+                    'gender': profile.gender,
+                    'bio': profile.bio,
+                    'cpf': profile.cpf,
+                    'avatar': profile.avatar.url if profile.avatar else None,
+                }
+            }
+            
+            return Response({
+                'token': token.key,
+                'user': user_data,
+                'message': 'Cadastro finalizado com sucesso!'
+            }, status=status.HTTP_201_CREATED)
+            
+    except Exception as e:
+        print(f'❌ Erro ao finalizar registro: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {'error': f'Erro ao finalizar cadastro: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

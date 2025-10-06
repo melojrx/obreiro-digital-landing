@@ -19,23 +19,24 @@ from .serializers import (
 class PrayerRequestPermission(BasePermission):
     """
     Permite acesso a pedidos de oração baseado no perfil do usuário:
-    - DENOMINATION_ADMIN: vê todos os pedidos da denominação
+    - CHURCH_ADMIN (inclui valor legado): vê todos os pedidos da denominação
     - Outros usuários: apenas da própria igreja
     """
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        
-        # Verifica se é DENOMINATION_ADMIN através do ChurchUser
+
+        # Verifica se é CHURCH_ADMIN (inclui valores legados) através do ChurchUser
         from apps.accounts.models import ChurchUser
         from apps.core.models import RoleChoices
-        
+
         church_user = ChurchUser.objects.filter(user=request.user).first()
-        if church_user and church_user.role == RoleChoices.DENOMINATION_ADMIN:
+        if church_user and church_user.has_role(RoleChoices.CHURCH_ADMIN):
             return True
-        
+
         # Para outros usuários, verifica se tem Member associado a uma igreja
         from apps.members.models import Member
+
         member = Member.objects.filter(user=request.user).first()
         return member and member.church is not None
     
@@ -47,12 +48,12 @@ class PrayerRequestPermission(BasePermission):
         
         church_user = ChurchUser.objects.filter(user=request.user).first()
         
-        # DENOMINATION_ADMIN pode ver tudo da denominação
-        if church_user and church_user.role == RoleChoices.DENOMINATION_ADMIN:
+        # CHURCH_ADMIN pode ver tudo da denominação (mantém compatibilidade com valores legados)
+        if church_user and church_user.has_role(RoleChoices.CHURCH_ADMIN):
             if hasattr(obj, 'church') and church_user.church:
                 return obj.church.denomination == church_user.church.denomination
             return True
-        
+
         # Para outros usuários, verifica através do Member
         member = Member.objects.filter(user=request.user).first()
         if hasattr(obj, 'church') and member and member.church:
@@ -81,8 +82,8 @@ class PrayerRequestViewSet(viewsets.ModelViewSet):
         user = self.request.user
         church_user = ChurchUser.objects.filter(user=user).first()
         
-        # DENOMINATION_ADMIN vê todos os pedidos da denominação
-        if church_user and church_user.role == RoleChoices.DENOMINATION_ADMIN:
+        # CHURCH_ADMIN vê todos os pedidos da denominação
+        if church_user and church_user.has_role(RoleChoices.CHURCH_ADMIN):
             if church_user.church and church_user.church.denomination:
                 return PrayerRequest.objects.filter(
                     church__denomination=church_user.church.denomination,
@@ -108,9 +109,9 @@ class PrayerRequestViewSet(viewsets.ModelViewSet):
         
         user = self.request.user
         
-        # Para DENOMINATION_ADMIN, pode usar a igreja dele do ChurchUser
+        # Para CHURCH_ADMIN, pode usar a igreja dele do ChurchUser (mantém legado)
         church_user = ChurchUser.objects.filter(user=user).first()
-        if church_user and church_user.role == RoleChoices.DENOMINATION_ADMIN and church_user.church:
+        if church_user and church_user.has_role(RoleChoices.CHURCH_ADMIN) and church_user.church:
             serializer.save(
                 author=user,
                 church=church_user.church
