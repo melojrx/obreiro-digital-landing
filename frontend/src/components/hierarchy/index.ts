@@ -6,7 +6,6 @@
 // Componentes de UI Base
 export { DenominationStatsCard } from './DenominationStatsCard';
 export { ChurchCard } from './ChurchCard';
-export { HierarchyView } from './HierarchyView';
 
 // Componentes de Dashboard
 export { DenominationDashboard } from './DenominationDashboard';

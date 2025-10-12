@@ -56,10 +56,6 @@ const ChurchDetailsPage = lazy(() =>
   import("./pages/ChurchDetailsPage")
 );
 
-const HierarchyViewPage = lazy(() => 
-  import("./pages/HierarchyViewPage")
-);
-
 const queryClient = new QueryClient();
 
 const AppContent = () => {
@@ -334,14 +330,6 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="auth_complete">
             <EditChurchPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/denominacao/hierarchy" 
-        element={
-          <ProtectedRoute level="auth_complete">
-            <HierarchyViewPage />
           </ProtectedRoute>
         } 
       />

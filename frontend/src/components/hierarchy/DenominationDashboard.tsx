@@ -34,7 +34,6 @@ import { usePermissions } from '@/hooks/usePermissions';
 // Componentes
 import { DenominationStatsCard } from './DenominationStatsCard';
 import { ChurchCard } from './ChurchCard';
-import { HierarchyView } from './HierarchyView';
 
 // Tipos
 import { DenominationDetails, ChurchDetails, MonthlyTrend, GeographicalData } from '@/types/hierarchy';

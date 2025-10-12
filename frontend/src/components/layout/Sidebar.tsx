@@ -43,14 +43,6 @@ const Sidebar: React.FC = () => {
   const permissions = usePermissions();
   const activeChurch = useCurrentActiveChurch();
 
-  // Debug temporário
-  console.log('🔍 Sidebar - user:', user?.email);
-  console.log('🔍 Sidebar - userChurch:', userChurch);
-  console.log('🔍 Sidebar - activeChurch:', activeChurch);
-  console.log('🔍 Sidebar - permissions.canViewHierarchyMenu:', permissions.canViewHierarchyMenu);
-  console.log('🔍 Sidebar - permissions.canCreateChurches:', permissions.canCreateChurches);
-  console.log('🔍 Sidebar - permissions.canManageDenomination:', permissions.canManageDenomination);
-
   const navigation: NavItem[] = [
     {
       title: 'PRINCIPAL',
@@ -76,8 +68,6 @@ const Sidebar: React.FC = () => {
         ] : []),
         // Ministérios - Para todos que têm acesso à gestão hierárquica
         { title: 'Ministérios', icon: Church, href: '/ministerios' },
-        // Visão Hierárquica - Denominação → Igrejas → Filiais
-        { title: 'Visão Hierárquica', icon: TreePine, href: '/denominacao/hierarchy' },
       ]
     }] : []),
     {

@@ -14,13 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ChurchSelector } from "./ChurchSelector";
-import { useInvalidateActiveChurchData } from "@/hooks/useActiveChurch";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const { clearAllChurchCache, forceRefreshActiveChurch } = useInvalidateActiveChurchData();
 
   // Função para fazer logout
   const handleLogout = async () => {
@@ -105,17 +103,6 @@ const Header: React.FC = () => {
                   <span>Notificações</span>
                 </DropdownMenuItem>
                 
-                {/* Debug - Botão temporário para limpar cache */}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="text-blue-600 cursor-pointer text-xs"
-                  onClick={() => {
-                    clearAllChurchCache();
-                    window.location.reload(); // Recarregar página após limpar cache
-                  }}
-                >
-                  🔄 <span className="ml-2">Limpar Cache (Debug)</span>
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   className="text-red-600 cursor-pointer"
