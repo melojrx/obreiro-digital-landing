@@ -46,8 +46,9 @@ export interface FinalizeRegistrationData {
   full_name: string;
   phone: string;
   password: string;
-  birth_date?: string;
-  gender?: string;
+  birth_date: string;
+  gender: string;
+  cpf: string;
   
   // Dados de endereço do usuário (etapa 2)
   denomination_id?: number;
@@ -77,6 +78,12 @@ export interface User {
     birth_date?: string;
     gender?: string;
     avatar?: string;
+    cpf?: string;
+    address?: string;
+    zipcode?: string;
+    number?: string;
+    email_notifications?: boolean;
+    sms_notifications?: boolean;
   };
   intended_role?: string;
   intended_denomination?: {

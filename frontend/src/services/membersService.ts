@@ -65,6 +65,7 @@ export interface Member {
   id: number;
   church: number;
   church_name: string;
+  user?: number;  // ID do usuário vinculado (opcional)
   full_name: string;
   cpf?: string;
   rg?: string;
@@ -422,6 +423,28 @@ export const membersService = {
     const response = await api.get(API_ENDPOINTS.members.availableForSpouse, { params });
     return response.data;
   },
+
+  // Obter opções de funções ministeriais
+  getMinisterialFunctionChoices() {
+    return MINISTERIAL_FUNCTION_CHOICES;
+  },
+  
+  // Obter opções de status de membresia
+  getMembershipStatusChoices() {
+    return MEMBERSHIP_STATUS_CHOICES;
+  },
+
+  // Converter Church Admin em Membro (simplificado)
+  async convertAdminToMember(data: {
+    ministerial_function: string;
+    marital_status: string;
+  }): Promise<{ message: string; member: Member }> {
+    const response = await api.post(
+      `${API_ENDPOINTS.members.list}convert-admin-to-member/`, 
+      data
+    );
+    return response.data;
+  },
 };
 
 // Serviço para MembershipStatus
@@ -475,15 +498,5 @@ export const membershipStatusService = {
   // Deletar status
   async deleteStatus(id: number): Promise<void> {
     await api.delete(API_ENDPOINTS.membershipStatus.delete(id));
-  },
-
-  // Obter opções de funções ministeriais
-  getMinisterialFunctionChoices() {
-    return MINISTERIAL_FUNCTION_CHOICES;
-  },
-  
-  // Obter opções de status de membresia
-  getMembershipStatusChoices() {
-    return MEMBERSHIP_STATUS_CHOICES;
   },
 }; 

@@ -107,7 +107,7 @@ class MemberListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Member
         fields = [
-            'id', 'full_name', 'email', 'phone', 'birth_date', 'age',
+            'id', 'user', 'full_name', 'email', 'phone', 'birth_date', 'age',
             'church_name', 'membership_status', 'membership_status_display',
             'ministerial_function', 'ministerial_function_display',
             'membership_date',
@@ -203,14 +203,35 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         """Validação de email"""
         # Apenas validar se email foi fornecido e não é string vazia
         if value and value.strip():
-            # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
-            existing = Member.objects.all().filter(
-                email=value,
-                is_active=True
-            ).exists()
+            # Tentar obter a igreja do contexto ou dos dados iniciais
+            church = None
             
-            if existing:
-                raise serializers.ValidationError("Este e-mail já está cadastrado.")
+            # Primeiro, tentar obter do contexto do request
+            if self.context.get('request'):
+                from apps.accounts.models import ChurchUser
+                user = self.context['request'].user
+                church = ChurchUser.objects.get_active_church_for_user(user)
+            
+            # Se não conseguiu do contexto, tentar dos dados iniciais (durante criação)
+            if not church and self.initial_data:
+                church_id = self.initial_data.get('church')
+                if church_id:
+                    from apps.churches.models import Church
+                    try:
+                        church = Church.objects.get(id=church_id)
+                    except Church.DoesNotExist:
+                        pass
+            
+            # Se conseguiu obter a igreja, validar unicidade
+            if church:
+                existing = Member.objects.filter(
+                    church=church,
+                    email=value,
+                    is_active=True
+                ).exists()
+                
+                if existing:
+                    raise serializers.ValidationError("Este e-mail já está cadastrado nesta igreja.")
         
         # Se email é string vazia, retornar None para salvar como NULL no banco
         return value if value and value.strip() else None
@@ -332,14 +353,29 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         """Validação de email na atualização"""
         # Apenas validar se email foi fornecido e não é string vazia
         if value and value.strip():
-            # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
-            existing = Member.objects.all().filter(
-                email=value,
-                is_active=True
-            ).exclude(pk=self.instance.pk).exists()
+            # Tentar obter a igreja do contexto ou da instância atual
+            church = None
             
-            if existing:
-                raise serializers.ValidationError("Este e-mail já está cadastrado.")
+            # Primeiro, tentar obter da instância sendo atualizada
+            if self.instance and hasattr(self.instance, 'church'):
+                church = self.instance.church
+            
+            # Se não conseguiu, tentar do contexto do request
+            if not church and self.context.get('request'):
+                from apps.accounts.models import ChurchUser
+                user = self.context['request'].user
+                church = ChurchUser.objects.get_active_church_for_user(user)
+            
+            # Se conseguiu obter a igreja, validar unicidade
+            if church:
+                existing = Member.objects.filter(
+                    church=church,
+                    email=value,
+                    is_active=True
+                ).exclude(pk=self.instance.pk).exists()
+                
+                if existing:
+                    raise serializers.ValidationError("Este e-mail já está cadastrado nesta igreja.")
         
         # Se email é string vazia, retornar None para salvar como NULL no banco
         return value if value and value.strip() else None

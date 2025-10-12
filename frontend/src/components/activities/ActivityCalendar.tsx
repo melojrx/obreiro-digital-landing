@@ -43,6 +43,32 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
   showFilters = true,
   className,
 }) => {
+  const safeParseDate = (value?: string | null) => {
+    if (!value) {
+      return null;
+    }
+    try {
+      return parseISO(value);
+    } catch (error) {
+      console.error('Erro ao converter data da atividade:', value, error);
+      return null;
+    }
+  };
+
+  const safeFormatDate = (
+    value?: string | null,
+    fallback = '',
+    pattern: string = 'dd/MM'
+  ) => {
+    const parsed = safeParseDate(value);
+    return parsed ? format(parsed, pattern, { locale: ptBR }) : fallback;
+  };
+
+  const safeFormatTime = (value?: string | null, fallback = '--:--') => {
+    const parsed = safeParseDate(value);
+    return parsed ? format(parsed, 'HH:mm', { locale: ptBR }) : fallback;
+  };
+
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [detailsDialog, setDetailsDialog] = useState<{
@@ -55,9 +81,10 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
 
   // Get activities for selected date
   const selectedDateActivities = useMemo(() => {
-    return activities.filter(activity => 
-      isSameDay(parseISO(activity.start_datetime), selectedDate)
-    );
+    return activities.filter(activity => {
+      const activityDate = safeParseDate(activity.start_datetime);
+      return activityDate ? isSameDay(activityDate, selectedDate) : false;
+    });
   }, [activities, selectedDate]);
 
   // Get activities for current month with colors
@@ -66,8 +93,8 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
     const monthEnd = endOfMonth(currentMonth);
     
     return activities.filter(activity => {
-      const activityDate = parseISO(activity.start_datetime);
-      return activityDate >= monthStart && activityDate <= monthEnd;
+      const activityDate = safeParseDate(activity.start_datetime);
+      return activityDate ? activityDate >= monthStart && activityDate <= monthEnd : false;
     });
   }, [activities, currentMonth]);
 
@@ -76,7 +103,11 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
     const grouped: Record<string, (Activity | PublicActivity)[]> = {};
     
     monthActivities.forEach(activity => {
-      const dateKey = format(parseISO(activity.start_datetime), 'yyyy-MM-dd');
+      const activityDate = safeParseDate(activity.start_datetime);
+      if (!activityDate) {
+        return;
+      }
+      const dateKey = format(activityDate, 'yyyy-MM-dd');
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
       }
@@ -111,9 +142,7 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
   };
 
   // Format time
-  const formatTime = (datetime: string) => {
-    return format(parseISO(datetime), 'HH:mm', { locale: ptBR });
-  };
+  const formatTime = (datetime?: string | null) => safeFormatTime(datetime);
 
   // Color mapping for different activity types
   const activityTypeColors = {
@@ -193,8 +222,8 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
   return (
     <div className={cn("space-y-4", className)}>
       {/* Header with controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -215,16 +244,16 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
         </div>
 
         {showFilters && onFiltersChange && (
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="self-start sm:self-auto">
             <FilterIcon className="w-4 h-4 mr-2" />
             Filtros
           </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         {/* Calendar View */}
-        <div className="lg:col-span-2">
+        <div className="xl:col-span-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-lg">
@@ -285,21 +314,21 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
                       monthActivities.map((activity) => (
                         <div
                           key={activity.id}
-                          className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
+                          className="flex flex-col gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50 sm:flex-row sm:items-center"
                           onClick={() => handleActivityClick(activity)}
                         >
                           <div
                             className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm"
                             style={{ backgroundColor: getActivityColor(activity) }}
                           />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{activity.name}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium break-words sm:truncate">{activity.name}</p>
                             <p className="text-sm text-muted-foreground">
                               {activity.ministry_name} • {formatTime(activity.start_datetime)}
                             </p>
                           </div>
-                          <Badge variant="outline" className="text-xs">
-                            {format(parseISO(activity.start_datetime), 'dd/MM')}
+                          <Badge variant="outline" className="text-xs whitespace-nowrap">
+                            {safeFormatDate(activity.start_datetime, '--/--')}
                           </Badge>
                         </div>
                       ))
@@ -426,7 +455,7 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
                 <div className="flex items-center gap-2 text-sm">
                   <CalendarIcon className="w-4 h-4" />
                   <span>
-                    {format(parseISO(detailsDialog.activity.start_datetime), 'dd/MM/yyyy', { locale: ptBR })}
+                    {safeFormatDate(detailsDialog.activity.start_datetime, '--/--/----', 'dd/MM/yyyy')}
                   </span>
                 </div>
 
@@ -459,11 +488,11 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({
 
               <div className="flex items-center gap-2">
                 <Badge variant="outline">
-                  {detailsDialog.activity.activity_type_display}
+                  {detailsDialog.activity.activity_type_display || 'Tipo não informado'}
                 </Badge>
                 {'branch_name' in detailsDialog.activity && (
                   <Badge variant="secondary">
-                    {detailsDialog.activity.branch_name}
+                    {detailsDialog.activity.branch_name || 'Filial não informada'}
                   </Badge>
                 )}
               </div>

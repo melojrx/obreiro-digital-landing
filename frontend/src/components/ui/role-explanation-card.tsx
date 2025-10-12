@@ -65,11 +65,14 @@ export const RoleExplanationCard: React.FC<RoleExplanationCardProps> = ({ classN
             </div>
 
             <div className="bg-blue-100 p-3 rounded-md border border-blue-200">
-              <p className="text-blue-800 text-sm">
-                <strong>Exemplo:</strong> Um usuário pode ser <Badge variant="outline" className="mx-1 text-xs">Membro</Badge> 
-                no sistema (permissões limitadas) mas ter função ministerial de 
-                <Badge variant="outline" className="mx-1 text-xs">Pastor</Badge> na igreja.
-              </p>
+              <div className="text-blue-800 text-sm flex flex-wrap items-center gap-x-1 gap-y-2">
+                <strong>Exemplo:</strong>
+                <span>Um usuário pode ser</span>
+                <Badge variant="outline" className="text-xs">Membro</Badge>
+                <span>no sistema (permissões limitadas) mas ter função ministerial de</span>
+                <Badge variant="outline" className="text-xs">Pastor</Badge>
+                <span>na igreja.</span>
+              </div>
             </div>
           </div>
         </div>

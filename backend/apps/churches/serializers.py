@@ -52,10 +52,11 @@ class ChurchCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Church
         fields = [
-            'denomination', 'name', 'short_name', 'description', 'email',
+            'id', 'denomination', 'name', 'short_name', 'description', 'email',
             'phone', 'website', 'address', 'city', 'state', 'zipcode',
             'cnpj', 'main_pastor', 'logo', 'cover_image', 'subscription_plan'
         ]
+        read_only_fields = ['id']
     
     def validate_main_pastor(self, value):
         """Validar se o usuário pode ser pastor principal"""

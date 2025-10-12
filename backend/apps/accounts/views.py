@@ -1,10 +1,16 @@
-from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.authtoken.models import Token
-from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework import status
+from datetime import date, datetime
+
+from django.core.exceptions import ValidationError
 from django.db import transaction
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+
+from apps.core.models import GenderChoices, RoleChoices, validate_cpf
+
 from .auth_serializers import CustomAuthTokenSerializer
 from .models import ChurchUser, CustomUser, UserProfile
 
@@ -328,7 +334,16 @@ def finalize_registration(request):
         data = request.data
         
         # Validar campos obrigatórios
-        required_fields = ['email', 'full_name', 'password', 'subscription_plan']
+        required_fields = [
+            'email',
+            'full_name',
+            'password',
+            'subscription_plan',
+            'phone',
+            'birth_date',
+            'gender',
+            'cpf'
+        ]
         missing_fields = [field for field in required_fields if not data.get(field)]
         
         if missing_fields:
@@ -343,6 +358,58 @@ def finalize_registration(request):
                 {'error': 'Email já cadastrado no sistema'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Validar CPF
+        cpf_raw = data.get('cpf', '')
+        cpf_digits = ''.join(filter(str.isdigit, cpf_raw))
+        try:
+            validate_cpf(cpf_digits)
+        except ValidationError as exc:
+            return Response(
+                {'error': 'CPF inválido', 'details': exc.messages},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        cpf_formatted = f"{cpf_digits[:3]}.{cpf_digits[3:6]}.{cpf_digits[6:9]}-{cpf_digits[9:]}"
+
+        # Garantir CPF único (considerando diferentes formatações)
+        existing_cpfs = UserProfile.objects.filter(cpf__isnull=False).values_list('cpf', flat=True)
+        if any(''.join(filter(str.isdigit, existing or '')) == cpf_digits for existing in existing_cpfs):
+            return Response(
+                {'error': 'CPF já cadastrado no sistema'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar data de nascimento e converter para date
+        birth_date_str = data.get('birth_date')
+        try:
+            birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Data de nascimento inválida. Use o formato YYYY-MM-DD.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Garantir idade mínima de 18 anos
+        today = date.today()
+        age = today.year - birth_date.year - (
+            (today.month, today.day) < (birth_date.month, birth_date.day)
+        )
+        if age < 18:
+            return Response(
+                {'error': 'Usuário deve ter pelo menos 18 anos para concluir o cadastro.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar gênero
+        gender_raw = data.get('gender')
+        gender = gender_raw.upper() if isinstance(gender_raw, str) else ''
+        if gender not in dict(GenderChoices.choices):
+            valid_choices = ', '.join(dict(GenderChoices.choices).keys())
+            return Response(
+                {'error': f'Gênero inválido. Use um dos valores: {valid_choices}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Criar usuário e perfil em uma transação
         with transaction.atomic():
@@ -351,14 +418,12 @@ def finalize_registration(request):
                 email=data['email'],
                 password=data['password'],
                 full_name=data['full_name'],
-                phone=data.get('phone', ''),
+                phone=data['phone'],
                 subscription_plan=data['subscription_plan'],
                 is_profile_complete=True
             )
             
             # Criar perfil complementar
-            from apps.core.models import RoleChoices
-            
             # Normalizar role: se vier 'CHURCH_ADMIN', converte para 'church_admin'
             intended_role = data.get('role', 'CHURCH_ADMIN')
             if intended_role == 'CHURCH_ADMIN':
@@ -369,9 +434,9 @@ def finalize_registration(request):
             
             profile = UserProfile.objects.create(
                 user=user,
-                birth_date=data.get('birth_date'),
-                gender=data.get('gender'),
-                cpf=data.get('cpf'),
+                birth_date=birth_date,
+                gender=gender,
+                cpf=cpf_formatted,
                 bio=data.get('bio', ''),
                 email_notifications=data.get('email_notifications', True),
                 sms_notifications=data.get('sms_notifications', False),
@@ -416,6 +481,9 @@ def finalize_registration(request):
                 'phone': user.phone,
                 'is_profile_complete': user.is_profile_complete,
                 'subscription_plan': user.subscription_plan,
+                'has_church': False,  # Usuário recém-cadastrado não tem igreja ainda
+                'needs_church_setup': True,  # Precisa criar/vincular igreja
+                'intended_role': intended_role,
                 'profile': {
                     'birth_date': str(profile.birth_date) if profile.birth_date else None,
                     'gender': profile.gender,

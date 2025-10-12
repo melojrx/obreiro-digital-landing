@@ -25,7 +25,8 @@ import {
   History,
   UserPlus,
   BarChart3,
-  FileText
+  FileText,
+  User
 } from 'lucide-react';
 
 import AppLayout from '@/components/layout/AppLayout';
@@ -65,7 +66,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-
+import { translateRole } from '@/utils/roleTranslations';
 import { churchService } from '@/services/churchService';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ChurchDetails, ChurchStats, AdminUser, BranchDetails } from '@/types/hierarchy';
@@ -880,7 +881,7 @@ const ChurchDetailsPage: React.FC = () => {
                         <TableCell>{admin.email || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {admin.role_label || admin.role}
+                            {translateRole(admin.role)}
                           </Badge>
                         </TableCell>
                         <TableCell>

@@ -25,6 +25,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     isAuthenticated, 
     isInitializing,
     pathname: location.pathname,
+    profileComplete: user?.is_profile_complete,
+    needsChurchSetup: user?.needs_church_setup,
+    hasChurch: user?.has_church,
   });
   
   // Aguardar inicialização antes de redirecionar
@@ -41,6 +44,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
   
   const profileComplete = user?.is_profile_complete || false;
+  const needsChurchSetup = user?.needs_church_setup || false;
 
   // 1. Rota para Perfil Completo (ex: /dashboard)
   if (level === 'auth_complete') {
@@ -51,6 +55,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if (isAuthenticated && !profileComplete) {
       console.log('✅ ProtectedRoute: Já autenticado, mas perfil incompleto, redirecionando para etapa-2');
       return <Navigate to="/cadastro/etapa-2" replace />;
+    }
+    // Verificar se precisa de setup de igreja (onboarding)
+    if (isAuthenticated && profileComplete && needsChurchSetup && location.pathname !== '/onboarding') {
+      console.log('✅ ProtectedRoute: Usuário precisa criar/vincular igreja, redirecionando para onboarding');
+      return <Navigate to="/onboarding" replace />;
     }
     console.log('✅ ProtectedRoute: Permitindo acesso');
     return <>{children}</>;
@@ -73,7 +82,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // 3. Rota Pública com restrição para logados (ex: /login, /cadastro)
   if (level === 'public') {
     if (isAuthenticated && profileComplete) {
-      console.log('✅ ProtectedRoute: Já autenticado, mas perfil completo, redirecionando para dashboard');
+      // Se está autenticado e perfil completo, verificar se precisa de onboarding
+      if (needsChurchSetup) {
+        console.log('✅ ProtectedRoute: Usuário precisa criar/vincular igreja, redirecionando para onboarding');
+        return <Navigate to="/onboarding" replace />;
+      }
+      console.log('✅ ProtectedRoute: Já autenticado e perfil completo, redirecionando para dashboard');
       return <Navigate to="/dashboard" replace />;
     }
     // Permitir acesso às rotas de cadastro para usuários autenticados ou não autenticados

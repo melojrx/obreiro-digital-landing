@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Drawer as DrawerPrimitive } from "vaul"
+import { Drawer as DrawerPrimitive, Portal as DrawerPrimitivePortal } from "vaul"
 
 import { cn } from "@/lib/utils"
 
@@ -16,7 +16,7 @@ Drawer.displayName = "Drawer"
 
 const DrawerTrigger = DrawerPrimitive.Trigger
 
-const DrawerPortal = DrawerPrimitive.Portal
+const DrawerPortal = DrawerPrimitivePortal
 
 const DrawerClose = DrawerPrimitive.Close
 

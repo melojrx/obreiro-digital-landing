@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useMainDashboard } from '@/hooks/useDashboard';
 import { useActivities } from '@/hooks/useActivities';
+import { api } from '@/config/api';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { RecentActivities } from '@/components/dashboard/RecentActivities';
@@ -11,22 +12,78 @@ import { QuickActions } from '@/components/dashboard/QuickActions';
 import { EventsTable } from '@/components/dashboard/EventsTable';
 import { VisitorStats } from '@/components/dashboard/VisitorStats';
 import { RecentVisitors } from '@/components/dashboard/RecentVisitors';
-import { Users, UserPlus, Calendar, DollarSign } from 'lucide-react';
+import { ConvertAdminToMemberModal } from '@/components/members/ConvertAdminToMemberModal';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Users, UserPlus, Calendar, DollarSign, UserCheck } from 'lucide-react';
 
 const Dashboard = () => {
-    const { user } = useAuth();
+    const { user, userChurch } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const { toast } = useToast();
     const { data, isLoading, error } = useMainDashboard();
     const { data: activities = [], isLoading: activitiesLoading } = useActivities({});
-
-    // Redirecionar para onboarding se necessário
+    const [showConvertModal, setShowConvertModal] = useState(false);
+    const [shouldShowConvertButton, setShouldShowConvertButton] = useState(false);
+    
+    // Verificar se o usuário é Church Admin
+    const isChurchAdmin = userChurch?.user_role === 'church_admin' || userChurch?.role === 'CHURCH_ADMIN';
+    
+    // Verificar se já tem registro de membro
     useEffect(() => {
-        if (user && user.needs_church_setup) {
-            navigate('/onboarding', { replace: true });
-        }
-    }, [user, navigate]);
+        const checkMemberStatus = async () => {
+            console.log('🔍 Verificando se deve mostrar card de conversão:', {
+                isChurchAdmin,
+                userEmail: user?.email,
+                userId: user?.id,
+                userChurch
+            });
+            
+            if (!isChurchAdmin || !user?.email || !user?.id) {
+                console.log('❌ Não deve mostrar card: isChurchAdmin =', isChurchAdmin, 'user.email =', user?.email, 'user.id =', user?.id);
+                setShouldShowConvertButton(false);
+                return;
+            }
+            
+            try {
+                console.log('🔍 Verificando se Church Admin já é membro:', user.email);
+                
+                // Buscar por e-mail E por user ID
+                const response = await api.get(
+                    `/members/?search=${encodeURIComponent(user.email)}`
+                );
+                console.log('✅ Resposta da busca de membros:', response.data);
+                
+                // Verificar se existe algum membro vinculado a este usuário OU com o mesmo e-mail
+                const hasMemberRecord = response.data.results?.some(
+                    (member: any) => {
+                        const isSameUser = member.user === user.id;
+                        const isSameEmail = member.email?.toLowerCase() === user.email?.toLowerCase();
+                        console.log('🔍 Verificando membro:', {
+                            memberId: member.id,
+                            memberUser: member.user,
+                            memberEmail: member.email,
+                            currentUserId: user.id,
+                            currentUserEmail: user.email,
+                            isSameUser,
+                            isSameEmail
+                        });
+                        return isSameUser || isSameEmail;
+                    }
+                );
+                
+                console.log('🎯 Tem registro de membro?', hasMemberRecord);
+                console.log('✅ shouldShowConvertButton será:', !hasMemberRecord);
+                setShouldShowConvertButton(!hasMemberRecord);
+            } catch (error) {
+                console.error('❌ Erro ao verificar status de membro:', error);
+                setShouldShowConvertButton(false);
+            }
+        };
+        
+        checkMemberStatus();
+    }, [isChurchAdmin, user, userChurch]);
 
     useEffect(() => {
         if (error) {
@@ -104,6 +161,31 @@ const Dashboard = () => {
                     />
                 </div>
 
+                {/* Card de Conversão de Admin para Membro */}
+                {shouldShowConvertButton && (
+                    <Card className="border-blue-200 bg-blue-50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-blue-900">
+                                <UserCheck className="h-5 w-5" />
+                                Torne-se Membro da Igreja
+                            </CardTitle>
+                            <CardDescription>
+                                Como administrador, você pode criar um registro de membro vinculado
+                                à sua conta. Isso não afetará suas permissões administrativas.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button 
+                                onClick={() => setShowConvertModal(true)}
+                                className="w-full sm:w-auto"
+                            >
+                                <UserCheck className="mr-2 h-4 w-4" />
+                                Criar Registro de Membro
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
                     <div className="lg:col-span-2 space-y-6 lg:space-y-8">
                         <EventsTable />
@@ -115,6 +197,16 @@ const Dashboard = () => {
                         <RecentActivities />
                     </div>
                 </div>
+
+                {/* Modal de Conversão */}
+                <ConvertAdminToMemberModal 
+                    isOpen={showConvertModal}
+                    onClose={() => {
+                        setShowConvertModal(false);
+                        // Recarregar verificação após fechar modal
+                        setShouldShowConvertButton(false);
+                    }}
+                />
             </div>
         </AppLayout>
     );

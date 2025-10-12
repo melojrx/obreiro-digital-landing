@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { translateRole } from '@/utils/roleTranslations';
 import AppLayout from '@/components/layout/AppLayout';
 import { 
   Church, 
@@ -103,12 +104,12 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ user, onNext }) => {
         <div className="flex items-center justify-center gap-2 mb-4">
           <Shield className="h-5 w-5 text-blue-600" />
           <span className="text-lg font-semibold text-blue-600">
-            Church Admin
+            {translateRole(user.intended_role)}
           </span>
         </div>
         
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Você foi cadastrado como <strong>Administrador da Igreja</strong>. 
+          Você foi cadastrado como <strong>{translateRole(user.intended_role)}</strong>. 
           Isso significa que você terá acesso completo para gerenciar sua igreja no sistema.
         </p>
       </div>

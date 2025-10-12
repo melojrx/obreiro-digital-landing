@@ -58,8 +58,8 @@ class VisitorSerializer(serializers.ModelSerializer):
     # Campos obrigatórios com valores padrão
     full_name = serializers.CharField(required=True)
     email = serializers.EmailField(required=False, allow_blank=True)
-    city = serializers.CharField(required=True)
-    state = serializers.CharField(required=True, max_length=2)
+    city = serializers.CharField(required=False, allow_blank=True)  # Tornado opcional
+    state = serializers.CharField(required=False, allow_blank=True, max_length=2)  # Tornado opcional
     
     # Campos opcionais que podem ser vazios
     phone = serializers.CharField(required=False, allow_blank=True)
@@ -69,7 +69,7 @@ class VisitorSerializer(serializers.ModelSerializer):
     neighborhood = serializers.CharField(required=False, allow_blank=True)
     ministry_interest = serializers.CharField(required=False, allow_blank=True)
     observations = serializers.CharField(required=False, allow_blank=True)
-    birth_date = serializers.DateField(required=False, allow_null=True)
+    birth_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', 'iso-8601'], default=None)
     gender = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     
     # Campos booleanos com valores padrão
@@ -90,14 +90,14 @@ class VisitorSerializer(serializers.ModelSerializer):
         if not data:
             raise serializers.ValidationError("Nenhum dado foi enviado para atualização")
         
-        # Validar campos obrigatórios básicos (apenas em criação, não em atualização)
+        # Converter birth_date vazio para None
+        if 'birth_date' in data and data['birth_date'] == '':
+            data['birth_date'] = None
+        
+        # Validar apenas nome como obrigatório (city e state são opcionais agora)
         if not self.instance:  # Apenas em criação
-            required_fields = ['full_name', 'city', 'state']
-            missing_fields = [field for field in required_fields if not data.get(field)]
-            if missing_fields:
-                raise serializers.ValidationError(
-                    f"Campos obrigatórios ausentes: {', '.join(missing_fields)}"
-                )
+            if not data.get('full_name'):
+                raise serializers.ValidationError("Campo 'full_name' é obrigatório")
         
         return data
     

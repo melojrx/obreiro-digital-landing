@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { translateRole } from '@/utils/roleTranslations';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -124,7 +125,7 @@ const Perfil: React.FC = () => {
                   <p className="text-sm text-gray-600">{user?.email}</p>
                   {userChurch && (
                     <Badge variant="secondary" className="mt-2">
-                      {userChurch.role_label || userChurch.user_role}
+                      {translateRole(userChurch.user_role)}
                     </Badge>
                   )}
                 </div>

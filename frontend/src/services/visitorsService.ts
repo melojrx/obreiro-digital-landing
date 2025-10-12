@@ -230,7 +230,25 @@ export const getVisitor = async (id: number): Promise<Visitor> => {
  * Cria um novo visitante (via painel administrativo)
  */
 export const createVisitor = async (visitorData: Partial<Visitor>): Promise<Visitor> => {
-  const response = await api.post(API_ENDPOINTS.visitors.create, visitorData);
+  // Limpar campos vazios e converter para null ou string vazia conforme o campo
+  const cleanedData = {
+    ...visitorData,
+    // Campos que devem ser null quando vazios
+    birth_date: visitorData.birth_date && visitorData.birth_date !== '' ? visitorData.birth_date : null,
+    // Campos que devem ser string vazia quando vazios (não null)
+    cpf: visitorData.cpf || '',
+    email: visitorData.email || '',
+    phone: visitorData.phone || '',
+    city: visitorData.city || '',
+    state: visitorData.state || '',
+    address: visitorData.address || '',
+    neighborhood: visitorData.neighborhood || '',
+    zipcode: visitorData.zipcode || '',
+    ministry_interest: visitorData.ministry_interest || '',
+    observations: visitorData.observations || '',
+  };
+  
+  const response = await api.post(API_ENDPOINTS.visitors.create, cleanedData);
   return response.data;
 };
 

@@ -83,47 +83,81 @@ class MemberViewSet(viewsets.ModelViewSet):
         """
         queryset = self.get_queryset()
         
+        # Importar datetime para cálculos
+        from datetime import date, timedelta
+        from django.db.models import Count
+        
+        today = date.today()
+        
         # Estatísticas básicas
         total_members = queryset.count()
         active_members = queryset.filter(membership_status='active').count()
+        inactive_members = queryset.filter(membership_status='inactive').count()
         
-        # Estatísticas por gênero
-        male_count = queryset.filter(gender='M').count()
-        female_count = queryset.filter(gender='F').count()
+        # Novos membros no último mês (baseado em created_at)
+        one_month_ago = today - timedelta(days=30)
+        new_members_month = queryset.filter(created_at__gte=one_month_ago).count()
         
-        # Estatísticas por faixa etária (aproximada)
-        from datetime import date, timedelta
-        today = date.today()
+        # Calcular taxa de crescimento (comparando com mês anterior)
+        two_months_ago = today - timedelta(days=60)
+        previous_month_members = queryset.filter(
+            created_at__gte=two_months_ago,
+            created_at__lt=one_month_ago
+        ).count()
         
-        # Jovens (até 30 anos)
-        young_date = today - timedelta(days=30*365)
-        young_count = queryset.filter(birth_date__gte=young_date).count()
+        if previous_month_members > 0:
+            growth_rate = ((new_members_month - previous_month_members) / previous_month_members) * 100
+        else:
+            growth_rate = 100.0 if new_members_month > 0 else 0.0
+        
+        # Distribuição por status
+        status_distribution = list(queryset.values('membership_status').annotate(
+            count=Count('id')
+        ).order_by('-count'))
+        
+        # Distribuição por gênero
+        gender_distribution = list(queryset.values('gender').annotate(
+            count=Count('id')
+        ).order_by('-count'))
+        
+        # Estatísticas por faixa etária
+        # Crianças (0-12 anos)
+        children_date = today - timedelta(days=12*365)
+        children = queryset.filter(birth_date__gte=children_date).count()
+        
+        # Jovens (13-30 anos)
+        youth_min_date = today - timedelta(days=30*365)
+        youth_max_date = children_date
+        youth = queryset.filter(
+            birth_date__gte=youth_min_date,
+            birth_date__lt=youth_max_date
+        ).count()
         
         # Adultos (31-60 anos)
-        adult_min_date = today - timedelta(days=60*365)
-        adult_max_date = today - timedelta(days=30*365)
-        adult_count = queryset.filter(
-            birth_date__gte=adult_min_date,
-            birth_date__lt=adult_max_date
+        adults_min_date = today - timedelta(days=60*365)
+        adults_max_date = youth_min_date
+        adults = queryset.filter(
+            birth_date__gte=adults_min_date,
+            birth_date__lt=adults_max_date
         ).count()
         
         # Idosos (acima de 60 anos)
-        elderly_date = today - timedelta(days=60*365)
-        elderly_count = queryset.filter(birth_date__lt=elderly_date).count()
+        elderly_date = adults_min_date
+        elderly = queryset.filter(birth_date__lt=elderly_date).count()
         
         data = {
             'total_members': total_members,
             'active_members': active_members,
-            'statistics': {
-                'by_gender': {
-                    'male': male_count,
-                    'female': female_count
-                },
-                'by_age': {
-                    'young': young_count,
-                    'adult': adult_count,
-                    'elderly': elderly_count
-                }
+            'inactive_members': inactive_members,
+            'new_members_month': new_members_month,
+            'growth_rate': round(growth_rate, 2),
+            'status_distribution': status_distribution,
+            'gender_distribution': gender_distribution,
+            'age_distribution': {
+                'children': children,
+                'youth': youth,
+                'adults': adults,
+                'elderly': elderly
             }
         }
         
@@ -369,3 +403,224 @@ class MemberViewSet(viewsets.ModelViewSet):
             'count': len(data),
             'results': data
         })
+    
+    @action(detail=False, methods=['post'], url_path='convert-admin-to-member')
+    def convert_admin_to_member(self, request):
+        """
+        Converte o Church Admin (usuário titular) em Membro da igreja.
+        
+        FORMULÁRIO SIMPLIFICADO: Apenas 2 campos obrigatórios:
+        - ministerial_function (função ministerial)
+        - marital_status (estado civil)
+        
+        Todos os outros dados são puxados automaticamente do CustomUser e UserProfile.
+        """
+        from apps.accounts.models import ChurchUser
+        from django.db import transaction
+        from datetime import date
+        import logging
+        
+        logger = logging.getLogger('apps.members')
+        logger.info(f"🔄 convert_admin_to_member iniciado para usuário: {request.user.email}")
+        logger.info(f"📦 Dados recebidos: {request.data}")
+        
+        # Obter igreja ativa do usuário
+        active_church = ChurchUser.objects.get_active_church_for_user(request.user)
+        if not active_church:
+            logger.error(f"❌ Igreja ativa não encontrada para {request.user.email}")
+            return Response(
+                {'error': 'Usuário não tem igreja ativa configurada'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar se o usuário já é membro
+        existing_member = Member.objects.filter(
+            user=request.user,
+            church=active_church,
+            is_active=True
+        ).first()
+        
+        if existing_member:
+            return Response(
+                {
+                    'error': 'Usuário já possui um registro de membro nesta igreja',
+                    'member_id': existing_member.id
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validar campos obrigatórios do formulário
+        ministerial_function = request.data.get('ministerial_function', 'member')
+        marital_status = request.data.get('marital_status', 'single')
+        
+        if not ministerial_function:
+            return Response(
+                {'error': 'Função ministerial é obrigatória'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not marital_status:
+            return Response(
+                {'error': 'Estado civil é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Buscar dados do perfil do usuário
+        user_profile = getattr(request.user, 'profile', None)
+
+        # Verificar se os dados obrigatórios estão preenchidos
+        missing_fields = []
+        if not request.user.phone:
+            missing_fields.append('telefone do perfil')
+        if not user_profile or not getattr(user_profile, 'cpf', None):
+            missing_fields.append('CPF no perfil')
+        if not user_profile or not getattr(user_profile, 'birth_date', None):
+            missing_fields.append('data de nascimento no perfil')
+        if not user_profile or not getattr(user_profile, 'gender', None):
+            missing_fields.append('gênero no perfil')
+
+        if missing_fields:
+            logger.warning(
+                "❌ Perfil incompleto para conversão de admin: campos faltando %s",
+                missing_fields
+            )
+            return Response(
+                {
+                    'error': 'Complete seu perfil antes de virar membro.',
+                    'missing_fields': missing_fields,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar se já existe um membro com o mesmo CPF ou e-mail (vinculado ou não ao user)
+        cpf = user_profile.cpf
+        email = request.user.email
+        
+        existing_by_cpf = Member.objects.filter(
+            church=active_church,
+            cpf=cpf,
+            is_active=True
+        ).first()
+        
+        existing_by_email = Member.objects.filter(
+            church=active_church,
+            email=email,
+            is_active=True
+        ).first()
+        
+        # Se existe membro com mesmo CPF ou e-mail, vincular ao usuário ao invés de criar novo
+        if existing_by_cpf or existing_by_email:
+            existing = existing_by_cpf or existing_by_email
+            
+            # Se já está vinculado a este usuário, retornar erro
+            if existing.user == request.user:
+                return Response(
+                    {
+                        'error': 'Você já possui um registro de membro nesta igreja',
+                        'member_id': existing.id
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Se o membro existe mas não está vinculado a nenhum usuário, vincular
+            if not existing.user:
+                logger.info(
+                    f"🔗 Vinculando membro existente (ID: {existing.id}) ao usuário {request.user.email}"
+                )
+                existing.user = request.user
+                
+                # Atualizar dados do membro com os do perfil
+                existing.full_name = request.user.full_name
+                existing.email = request.user.email
+                existing.phone = request.user.phone
+                existing.ministerial_function = ministerial_function
+                existing.marital_status = marital_status
+                existing.save()
+                
+                return Response(
+                    {
+                        'message': 'Seu registro de membro foi vinculado à sua conta!',
+                        'member': MemberSerializer(existing).data
+                    },
+                    status=status.HTTP_200_OK
+                )
+            
+            # Se o membro está vinculado a OUTRO usuário, retornar erro
+            return Response(
+                {
+                    'error': f'Já existe um membro cadastrado com {"este CPF" if existing_by_cpf else "este e-mail"} vinculado a outra conta',
+                    'member_id': existing.id
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Dados do membro: puxar tudo automaticamente do perfil
+        member_data = {
+            'church': active_church.id,
+            'user': request.user.id,
+            'full_name': request.user.full_name,
+            'email': request.user.email,
+            'phone': request.user.phone or '',
+            'membership_status': 'active',
+            'membership_date': date.today(),
+            
+            # Campos do formulário (obrigatórios)
+            'ministerial_function': ministerial_function,
+            'marital_status': marital_status,
+            
+            # Campos puxados automaticamente do UserProfile
+            'cpf': user_profile.cpf,
+            'birth_date': user_profile.birth_date,
+            'gender': user_profile.gender,
+            'address': getattr(user_profile, 'address', '') or '',
+            'zipcode': getattr(user_profile, 'zipcode', '') or '',
+            
+            # Campos opcionais vazios (podem ser editados depois)
+            'rg': '',
+            'city': '',
+            'state': '',
+            'baptism_date': None,
+            'conversion_date': None,
+            'notes': 'Membro criado automaticamente via conversão de Church Admin'
+        }
+        
+        # Validar e criar o membro (passar o contexto do request)
+        serializer = MemberCreateSerializer(data=member_data, context={'request': request})
+        
+        if not serializer.is_valid():
+            logger.error(
+                "❌ Erro de validação ao converter admin em membro: %s",
+                serializer.errors
+            )
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                # Criar o registro de membro
+                member = serializer.save()
+                
+                # Log da conversão
+                import logging
+                logger = logging.getLogger('apps.members')
+                logger.info(
+                    f"Church Admin convertido em membro: {request.user.email} "
+                    f"→ Member ID {member.id} na igreja {active_church.name}"
+                )
+                
+                # Retornar dados do membro criado
+                return Response(
+                    {
+                        'message': 'Você agora é um membro da igreja!',
+                        'member': MemberSerializer(member).data
+                    },
+                    status=status.HTTP_201_CREATED
+                )
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Erro ao criar registro de membro: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

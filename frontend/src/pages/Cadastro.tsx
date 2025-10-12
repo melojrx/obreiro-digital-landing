@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, AlertCircle, CheckCircle, Calendar, Phone } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, AlertCircle, CheckCircle, Calendar, Phone, IdCard } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -30,6 +30,7 @@ const Cadastro = () => {
     birth_date: prefill?.birth_date || storedStep1?.birth_date || '',
     gender: prefill?.gender || storedStep1?.gender || '',
     phone: prefill?.phone || storedStep1?.phone || user?.phone || '',
+    cpf: prefill?.cpf || storedStep1?.cpf || user?.profile?.cpf || '',
     password: '',
     password_confirm: '',
     accept_terms: storedStep1?.accept_terms || false
@@ -76,6 +77,36 @@ const Cadastro = () => {
     }
   };
 
+  const formatCpf = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  };
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCpf(e.target.value);
+    setFormData(prev => ({
+      ...prev,
+      cpf: formatted
+    }));
+
+    try {
+      const snapshot = { ...formData, cpf: formatted } as Record<string, unknown>;
+      delete snapshot.password;
+      delete snapshot.password_confirm;
+      localStorage.setItem('registration_step1_data', JSON.stringify(snapshot));
+    } catch {}
+
+    if (errors.cpf) {
+      setErrors(prev => ({
+        ...prev,
+        cpf: ''
+      }));
+    }
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -87,6 +118,45 @@ const Cadastro = () => {
 
     if (!formData.full_name) {
       newErrors.full_name = 'Nome completo é obrigatório';
+    }
+
+    if (!formData.birth_date) {
+      newErrors.birth_date = 'Data de nascimento é obrigatória';
+    } else {
+      const birthDate = new Date(formData.birth_date);
+      if (Number.isNaN(birthDate.getTime())) {
+        newErrors.birth_date = 'Data de nascimento inválida';
+      } else {
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear() - (
+          today.getMonth() < birthDate.getMonth() || (
+            today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate()
+          )
+            ? 1
+            : 0
+        );
+        if (age < 18) {
+          newErrors.birth_date = 'Você deve ter pelo menos 18 anos';
+        }
+      }
+    }
+
+    if (!formData.gender) {
+      newErrors.gender = 'Gênero é obrigatório';
+    } else if (!['M', 'F'].includes(formData.gender)) {
+      newErrors.gender = 'Selecione um gênero válido';
+    }
+
+    if (!formData.phone) {
+      newErrors.phone = 'Telefone é obrigatório';
+    } else if (formData.phone.replace(/\D/g, '').length < 10) {
+      newErrors.phone = 'Telefone inválido';
+    }
+
+    if (!formData.cpf) {
+      newErrors.cpf = 'CPF é obrigatório';
+    } else if (formData.cpf.replace(/\D/g, '').length !== 11) {
+      newErrors.cpf = 'CPF inválido';
     }
 
     if (!formData.password) {
@@ -128,6 +198,13 @@ const Cadastro = () => {
       ...prev,
       phone: formatted
     }));
+
+    try {
+      const snapshot = { ...formData, phone: formatted } as Record<string, unknown>;
+      delete snapshot.password;
+      delete snapshot.password_confirm;
+      localStorage.setItem('registration_step1_data', JSON.stringify(snapshot));
+    } catch {}
     
     if (errors.phone) {
       setErrors(prev => ({
@@ -155,9 +232,10 @@ const Cadastro = () => {
       const registrationData = {
         email: formData.email,
         full_name: formData.full_name,
-        phone: formData.phone || '(11) 99999-9999',
-        birth_date: formData.birth_date || '1990-01-01',
-        gender: formData.gender || 'N',
+        phone: formData.phone,
+        birth_date: formData.birth_date,
+        gender: formData.gender,
+        cpf: formData.cpf,
         password: formData.password,
         password_confirm: formData.password_confirm,
         accept_terms: formData.accept_terms
@@ -271,7 +349,7 @@ const Cadastro = () => {
 
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Row 1: Nome completo e E-mail */}
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Nome Completo Field */}
               <div>
                 <label htmlFor="full_name" className="block text-sm font-semibold text-slate-700 mb-2">
@@ -387,34 +465,65 @@ const Cadastro = () => {
               </div>
             </div>
 
-            {/* Row 3: Telefone */}
-            <div>
-              <label htmlFor="phone" className="block text-sm font-semibold text-slate-700 mb-2">
-                Telefone*
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-slate-400" />
+            {/* Row 3: CPF e Telefone */}
+            <div className="grid grid-cols-1 gap-6">
+              <div>
+                <label htmlFor="cpf" className="block text-sm font-semibold text-slate-700 mb-2">
+                  CPF*
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <IdCard className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="cpf"
+                    name="cpf"
+                    type="text"
+                    required
+                    value={formData.cpf}
+                    onChange={handleCpfChange}
+                    disabled={isLoading}
+                    className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      errors.cpf ? 'border-red-300' : 'border-gray-200'
+                    }`}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                    inputMode="numeric"
+                  />
                 </div>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  required
-                  value={formData.phone}
-                  onChange={handlePhoneChange}
-                  disabled={isLoading}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    errors.phone ? 'border-red-300' : 'border-gray-200'
-                  }`}
-                  placeholder="(00) 00000-0000"
-                  maxLength={15}
-                />
+                {errors.cpf && (
+                  <p className="mt-1 text-sm text-red-600">{errors.cpf}</p>
+                )}
               </div>
-              {errors.phone && (
-                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-              )}
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Telefone*
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    required
+                    value={formData.phone}
+                    onChange={handlePhoneChange}
+                    disabled={isLoading}
+                    className={`block w-full pl-10 pr-3 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      errors.phone ? 'border-red-300' : 'border-gray-200'
+                    }`}
+                    placeholder="(00) 00000-0000"
+                    maxLength={15}
+                  />
+                </div>
+                {errors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                )}
+              </div>
             </div>
 
             {/* Row 4: Senha e Confirmar Senha */}

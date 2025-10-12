@@ -99,6 +99,8 @@ class Visitor(BaseModel):
         "CPF",
         max_length=14,
         blank=True,
+        null=True,
+        default="",
         validators=[validate_cpf]
     )
     

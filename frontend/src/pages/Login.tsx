@@ -31,7 +31,9 @@ const Login = () => {
     try {
       await login({ email, password });
       console.log('🎉 Login completed successfully');
-      // ProtectedRoute irá redirecionar automaticamente
+      
+      // Redirecionar para dashboard, mas ProtectedRoute vai verificar
+      // se precisa ir para onboarding primeiro
       navigate('/dashboard', { replace: true });
     } catch (err) {
       // Erro já foi tratado pelo hook useAuth

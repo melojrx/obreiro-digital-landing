@@ -144,6 +144,7 @@ const CadastroEtapa3 = () => {
         password: step1Data.password,
         birth_date: step1Data.birth_date,
         gender: step1Data.gender,
+        cpf: step1Data.cpf,
         
         // Dados de endereço do usuário (etapa 2)
         denomination_id: step2Data.denomination_id,
