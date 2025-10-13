@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Check, Users, BarChart3, QrCode, Cloud, Building, Star, Menu, X, ArrowRight, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { SERVER_BASE_URL } from '@/config/api';
 
 const Index = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -590,7 +591,7 @@ const Index = () => {
               <ul className="space-y-2 text-slate-400">
                 <li><a href="#recursos" className="hover:text-white transition-colors">Recursos</a></li>
                 <li><a href="#precos" className="hover:text-white transition-colors">Preços</a></li>
-                <li><a href="http://localhost:8000/api/docs/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">API Docs</a></li>
+                <li><a href={`${SERVER_BASE_URL}/api/docs/`} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">API Docs</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Integrações</a></li>
               </ul>
             </div>

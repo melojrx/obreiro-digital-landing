@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { translateRole } from '@/utils/roleTranslations';
+import { API_BASE_URL } from '@/config/api';
 import AppLayout from '@/components/layout/AppLayout';
-import { 
-  Church, 
-  CheckCircle, 
-  ArrowRight, 
-  Sparkles, 
-  Users, 
+import {
+  Church,
+  CheckCircle,
+  ArrowRight,
+  Sparkles,
+  Users,
   BarChart3,
   Calendar,
   MessageSquare,
@@ -206,12 +207,12 @@ const CreateChurchStep: React.FC<CreateChurchStepProps> = ({ user, onBack, toast
   const fetchDenominations = async () => {
     setLoadingDenominations(true);
     try {
-      const response = await fetch('http://localhost:8000/api/v1/denominations/', {
+      const response = await fetch(`${API_BASE_URL}/denominations/`, {
         headers: {
           'Authorization': `Token ${localStorage.getItem('auth_token')}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setDenominations(data.results || data);
@@ -283,7 +284,7 @@ const CreateChurchStep: React.FC<CreateChurchStepProps> = ({ user, onBack, toast
         })
       };
 
-      const response = await fetch('http://localhost:8000/api/v1/churches/create-first-church/', {
+      const response = await fetch(`${API_BASE_URL}/churches/create-first-church/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

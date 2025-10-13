@@ -150,7 +150,8 @@ services:
       dockerfile: ../docker/frontend/Dockerfile
       target: build
       args:
-        - VITE_API_URL=${FRONTEND_URL:-https://www.obreirovirtual.com/api/v1}
+        # Hardcoded para produção (não depende de variáveis externas)
+        - VITE_API_URL=https://www.obreirovirtual.com/api/v1
     container_name: obreiro_frontend_build
     volumes:
       - ./frontend_build:/shared/dist
