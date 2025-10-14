@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "postgres-obreiro": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "pg-mcp-server",
+        "--transport",
+        "stdio"
+      ],
+      "env": {
+        "DATABASE_URL": "postgresql://obreiro_user:obreiro_pass@localhost:5432/obreiro_dev?sslmode=disable"
+      }
+    }
+  }
+}

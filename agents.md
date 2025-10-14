@@ -36,7 +36,7 @@ Este arquivo fornece orientações para o Claude Code (claude.ai/code) ao trabal
 ## 🐳 Ambiente de Desenvolvimento
 
 ### Sistema Base
-- **Sistema**: WSL2 Ubuntu no Windows
+- **Sistema**: Ubuntu
 - **Containerização**: Docker + Docker Compose (dev e prod)
 - **GitHub CLI**: gh instalado e configurado
 - **Autenticação**: HTTPS
@@ -191,8 +191,8 @@ cd backend && python manage.py create_platform_admin
 
 #### Core Business Logic
 - **accounts/**: Sistema de autenticação, perfis e permissões hierárquicas
+  **denominations/**: Gestão de denominações religiosas
 - **churches/**: Gestão de igrejas principais (multi-tenant)
-- **denominations/**: Gestão de denominações religiosas
 - **branches/**: Sistema de filiais de igrejas
 - **members/**: CRUD completo de membros com papéis e permissões
 - **visitors/**: Sistema de visitantes com QR code
@@ -222,24 +222,52 @@ class TenantManager(models.Manager):
 
 ### Sistema de Permissões
 
-Hierarquia de 8 níveis de permissões:
-```
-SUPER_ADMIN (10)         → Desenvolvedores da plataforma
-    ↓
-DENOMINATION_ADMIN (9)   → Administra múltiplas igrejas (LEGADO - usar CHURCH_ADMIN)
-    ↓
-CHURCH_ADMIN (8)         → Administra igreja específica + denominação se configurado
-    ↓
-PASTOR (7)               → Gestão pastoral completa
-    ↓
-SECRETARY (6)            → Gestão de cadastros
-    ↓
-LEADER (5)               → Liderança de filial/ministério
-    ↓
-MEMBER (4)               → Membro comum
-    ↓
-READ_ONLY (3)            → Apenas visualização
-```
+Hierarquia de Papéis
+1. SuperUser (Django Admin) / Platform Admin
+Escopo: Sistema completo (toda a plataforma SaaS)
+Descrição: Administrador técnico da plataforma - EXCLUSIVO para desenvolvedores/donos
+Acesso: Irrestrito a todos os dados e funcionalidades
+Uso: Manutenção técnica, suporte, configurações globais, dashboard de faturamento
+⚠️ IMPORTANTE: Este papel NUNCA pode ser atribuído via cadastro normal da aplicação
+2. Church Admin (Administrador da Igreja/Igrejas dentro do Sistema)
+Escopo: Todas as igrejas de uma denominação ou igreja específica
+Descrição: Usuário que criou e paga pela conta da denominação/igreja
+Acesso: Gestão completa de todas as igrejas sob sua denominação (se aplicável) ou da igreja específica
+Responsabilidades:
+Criar e gerenciar igrejas (no caso de denominações)
+Gerenciar membros e visitantes
+Criar e administrar filiais
+Definir líderes e responsáveis (Branch Managers)
+Configurar atividades e ministérios
+Visão consolidada de relatórios
+Gerenciar assinaturas e pagamentos
+Nota: Este papel substitui o antigo DENOMINATION_ADMIN, centralizando a administração de igrejas
+3. Branch Manager (Gestor de Filial)
+Escopo: Filiais específicas atribuídas
+Descrição: Responsável por uma ou mais filiais específicas
+Acesso: Gestão limitada às filiais designadas
+Responsabilidades:
+Gerenciar membros da filial
+Acompanhar visitantes
+Organizar atividades locais
+Relatórios da filial
+4. Member User (Usuário Membro)
+Escopo: Dados da própria igreja
+Descrição: Membro comum com acesso ao sistema
+Acesso: Visualização de dados gerais da igreja
+Responsabilidades:
+Visualizar informações da igreja
+Acessar calendário de atividades
+Atualizar dados pessoais
+5. Visitor (Visitante)
+Escopo: Dados próprios e atividades públicas
+Descrição: Pessoa que visitou a igreja via QR Code
+Acesso: Muito limitado, apenas dados próprios
+Responsabilidades:
+Visualizar informações básicas da igreja
+Receber comunicações direcionadas
+Candidato à conversão para membro
+
 
 **Validação em múltiplas camadas**:
 1. Model (validações no save/clean)
