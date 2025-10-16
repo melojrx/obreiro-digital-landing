@@ -1026,24 +1026,81 @@ class ChurchViewSet(viewsets.ModelViewSet):
         from apps.accounts.models import RoleChoices, LEGACY_DENOMINATION_ROLE
 
         User = get_user_model()
+        user = request.user
         
-        # Buscar usuários que podem ser administradores
+        # Determinar privilégios de plataforma (acesso irrestrito)
+        is_platform_admin = user.is_superuser or user.church_users.filter(
+            role='super_admin',
+            is_active=True
+        ).exists()
+        
         eligible_users = User.objects.filter(
             is_active=True
-        ).select_related('profile').prefetch_related('church_users', 'member_profile')
+        ).select_related('profile').prefetch_related(
+            'member_profile',
+            'administered_denominations',
+            'church_users__church__denomination'
+        )
         
-        # Filtrar por denominação se especificada
-        denomination_id = request.query_params.get('denomination_id')
-        if denomination_id:
-            eligible_users = eligible_users.filter(
-                Q(church_users__church__denomination_id=denomination_id) |
-                Q(church_users__isnull=True)
-            ).distinct()
+        allowed_denomination_ids = set()
+        allowed_church_ids = set(
+            user.church_users.filter(is_active=True).values_list('church_id', flat=True)
+        )
+        
+        # Denominações administradas diretamente
+        allowed_denomination_ids.update(
+            user.administered_denominations.filter(is_active=True).values_list('id', flat=True)
+        )
+        # Denominações associadas às igrejas onde o usuário atua
+        allowed_denomination_ids.update(
+            user.church_users.filter(
+                is_active=True,
+                church__denomination__isnull=False
+            ).values_list('church__denomination_id', flat=True)
+        )
+        # Denominação da igreja ativa no request (quando disponível)
+        if getattr(request, 'church', None) and request.church.denomination_id:
+            allowed_denomination_ids.add(request.church.denomination_id)
+        
+        # Filtrar por denominação solicitada apenas se usuário tiver acesso
+        requested_denomination = request.query_params.get('denomination_id')
+        if requested_denomination:
+            try:
+                requested_denomination_id = int(requested_denomination)
+            except (TypeError, ValueError):
+                requested_denomination_id = None
+            if requested_denomination_id is not None:
+                if is_platform_admin or requested_denomination_id in allowed_denomination_ids:
+                    allowed_denomination_ids.add(requested_denomination_id)
+        
+        if not is_platform_admin:
+            filters = []
+            if allowed_denomination_ids:
+                filters.append(
+                    Q(church_users__is_active=True, church_users__church__denomination_id__in=allowed_denomination_ids)
+                )
+                filters.append(
+                    Q(administered_denominations__id__in=allowed_denomination_ids)
+                )
+            if allowed_church_ids:
+                filters.append(
+                    Q(church_users__is_active=True, church_users__church_id__in=allowed_church_ids)
+                )
+            
+            if filters:
+                combined_filter = Q()
+                for condition in filters:
+                    combined_filter |= condition
+                eligible_users = eligible_users.filter(combined_filter).distinct()
+            else:
+                eligible_users = eligible_users.filter(id=user.id).distinct()
+        else:
+            eligible_users = eligible_users.distinct()
         
         # Serializar dados dos usuários
         users_data = []
-        for user in eligible_users:
-            current_roles = user.church_users.filter(is_active=True).values_list('role', flat=True)
+        for candidate in eligible_users:
+            current_roles = candidate.church_users.filter(is_active=True).values_list('role', flat=True)
             
             # Papéis de sistema que podem ser administradores
             allowed_system_roles = [
@@ -1062,23 +1119,23 @@ class ChurchViewSet(viewsets.ModelViewSet):
             # Obter função ministerial se for membro
             ministerial_function = None
             ministerial_function_display = None
-            if hasattr(user, 'member_profile') and user.member_profile:
-                ministerial_function = user.member_profile.ministerial_function
-                ministerial_function_display = user.member_profile.get_ministerial_function_display()
+            if hasattr(candidate, 'member_profile') and candidate.member_profile:
+                ministerial_function = candidate.member_profile.ministerial_function
+                ministerial_function_display = candidate.member_profile.get_ministerial_function_display()
             
             if can_be_admin:
                 users_data.append({
-                    'id': user.id,
-                    'full_name': user.full_name,
-                    'email': user.email,
-                    'phone': user.phone,
+                    'id': candidate.id,
+                    'full_name': candidate.full_name,
+                    'email': candidate.email,
+                    'phone': candidate.phone,
                     'current_system_roles': [{
                         'role': role,
                         'role_display': dict(RoleChoices.choices).get(role, role)
                     } for role in current_roles],
                     'ministerial_function': ministerial_function,
                     'ministerial_function_display': ministerial_function_display,
-                    'avatar': user.profile.avatar.url if hasattr(user, 'profile') and user.profile.avatar else None,
+                    'avatar': candidate.profile.avatar.url if hasattr(candidate, 'profile') and candidate.profile.avatar else None,
                     'role_explanation': self._get_role_explanation(current_roles, ministerial_function)
                 })
         
@@ -1096,20 +1153,69 @@ class ChurchViewSet(viewsets.ModelViewSet):
         from apps.accounts.models import RoleChoices, LEGACY_DENOMINATION_ROLE
         
         User = get_user_model()
+        user = request.user
+        
+        is_platform_admin = user.is_superuser or user.church_users.filter(
+            role='super_admin',
+            is_active=True
+        ).exists()
         
         eligible_users = User.objects.filter(
             is_active=True
-        ).select_related('profile').prefetch_related('church_users', 'member_profile')
+        ).select_related('profile').prefetch_related(
+            'member_profile',
+            'administered_denominations',
+            'church_users__church__denomination'
+        )
         
-        if church.denomination:
-            eligible_users = eligible_users.filter(
-                Q(church_users__church__denomination=church.denomination) |
-                Q(church_users__isnull=True)
-            ).distinct()
+        allowed_denomination_ids = set()
+        allowed_church_ids = set(
+            user.church_users.filter(is_active=True).values_list('church_id', flat=True)
+        )
+        
+        allowed_denomination_ids.update(
+            user.administered_denominations.filter(is_active=True).values_list('id', flat=True)
+        )
+        allowed_denomination_ids.update(
+            user.church_users.filter(
+                is_active=True,
+                church__denomination__isnull=False
+            ).values_list('church__denomination_id', flat=True)
+        )
+        if getattr(request, 'church', None) and request.church.denomination_id:
+            allowed_denomination_ids.add(request.church.denomination_id)
+        
+        if church.denomination_id:
+            allowed_denomination_ids.add(church.denomination_id)
+        allowed_church_ids.add(church.id)
+        
+        if not is_platform_admin:
+            filters = []
+            if allowed_denomination_ids:
+                filters.append(
+                    Q(church_users__is_active=True, church_users__church__denomination_id__in=allowed_denomination_ids)
+                )
+                filters.append(
+                    Q(administered_denominations__id__in=allowed_denomination_ids)
+                )
+            if allowed_church_ids:
+                filters.append(
+                    Q(church_users__is_active=True, church_users__church_id__in=allowed_church_ids)
+                )
+            
+            if filters:
+                combined_filter = Q()
+                for condition in filters:
+                    combined_filter |= condition
+                eligible_users = eligible_users.filter(combined_filter).distinct()
+            else:
+                eligible_users = eligible_users.filter(id=user.id).distinct()
+        else:
+            eligible_users = eligible_users.distinct()
         
         users_data = []
-        for user in eligible_users:
-            current_roles = user.church_users.filter(is_active=True).values_list('role', flat=True)
+        for candidate in eligible_users:
+            current_roles = candidate.church_users.filter(is_active=True).values_list('role', flat=True)
             
             # Papéis de sistema que podem ser administradores
             allowed_system_roles = [
@@ -1128,24 +1234,24 @@ class ChurchViewSet(viewsets.ModelViewSet):
             # Obter função ministerial se for membro
             ministerial_function = None
             ministerial_function_display = None
-            if hasattr(user, 'member_profile') and user.member_profile:
-                ministerial_function = user.member_profile.ministerial_function
-                ministerial_function_display = user.member_profile.get_ministerial_function_display()
+            if hasattr(candidate, 'member_profile') and candidate.member_profile:
+                ministerial_function = candidate.member_profile.ministerial_function
+                ministerial_function_display = candidate.member_profile.get_ministerial_function_display()
             
             if can_be_admin:
                 users_data.append({
-                    'id': user.id,
-                    'full_name': user.full_name,
-                    'email': user.email,
-                    'phone': user.phone,
+                    'id': candidate.id,
+                    'full_name': candidate.full_name,
+                    'email': candidate.email,
+                    'phone': candidate.phone,
                     'current_system_roles': [{
                         'role': role,
                         'role_display': dict(RoleChoices.choices).get(role, role)
                     } for role in current_roles],
                     'ministerial_function': ministerial_function,
                     'ministerial_function_display': ministerial_function_display,
-                    'avatar': user.profile.avatar.url if hasattr(user, 'profile') and user.profile.avatar else None,
-                    'is_current_pastor': church.main_pastor_id == user.id,
+                    'avatar': candidate.profile.avatar.url if hasattr(candidate, 'profile') and candidate.profile.avatar else None,
+                    'is_current_pastor': church.main_pastor_id == candidate.id,
                     'role_explanation': self._get_role_explanation(current_roles, ministerial_function)
                 })
         

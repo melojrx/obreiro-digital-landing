@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { isAxiosError } from 'axios';
 import {
   Building2,
   ArrowLeft,
@@ -99,9 +100,13 @@ const churchFormSchema = z.object({
     .or(z.literal('')),
 
   // Pastor principal (ID do usuário)
-  main_pastor: z.number()
-    .min(1, 'Selecione um administrador')
-    .optional(),
+  main_pastor: z.number({
+      invalid_type_error: 'Selecione um administrador válido',
+    })
+    .int('Selecione um administrador válido')
+    .positive('Selecione um administrador válido')
+    .optional()
+    .nullable(),
 
   // Configurações
   subscription_plan: z.string().optional(),
@@ -151,7 +156,7 @@ const CreateChurchPage: React.FC = () => {
       state: '',
       zipcode: '',
       cnpj: '',
-      main_pastor: 0,
+      main_pastor: null,
       subscription_plan: 'basic',
       max_members: 500,
       max_branches: 5,
@@ -351,7 +356,9 @@ const CreateChurchPage: React.FC = () => {
         max_members: data.max_members || 500,
         max_branches: data.max_branches || 5,
         subscription_plan: data.subscription_plan || 'basic',
-        main_pastor: data.main_pastor > 0 ? data.main_pastor : undefined,
+        main_pastor: typeof data.main_pastor === 'number' && data.main_pastor > 0
+          ? data.main_pastor
+          : undefined,
       };
 
       const newChurch = await churchService.createChurch(churchData);
@@ -381,14 +388,22 @@ const CreateChurchPage: React.FC = () => {
       });
 
       navigate(`/denominacao/churches/${newChurch.id}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao criar igreja:', error);
       
       let errorMessage = 'Erro interno. Tente novamente.';
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.data?.errors) {
-        errorMessage = Object.values(error.response.data.errors)[0] as string;
+      if (isAxiosError(error)) {
+        const responseData = error.response?.data as {
+          message?: string;
+          errors?: Record<string, string | string[]>;
+        } | undefined;
+
+        if (responseData?.message) {
+          errorMessage = responseData.message;
+        } else if (responseData?.errors) {
+          const firstError = Object.values(responseData.errors)[0];
+          errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+        }
       }
 
       toast({
@@ -742,10 +757,16 @@ const CreateChurchPage: React.FC = () => {
                   name="main_pastor"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Selecionar Administrador</FormLabel>
+                      <FormLabel>
+                        Selecionar Administrador <span className="text-gray-500 text-xs">(opcional)</span>
+                      </FormLabel>
                       <Select 
-                        onValueChange={(value) => field.onChange(Number(value))} 
-                        value={field.value > 0 ? field.value.toString() : ''}
+                        onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))} 
+                        value={
+                          typeof field.value === 'number' && field.value > 0
+                            ? field.value.toString()
+                            : 'none'
+                        }
                         disabled={loadingAdmins}
                       >
                         <FormControl>
@@ -754,6 +775,12 @@ const CreateChurchPage: React.FC = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="none">
+                            <div className="flex flex-col">
+                              <span className="font-medium">Sem administrador definido</span>
+                              <span className="text-xs text-gray-500">Você pode atribuir depois</span>
+                            </div>
+                          </SelectItem>
                           {eligibleAdmins.map((admin) => (
                             <SelectItem key={admin.id} value={admin.id.toString()}>
                               <div className="flex items-center gap-3 w-full">
@@ -801,7 +828,7 @@ const CreateChurchPage: React.FC = () => {
                         </SelectContent>
                       </Select>
                       <FormDescription>
-                        Selecione o usuário que será o administrador principal desta igreja.
+                        Se desejar, selecione um administrador principal agora. Você poderá escolher ou alterar este responsável posteriormente.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
