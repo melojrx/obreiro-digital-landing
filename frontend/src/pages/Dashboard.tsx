@@ -16,6 +16,11 @@ import { ConvertAdminToMemberModal } from '@/components/members/ConvertAdminToMe
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, UserPlus, Calendar, DollarSign, UserCheck } from 'lucide-react';
+import type { Member } from '@/services/membersService';
+
+interface MemberSearchResponse {
+    results?: Array<Pick<Member, 'id' | 'user' | 'email'>>;
+}
 
 const Dashboard = () => {
     const { user, userChurch } = useAuth();
@@ -50,28 +55,27 @@ const Dashboard = () => {
                 console.log('🔍 Verificando se Church Admin já é membro:', user.email);
                 
                 // Buscar por e-mail E por user ID
-                const response = await api.get(
+                const response = await api.get<MemberSearchResponse>(
                     `/members/?search=${encodeURIComponent(user.email)}`
                 );
                 console.log('✅ Resposta da busca de membros:', response.data);
                 
                 // Verificar se existe algum membro vinculado a este usuário OU com o mesmo e-mail
-                const hasMemberRecord = response.data.results?.some(
-                    (member: any) => {
-                        const isSameUser = member.user === user.id;
-                        const isSameEmail = member.email?.toLowerCase() === user.email?.toLowerCase();
-                        console.log('🔍 Verificando membro:', {
-                            memberId: member.id,
-                            memberUser: member.user,
-                            memberEmail: member.email,
-                            currentUserId: user.id,
-                            currentUserEmail: user.email,
-                            isSameUser,
-                            isSameEmail
-                        });
-                        return isSameUser || isSameEmail;
-                    }
-                );
+                const members = response.data.results ?? [];
+                const hasMemberRecord = members.some((member) => {
+                    const isSameUser = member.user === user.id;
+                    const isSameEmail = member.email?.toLowerCase() === user.email?.toLowerCase();
+                    console.log('🔍 Verificando membro:', {
+                        memberId: member.id,
+                        memberUser: member.user,
+                        memberEmail: member.email,
+                        currentUserId: user.id,
+                        currentUserEmail: user.email,
+                        isSameUser,
+                        isSameEmail
+                    });
+                    return isSameUser || isSameEmail;
+                });
                 
                 console.log('🎯 Tem registro de membro?', hasMemberRecord);
                 console.log('✅ shouldShowConvertButton será:', !hasMemberRecord);

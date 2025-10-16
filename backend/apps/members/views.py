@@ -415,9 +415,11 @@ class MemberViewSet(viewsets.ModelViewSet):
         
         Todos os outros dados são puxados automaticamente do CustomUser e UserProfile.
         """
-        from apps.accounts.models import ChurchUser
+        from apps.accounts.models import ChurchUser, UserProfile
+        from apps.core.models import validate_cpf, GenderChoices, phone_validator
+        from django.core.exceptions import ValidationError as DjangoValidationError
         from django.db import transaction
-        from datetime import date
+        from django.utils.dateparse import parse_date
         import logging
         
         logger = logging.getLogger('apps.members')
@@ -465,10 +467,101 @@ class MemberViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Buscar dados do perfil do usuário
+        # Buscar dados do perfil do usuário (criar se não existir)
         user_profile = getattr(request.user, 'profile', None)
+        if not user_profile:
+            user_profile = UserProfile.objects.create(user=request.user)
 
-        # Verificar se os dados obrigatórios estão preenchidos
+        # Atualizar dados obrigatórios do perfil caso fornecidos
+        profile_update_fields = set()
+        user_update_fields = set()
+
+        phone_input = request.data.get('phone')
+        if phone_input:
+            phone_digits = ''.join(filter(str.isdigit, str(phone_input)))
+            if len(phone_digits) not in (10, 11):
+                return Response(
+                    {'error': 'Telefone inválido. Informe DDD e número com 10 ou 11 dígitos.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if len(phone_digits) == 11:
+                formatted_phone = f"({phone_digits[:2]}) {phone_digits[2:7]}-{phone_digits[7:]}"
+            else:
+                formatted_phone = f"({phone_digits[:2]}) {phone_digits[2:6]}-{phone_digits[6:]}"
+            try:
+                phone_validator(formatted_phone)
+            except DjangoValidationError as exc:
+                return Response(
+                    {'error': 'Telefone inválido.', 'details': exc.messages},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if formatted_phone != request.user.phone:
+                request.user.phone = formatted_phone
+                user_update_fields.add('phone')
+
+        cpf_input = request.data.get('cpf')
+        if cpf_input:
+            cpf_digits = ''.join(filter(str.isdigit, str(cpf_input)))
+            try:
+                validate_cpf(cpf_digits)
+            except DjangoValidationError as exc:
+                return Response(
+                    {'error': 'CPF inválido.', 'details': exc.messages},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            formatted_cpf = f"{cpf_digits[:3]}.{cpf_digits[3:6]}.{cpf_digits[6:9]}-{cpf_digits[9:]}"
+            existing_cpfs = UserProfile.objects.filter(cpf__isnull=False).exclude(user=request.user)
+            if any(''.join(filter(str.isdigit, existing.cpf or '')) == cpf_digits for existing in existing_cpfs):
+                return Response(
+                    {'error': 'CPF já cadastrado no sistema.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if formatted_cpf != user_profile.cpf:
+                user_profile.cpf = formatted_cpf
+                profile_update_fields.add('cpf')
+
+        birth_date_input = request.data.get('birth_date')
+        if birth_date_input:
+            birth_date = parse_date(str(birth_date_input))
+            if not birth_date:
+                return Response(
+                    {'error': 'Data de nascimento inválida. Use o formato AAAA-MM-DD.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            today = date.today()
+            age = today.year - birth_date.year - (
+                (today.month, today.day) < (birth_date.month, birth_date.day)
+            )
+            if age < 18:
+                return Response(
+                    {'error': 'Usuário deve ter pelo menos 18 anos para tornar-se membro como administrador.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if birth_date != getattr(user_profile, 'birth_date', None):
+                user_profile.birth_date = birth_date
+                profile_update_fields.add('birth_date')
+
+        gender_input = request.data.get('gender')
+        if gender_input:
+            gender_value = str(gender_input).upper()
+            if gender_value not in GenderChoices.values:
+                valid_choices = ', '.join(GenderChoices.values)
+                return Response(
+                    {'error': f'Gênero inválido. Utilize um dos valores: {valid_choices}.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if gender_value != getattr(user_profile, 'gender', None):
+                user_profile.gender = gender_value
+                profile_update_fields.add('gender')
+
+        if profile_update_fields:
+            profile_update_fields.add('updated_at')
+            user_profile.save(update_fields=list(profile_update_fields))
+
+        if user_update_fields:
+            request.user.save(update_fields=list(user_update_fields))
+
+        # Verificar se os dados obrigatórios estão preenchidos após possíveis atualizações
         missing_fields = []
         if not request.user.phone:
             missing_fields.append('telefone do perfil')
@@ -491,6 +584,10 @@ class MemberViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        if not request.user.is_profile_complete:
+            request.user.is_profile_complete = True
+            request.user.save(update_fields=['is_profile_complete'])
         
         # Verificar se já existe um membro com o mesmo CPF ou e-mail (vinculado ou não ao user)
         cpf = user_profile.cpf

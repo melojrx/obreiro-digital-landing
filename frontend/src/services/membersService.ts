@@ -438,10 +438,17 @@ export const membersService = {
   async convertAdminToMember(data: {
     ministerial_function: string;
     marital_status: string;
+    phone?: string;
+    cpf?: string;
+    birth_date?: string;
+    gender?: string;
   }): Promise<{ message: string; member: Member }> {
+    const payload = Object.fromEntries(
+      Object.entries(data).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    );
     const response = await api.post(
       `${API_ENDPOINTS.members.list}convert-admin-to-member/`, 
-      data
+      payload
     );
     return response.data;
   },
