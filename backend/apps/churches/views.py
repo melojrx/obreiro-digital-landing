@@ -123,6 +123,11 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 'branches',
                 filter=Q(branches__is_active=True, branches__is_headquarters=False),
                 distinct=True
+            ),
+            visitors_count=Count(
+                'visitors',
+                filter=Q(visitors__is_active=True),
+                distinct=True
             )
         )
         

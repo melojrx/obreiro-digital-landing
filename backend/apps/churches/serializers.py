@@ -307,6 +307,12 @@ class ChurchListSerializer(serializers.ModelSerializer):
 
         data['branches_count'] = data.get('branches_count', 0)
 
+        visitors_count = getattr(instance, 'visitors_count', None)
+        if visitors_count is not None:
+            data['total_visitors'] = visitors_count
+        else:
+            data['total_visitors'] = data.get('total_visitors', 0)
+
         return data
 
 
@@ -547,6 +553,12 @@ class ChurchDetailSerializer(serializers.ModelSerializer):
         if branches_count is not None:
             data['branches_count'] = branches_count
         data['branches_count'] = data.get('branches_count', 0)
+
+        visitors_count = getattr(instance, 'visitors_count', None)
+        if visitors_count is not None:
+            data['total_visitors'] = visitors_count
+        else:
+            data['total_visitors'] = data.get('total_visitors', 0)
 
         return data
 
