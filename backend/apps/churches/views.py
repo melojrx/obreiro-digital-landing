@@ -24,6 +24,7 @@ from apps.core.permissions import (
     IsChurchAdmin, IsPlatformAdmin,
     CanCreateChurches, CanManageChurchAdmins
 )
+from apps.core.models import MembershipStatusChoices
 from apps.accounts.models import LEGACY_DENOMINATION_ROLE
 
 # Setup logging
@@ -109,6 +110,20 @@ class ChurchViewSet(viewsets.ModelViewSet):
             'denomination', 'main_pastor'
         ).prefetch_related(
             'branches'
+        ).annotate(
+            members_count=Count(
+                'members',
+                filter=Q(
+                    members__is_active=True,
+                    members__membership_status=MembershipStatusChoices.ACTIVE
+                ),
+                distinct=True
+            ),
+            branches_count=Count(
+                'branches',
+                filter=Q(branches__is_active=True, branches__is_headquarters=False),
+                distinct=True
+            )
         )
         
         # Superuser vê tudo
@@ -319,7 +334,7 @@ class ChurchViewSet(viewsets.ModelViewSet):
         
         # Assumindo que existe um modelo Branch relacionado
         try:
-            branches = church.branches.filter(is_active=True)
+            branches = church.branches.filter(is_active=True, is_headquarters=False)
             # Usar serializer básico para evitar circular import
             branches_data = []
             for branch in branches:

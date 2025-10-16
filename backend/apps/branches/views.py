@@ -13,6 +13,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 
 from .models import Branch
 from .serializers import BranchSerializer, BranchQRCodeSerializer
+from apps.churches.models import Church
 from apps.core.permissions import IsMemberUser
 
 
@@ -139,6 +140,56 @@ class BranchViewSet(viewsets.ModelViewSet):
         if self.action in ['qr_codes', 'regenerate_qr_code', 'toggle_qr_code']:
             return BranchQRCodeSerializer
         return super().get_serializer_class()
+
+    @action(detail=False, methods=['get'], url_path='check-create-availability')
+    def check_create_availability(self, request):
+        """Verifica se a igreja pode criar novas filiais com base no plano vigente"""
+        church_id = request.query_params.get('church_id')
+        if not church_id:
+            return Response(
+                {'error': 'Parâmetro church_id é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            church_id = int(church_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'Parâmetro church_id inválido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            church = Church.objects.get(id=church_id, is_active=True)
+        except Church.DoesNotExist:
+            return Response(
+                {'error': 'Igreja não encontrada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        user = request.user
+        has_access = (
+            user.is_superuser
+            or church.users.filter(user=user, is_active=True).exists()
+            or (church.denomination and church.denomination.administrator_id == user.id)
+        )
+
+        if not has_access:
+            return Response(
+                {'error': 'Você não tem permissão para gerenciar esta igreja'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        return Response({
+            'can_create': True,
+            'remaining_slots': None,
+            'max_allowed': None,
+            'current_count': church.branches.filter(is_active=True, is_headquarters=False).count(),
+            'subscription_plan': church.subscription_plan,
+            'subscription_plan_display': church.get_subscription_plan_display(),
+            'message': None,
+            'limits_enforced': False,
+        })
     
     @action(detail=False, methods=['get'])
     def qr_codes(self, request):

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import { 
   Building2,
   Building,
@@ -104,40 +105,16 @@ const ChurchManagementPage: React.FC = () => {
   // Debounce do termo de busca
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  // Verificar permissões
-  useEffect(() => {
-    if (!permissions.canManageDenomination && !permissions.canCreateChurches) {
-      navigate('/dashboard');
-      return;
-    }
-    
-    loadInitialData();
-  }, [permissions, navigate]);
-
-  // Recarregar dados quando filtros mudarem
-  useEffect(() => {
-    loadChurches();
-  }, [
-    debouncedSearchTerm,
-    filterState,
-    filterPlan,
-    filterStatus,
-    sortBy,
-    sortDirection,
-    currentPage,
-    pageSize
-  ]);
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     try {
       const states = await churchService.getAvailableStates();
       setAvailableStates(states);
     } catch (error) {
       console.error('Erro ao carregar dados auxiliares:', error);
     }
-  };
+  }, []);
 
-  const loadChurches = async () => {
+  const loadChurches = useCallback(async () => {
     if (!permissions.canManageDenomination && !permissions.canCreateChurches) {
       return;
     }
@@ -157,18 +134,44 @@ const ChurchManagementPage: React.FC = () => {
 
       const data = await churchService.getChurches(filters, currentPage, pageSize);
       setChurchesData(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar igrejas:', error);
       toast({
         title: 'Erro',
-        description: 'Erro ao carregar lista de igrejas. Tente novamente.',
+        description: isAxiosError(error)
+          ? error.response?.data?.message || 'Erro ao carregar lista de igrejas. Tente novamente.'
+          : 'Erro ao carregar lista de igrejas. Tente novamente.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [
+    permissions.canManageDenomination,
+    permissions.canCreateChurches,
+    debouncedSearchTerm,
+    filterState,
+    filterPlan,
+    filterStatus,
+    sortBy,
+    sortDirection,
+    currentPage,
+    pageSize
+  ]);
+
+  useEffect(() => {
+    if (!permissions.canManageDenomination && !permissions.canCreateChurches) {
+      navigate('/dashboard');
+      return;
+    }
+
+    loadInitialData();
+  }, [permissions, navigate, loadInitialData]);
+
+  useEffect(() => {
+    loadChurches();
+  }, [loadChurches]);
 
   const handleRefresh = () => {
     setCurrentPage(1);
@@ -195,10 +198,12 @@ const ChurchManagementPage: React.FC = () => {
         description: `A igreja "${name}" foi removida com sucesso.`,
       });
       loadChurches();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao remover igreja',
-        description: error.response?.data?.message || 'Erro interno. Tente novamente.',
+        description: isAxiosError(error)
+          ? error.response?.data?.message || 'Erro interno. Tente novamente.'
+          : 'Erro interno. Tente novamente.',
         variant: 'destructive',
       });
     }
@@ -231,10 +236,12 @@ const ChurchManagementPage: React.FC = () => {
 
       setSelectedChurches([]);
       loadChurches();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro na ação em lote',
-        description: error.response?.data?.message || 'Erro interno. Tente novamente.',
+        description: isAxiosError(error)
+          ? error.response?.data?.message || 'Erro interno. Tente novamente.'
+          : 'Erro interno. Tente novamente.',
         variant: 'destructive',
       });
     }
@@ -350,6 +357,15 @@ const ChurchManagementPage: React.FC = () => {
 
   const totalPages = Math.ceil((churchesData?.count || 0) / pageSize);
   const churches = churchesData?.results || [];
+
+  const getMembersCount = useCallback(
+    (church: ChurchDetails) => church.members_count ?? church.total_members ?? 0,
+    []
+  );
+  const getBranchesCount = useCallback(
+    (church: ChurchDetails) => church.branches_count ?? 0,
+    []
+  );
   const allSelected = churches.length > 0 && selectedChurches.length === churches.length;
   const someSelected = selectedChurches.length > 0 && selectedChurches.length < churches.length;
 
@@ -532,7 +548,7 @@ const ChurchManagementPage: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-gray-600 truncate">Membros</p>
                     <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                      {churches.reduce((sum, church) => sum + church.total_members, 0)}
+                      {churches.reduce((sum, church) => sum + getMembersCount(church), 0)}
                     </p>
                   </div>
                 </div>
@@ -548,7 +564,7 @@ const ChurchManagementPage: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-gray-600 truncate">Filiais</p>
                     <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                      {churches.reduce((sum, church) => sum + (church.branches_count || 0), 0)}
+                      {churches.reduce((sum, church) => sum + getBranchesCount(church), 0)}
                     </p>
                   </div>
                 </div>
@@ -706,7 +722,7 @@ const ChurchManagementPage: React.FC = () => {
                           <TableCell>
                             <div className="flex items-center">
                               <Users className="h-4 w-4 text-gray-400 mr-1" />
-                              <span>{church.total_members}</span>
+                              <span>{getMembersCount(church)}</span>
                               <span className="text-xs text-gray-500 ml-1">
                                 /{church.max_members}
                               </span>
@@ -715,7 +731,7 @@ const ChurchManagementPage: React.FC = () => {
                           <TableCell>
                             <div className="flex items-center">
                               <Building className="h-4 w-4 text-gray-400 mr-1" />
-                              <span>{church.branches_count || 0}</span>
+                              <span>{getBranchesCount(church)}</span>
                               <span className="text-xs text-gray-500 ml-1">
                                 /{church.max_branches}
                               </span>
@@ -863,11 +879,11 @@ const ChurchManagementPage: React.FC = () => {
                             <div className="flex flex-wrap items-center gap-3 mt-2 mb-3 text-xs text-gray-500">
                               <div className="flex items-center gap-1">
                                 <Users className="h-3 w-3 flex-shrink-0" />
-                                <span className="whitespace-nowrap">{church.total_members}/{church.max_members}</span>
+                                <span className="whitespace-nowrap">{getMembersCount(church)}/{church.max_members}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Building className="h-3 w-3 flex-shrink-0" />
-                                <span className="whitespace-nowrap">{church.branches_count || 0}/{church.max_branches}</span>
+                                <span className="whitespace-nowrap">{getBranchesCount(church)}/{church.max_branches}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3 flex-shrink-0" />

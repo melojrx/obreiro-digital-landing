@@ -1,20 +1,21 @@
 import { api } from '@/config/api';
-import { 
-  BranchDetails, 
-  CreateBranchFormData,
+import {
+  BranchDetails,
   BranchFilters,
   PaginatedResponse,
   BranchStats,
   BatchActionRequest,
-  BatchActionResponse 
+  BatchActionResponse,
 } from '@/types/hierarchy';
 
 export interface CreateBranchRequest {
-  church_id: number;
+  church: number;
   name: string;
+  short_name: string;
   email?: string;
   phone?: string;
   address: string;
+  neighborhood: string;
   city: string;
   state: string;
   zipcode: string;
@@ -23,6 +24,7 @@ export interface CreateBranchRequest {
   qr_code_active: boolean;
   capacity?: number;
   description?: string;
+  is_headquarters?: boolean;
 }
 
 export interface BranchQRCode {
@@ -108,7 +110,7 @@ class BranchService {
   /**
    * Cria uma nova filial
    */
-  async createBranch(data: CreateBranchFormData): Promise<BranchDetails> {
+  async createBranch(data: CreateBranchRequest): Promise<BranchDetails> {
     const response = await api.post(`${this.baseURL}/`, data);
     return response.data;
   }
@@ -172,7 +174,7 @@ class BranchService {
   async getVisitorStats(branchId: number): Promise<{
     branch_id: number;
     branch_name: string;
-    stats: any;
+    stats: Record<string, unknown>;
   }> {
     const response = await api.get(`${this.baseURL}/${branchId}/visitor_stats/`);
     return response.data;

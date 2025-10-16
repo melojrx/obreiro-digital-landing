@@ -165,6 +165,12 @@ class Branch(BaseModel):
         default=True,
         help_text="Se o QR code está ativo para registro de visitantes"
     )
+
+    is_headquarters = models.BooleanField(
+        "Filial Matriz",
+        default=False,
+        help_text="Indica se esta filial representa a igreja sede"
+    )
     
     
     # Configurações da filial

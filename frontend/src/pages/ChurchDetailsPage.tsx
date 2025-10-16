@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Building2,
@@ -71,6 +71,16 @@ import { churchService } from '@/services/churchService';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ChurchDetails, ChurchStats, AdminUser, BranchDetails } from '@/types/hierarchy';
 
+interface ChurchHistoryEntry {
+  id: number | string;
+  timestamp: string;
+  user: string;
+  action: string;
+  field: string;
+  old_value?: string | null;
+  new_value?: string | null;
+}
+
 // Importar os novos componentes modais
 import CreateBranchModal from '@/components/modals/CreateBranchModal';
 import ShareChurchModal from '@/components/modals/ShareChurchModal';
@@ -87,7 +97,7 @@ const ChurchDetailsPage: React.FC = () => {
   const [statistics, setStatistics] = useState<ChurchStats | null>(null);
   const [branches, setBranches] = useState<BranchDetails[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<ChurchHistoryEntry[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
   
   // Estados para os modais
@@ -95,14 +105,77 @@ const ChurchDetailsPage: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-  useEffect(() => {
+  const loadChurchData = useCallback(async () => {
     if (!id || isNaN(Number(id))) {
       navigate('/denominacao/churches');
       return;
     }
 
-    loadChurchData();
+    try {
+      setIsLoading(true);
+      const churchData = await churchService.getChurch(Number(id));
+      setChurch(churchData);
+    } catch (error) {
+      console.error('Erro ao carregar igreja:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao carregar dados da igreja. Tente novamente.',
+        variant: 'destructive',
+      });
+      navigate('/denominacao/churches');
+    } finally {
+      setIsLoading(false);
+    }
   }, [id, navigate]);
+
+  const loadStatistics = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      const stats = await churchService.getChurchStatistics(Number(id));
+      setStatistics(stats);
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+    }
+  }, [id]);
+
+  const loadBranches = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      const response = await churchService.getChurchBranches(Number(id));
+      setBranches(response);
+    } catch (error) {
+      console.error('Erro ao carregar filiais:', error);
+    }
+  }, [id]);
+
+  const loadAdmins = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      const adminsData = await churchService.getChurchAdmins(Number(id));
+      setAdmins(adminsData);
+    } catch (error) {
+      console.error('Erro ao carregar administradores:', error);
+    }
+  }, [id]);
+
+  const loadHistory = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      const historyData = await churchService.getChurchHistory(Number(id));
+      const normalized = Array.isArray(historyData) ? historyData : [];
+      setHistory(normalized);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadChurchData();
+  }, [loadChurchData]);
 
   useEffect(() => {
     if (activeTab === 'statistics' && !statistics) {
@@ -114,69 +187,17 @@ const ChurchDetailsPage: React.FC = () => {
     } else if (activeTab === 'history' && history.length === 0) {
       loadHistory();
     }
-  }, [activeTab, statistics, branches, admins, history]);
-
-  const loadChurchData = async () => {
-    try {
-      setIsLoading(true);
-      const churchData = await churchService.getChurch(Number(id));
-      setChurch(churchData);
-    } catch (error: any) {
-      console.error('Erro ao carregar igreja:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao carregar dados da igreja. Tente novamente.',
-        variant: 'destructive',
-      });
-      navigate('/denominacao/churches');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadStatistics = async () => {
-    if (!id) return;
-    
-    try {
-      const stats = await churchService.getChurchStatistics(Number(id));
-      setStatistics(stats);
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
-    }
-  };
-
-  const loadBranches = async () => {
-    if (!id) return;
-    
-    try {
-      const branchesData = await churchService.getChurchBranches(Number(id));
-      setBranches(branchesData);
-    } catch (error) {
-      console.error('Erro ao carregar filiais:', error);
-    }
-  };
-
-  const loadAdmins = async () => {
-    if (!id) return;
-    
-    try {
-      const adminsData = await churchService.getChurchAdmins(Number(id));
-      setAdmins(adminsData);
-    } catch (error) {
-      console.error('Erro ao carregar administradores:', error);
-    }
-  };
-
-  const loadHistory = async () => {
-    if (!id) return;
-    
-    try {
-      const historyData = await churchService.getChurchHistory(Number(id));
-      setHistory(historyData);
-    } catch (error) {
-      console.error('Erro ao carregar histórico:', error);
-    }
-  };
+  }, [
+    activeTab,
+    statistics,
+    branches.length,
+    admins.length,
+    history.length,
+    loadStatistics,
+    loadBranches,
+    loadAdmins,
+    loadHistory,
+  ]);
 
   const handleEdit = () => {
     if (church) {
@@ -197,7 +218,7 @@ const ChurchDetailsPage: React.FC = () => {
   };
 
   const handleBranchCreated = (newBranch: BranchDetails) => {
-    setBranches(prev => [...prev, newBranch]);
+    setBranches(prev => (Array.isArray(prev) ? [...prev, newBranch] : [newBranch]));
     // Recarregar dados da igreja para atualizar contadores
     if (church) {
       loadChurchData();
@@ -315,6 +336,9 @@ const ChurchDetailsPage: React.FC = () => {
       </AppLayout>
     );
   }
+
+  const totalMembers = church.members_count ?? church.total_members ?? 0;
+  const branchesCount = church.branches_count ?? 0;
 
   return (
     <AppLayout>
@@ -435,7 +459,7 @@ const ChurchDetailsPage: React.FC = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Membros</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {church.total_members}
+                    {totalMembers}
                   </p>
                   <p className="text-xs text-gray-500">
                     de {church.max_members} permitidos
@@ -452,7 +476,7 @@ const ChurchDetailsPage: React.FC = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Filiais</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {church.branches_count || 0}
+                    {branchesCount}
                   </p>
                   <p className="text-xs text-gray-500">
                     de {church.max_branches} permitidas
@@ -612,7 +636,7 @@ const ChurchDetailsPage: React.FC = () => {
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5 text-blue-600" />
                       Membros da Igreja
-                      <Badge variant="outline">{church.total_members}</Badge>
+                      <Badge variant="outline">{totalMembers}</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -654,10 +678,10 @@ const ChurchDetailsPage: React.FC = () => {
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Membros</span>
-                          <span>{church.total_members}/{church.max_members}</span>
+                          <span>{totalMembers}/{church.max_members}</span>
                         </div>
                         <Progress 
-                          value={(church.total_members / church.max_members) * 100} 
+                          value={church.max_members > 0 ? (totalMembers / church.max_members) * 100 : 0} 
                           className="h-2"
                         />
                       </div>
@@ -665,10 +689,10 @@ const ChurchDetailsPage: React.FC = () => {
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Filiais</span>
-                          <span>{church.branches_count || 0}/{church.max_branches}</span>
+                          <span>{branchesCount}/{church.max_branches}</span>
                         </div>
                         <Progress 
-                          value={((church.branches_count || 0) / church.max_branches) * 100} 
+                          value={church.max_branches > 0 ? (branchesCount / church.max_branches) * 100 : 0} 
                           className="h-2"
                         />
                       </div>

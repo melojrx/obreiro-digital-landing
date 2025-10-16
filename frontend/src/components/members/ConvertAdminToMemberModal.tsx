@@ -63,9 +63,17 @@ export function ConvertAdminToMemberModal({
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const needsPhone = !user?.phone;
-  const needsCpf = !user?.profile?.cpf;
   const needsBirthDate = !user?.profile?.birth_date;
   const needsGender = !user?.profile?.gender;
+
+  const formattedCpf = useMemo(() => {
+    const rawCpf = user?.profile?.cpf ?? '';
+    const digits = rawCpf.replace(/\D/g, '');
+    if (digits.length !== 11) {
+      return rawCpf;
+    }
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }, [user?.profile?.cpf]);
 
   const validationSchema = useMemo(
     () =>
@@ -75,14 +83,6 @@ export function ConvertAdminToMemberModal({
             path: ['phone'],
             code: z.ZodIssueCode.custom,
             message: 'Telefone é obrigatório',
-          });
-        }
-
-        if (needsCpf && !data.cpf) {
-          ctx.addIssue({
-            path: ['cpf'],
-            code: z.ZodIssueCode.custom,
-            message: 'CPF é obrigatório',
           });
         }
 
@@ -109,17 +109,6 @@ export function ConvertAdminToMemberModal({
               path: ['phone'],
               code: z.ZodIssueCode.custom,
               message: 'Telefone inválido. Informe DDD e número.',
-            });
-          }
-        }
-
-        if (data.cpf) {
-          const cpfDigits = data.cpf.replace(/\D/g, '');
-          if (cpfDigits.length !== 11) {
-            ctx.addIssue({
-              path: ['cpf'],
-              code: z.ZodIssueCode.custom,
-              message: 'CPF deve conter 11 dígitos.',
             });
           }
         }
@@ -157,7 +146,7 @@ export function ConvertAdminToMemberModal({
           });
         }
       }),
-    [needsPhone, needsCpf, needsBirthDate, needsGender]
+    [needsPhone, needsBirthDate, needsGender]
   );
 
   const defaultValues = useMemo<FormData>(
@@ -165,7 +154,6 @@ export function ConvertAdminToMemberModal({
       ministerial_function: 'member',
       marital_status: 'single',
       phone: user?.phone || '',
-      cpf: user?.profile?.cpf || '',
       birth_date: (() => {
         const birthDate = user?.profile?.birth_date;
         if (!birthDate) {
@@ -181,13 +169,13 @@ export function ConvertAdminToMemberModal({
   const profileFieldsToHighlight = useMemo(() => {
     const fields: string[] = [];
     if (needsPhone) fields.push('Telefone');
-    if (needsCpf) fields.push('CPF');
     if (needsBirthDate) fields.push('Data de nascimento');
     if (needsGender) fields.push('Gênero');
     return fields;
-  }, [needsPhone, needsCpf, needsBirthDate, needsGender]);
-  const hasMissingProfileFields = profileFieldsToHighlight.length > 0;
-  const profileFieldsText = profileFieldsToHighlight.join(', ');
+  }, [needsPhone, needsBirthDate, needsGender]);
+  const isCpfMissing = !formattedCpf;
+  const hasMissingProfileFields = profileFieldsToHighlight.length > 0 || isCpfMissing;
+  const profileFieldsText = [...profileFieldsToHighlight, ...(isCpfMissing ? ['CPF'] : [])].join(', ');
 
   const {
     register,
@@ -397,36 +385,17 @@ export function ConvertAdminToMemberModal({
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="cpf">
-                  CPF {needsCpf && <span className="text-red-500">*</span>}
-                </Label>
-                <Controller
-                  control={control}
-                  name="cpf"
-                  render={({ field }) => (
-                    <InputMask
-                      mask="999.999.999-99"
-                      value={field.value || ''}
-                      onChange={(event) => field.onChange(event.target.value)}
-                      onBlur={field.onBlur}
-                      inputRef={field.ref}
-                    >
-                      {(inputProps: MaskedInputRenderProps) => (
-                        <Input
-                          id="cpf"
-                          placeholder="000.000.000-00"
-                          {...inputProps}
-                          name={field.name}
-                        />
-                      )}
-                    </InputMask>
-                  )}
-                />
-                {errors.cpf && (
-                  <p className="text-sm text-red-500">{errors.cpf.message}</p>
-                )}
-              </div>
+              {formattedCpf && (
+                <div className="space-y-2">
+                  <Label>CPF</Label>
+                  <div className="rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    {formattedCpf}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Este CPF foi informado no seu cadastro inicial e será usado automaticamente na criação do membro.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="birth_date">
@@ -480,6 +449,11 @@ export function ConvertAdminToMemberModal({
                 <>
                   Você pode editá-los em <span className="font-semibold">Configurações → Perfil</span>.
                 </>
+              )}
+              {!formattedCpf && (
+                <span className="block mt-1 text-xs text-red-600">
+                  Adicione seu CPF em <span className="font-semibold">Configurações → Perfil</span> para prosseguir.
+                </span>
               )}
             </AlertDescription>
           </Alert>

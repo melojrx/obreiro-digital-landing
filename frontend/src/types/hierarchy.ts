@@ -69,6 +69,7 @@ export interface ChurchDetails extends BaseHierarchyEntity {
   max_members: number;
   max_branches: number;
   total_members: number;
+  members_count?: number;
   total_visitors: number;
   branches_count?: number;
 }
@@ -102,6 +103,7 @@ export interface BranchDetails extends BaseHierarchyEntity {
   total_visitors_registered: number;
   total_visitors: number;
   total_activities: number;
+  is_headquarters?: boolean;
   branch_type?: 'main' | 'congregation' | 'mission' | 'cell';
   service_times?: ServiceTime[];
 }
@@ -230,8 +232,8 @@ export interface CreateBranchFormData {
   name: string;
   short_name?: string;
   description?: string;
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
   address: string;
   neighborhood?: string;
   city: string;
@@ -243,6 +245,7 @@ export interface CreateBranchFormData {
   branch_type?: string;
   allows_visitor_registration?: boolean;
   requires_visitor_approval?: boolean;
+  qr_code_active?: boolean;
   service_times?: ServiceTime[];
 }
 

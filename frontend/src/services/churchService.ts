@@ -1,13 +1,14 @@
 import { api } from '@/config/api';
-import { 
-  ChurchDetails, 
+import {
+  ChurchDetails,
   CreateChurchFormData,
   ChurchFilters,
   PaginatedResponse,
   ChurchStats,
   AdminUser,
+  BranchDetails,
   BatchActionRequest,
-  BatchActionResponse 
+  BatchActionResponse,
 } from '@/types/hierarchy';
 
 export interface ChurchSubscriptionData {
@@ -160,7 +161,7 @@ class ChurchService {
   /**
    * Criação em lote de igrejas
    */
-  async bulkCreateChurches(data: BulkCreateRequest): Promise<{ created: ChurchDetails[]; errors: any[] }> {
+  async bulkCreateChurches(data: BulkCreateRequest): Promise<{ created: ChurchDetails[]; errors: unknown[] }> {
     const response = await api.post(`${this.baseURL}/bulk-create/`, data);
     return response.data;
   }
@@ -176,9 +177,23 @@ class ChurchService {
   /**
    * Obtém filiais da igreja
    */
-  async getChurchBranches(id: number): Promise<any[]> {
+  async getChurchBranches(id: number): Promise<BranchDetails[]> {
     const response = await api.get(`${this.baseURL}/${id}/branches/`);
-    return response.data;
+    const data = response.data;
+
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    if (Array.isArray(data?.results)) {
+      return data.results;
+    }
+
+    if (Array.isArray(data?.branches)) {
+      return data.branches;
+    }
+
+    return [];
   }
 
   /**
@@ -385,7 +400,7 @@ class ChurchService {
   /**
    * Obtém membros de uma igreja específica
    */
-  async getChurchMembers(id: number, search?: string): Promise<{ count: number; results: any[] }> {
+  async getChurchMembers(id: number, search?: string): Promise<{ count: number; results: unknown[] }> {
     const params = new URLSearchParams();
     if (search) {
       params.append('search', search);

@@ -204,7 +204,8 @@ class ChurchCreateSerializer(serializers.ModelSerializer):
                 phone=church.phone,
                 email=church.email,
                 qr_code_active=True,
-                is_active=True
+                is_active=True,
+                is_headquarters=True
             )
             logger.info(f"✅ Filial matriz criada com QR Code para igreja '{church.name}'")
             logger.info(f"   QR Code UUID: {main_branch.qr_code_uuid}")
@@ -277,6 +278,8 @@ class ChurchListSerializer(serializers.ModelSerializer):
     subscription_status_display = serializers.CharField(source='get_subscription_status_display', read_only=True)
     subscription_plan_display = serializers.CharField(source='get_subscription_plan_display', read_only=True)
     main_pastor_name = serializers.CharField(source='main_pastor.get_full_name', read_only=True)
+    members_count = serializers.IntegerField(read_only=True)
+    branches_count = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = Church
@@ -284,9 +287,27 @@ class ChurchListSerializer(serializers.ModelSerializer):
             'id', 'name', 'display_name', 'short_name', 'city', 'state', 
             'denomination', 'denomination_name', 'subscription_plan', 
             'subscription_plan_display', 'subscription_status', 
-            'subscription_status_display', 'total_members', 'total_visitors',
+            'subscription_status_display', 'total_members', 'members_count',
+            'total_visitors', 'branches_count',
             'main_pastor_name', 'phone', 'email', 'is_active', 'created_at'
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        members_count = getattr(instance, 'members_count', None)
+        if members_count is not None:
+            data['total_members'] = members_count
+        data['members_count'] = data.get('total_members', 0)
+
+        branches_count = getattr(instance, 'branches_count', None)
+        if branches_count is not None:
+            data['branches_count'] = branches_count
+        else:
+            data.setdefault('branches_count', 0)
+
+        data['branches_count'] = data.get('branches_count', 0)
+
+        return data
 
 
 class ChurchUpdateSerializer(serializers.ModelSerializer):
@@ -385,7 +406,9 @@ class ChurchStatisticsSerializer(serializers.ModelSerializer):
     
     def get_branches_count(self, obj):
         """Retorna contagem de filiais ativas"""
-        return obj.branches.filter(is_active=True).count() if hasattr(obj, 'branches') else 0
+        if not hasattr(obj, 'branches'):
+            return 0
+        return obj.branches.filter(is_active=True, is_headquarters=False).count()
     
     def get_members_by_age_group(self, obj):
         """Estatísticas de membros por faixa etária"""
@@ -494,6 +517,8 @@ class ChurchDetailSerializer(serializers.ModelSerializer):
     can_add_branches = serializers.ReadOnlyField()
     subscription_status_display = serializers.CharField(source='get_subscription_status_display', read_only=True)
     subscription_plan_display = serializers.CharField(source='get_subscription_plan_display', read_only=True)
+    members_count = serializers.IntegerField(read_only=True)
+    branches_count = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = Church
@@ -505,11 +530,25 @@ class ChurchDetailSerializer(serializers.ModelSerializer):
             'subscription_plan', 'subscription_plan_display', 'subscription_status',
             'subscription_status_display', 'subscription_start_date', 
             'subscription_end_date', 'trial_end_date', 'max_members', 'max_branches', 
-            'total_members', 'total_visitors', 'display_name', 'full_address', 
+            'total_members', 'members_count', 'total_visitors', 'branches_count', 'display_name', 'full_address', 
             'is_subscription_active', 'is_trial_active', 'days_until_expiration', 
             'subscription_expired', 'can_add_members', 'can_add_branches', 
             'created_at', 'updated_at', 'is_active'
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        members_count = getattr(instance, 'members_count', None)
+        if members_count is not None:
+            data['total_members'] = members_count
+        data['members_count'] = data.get('total_members', 0)
+
+        branches_count = getattr(instance, 'branches_count', None)
+        if branches_count is not None:
+            data['branches_count'] = branches_count
+        data['branches_count'] = data.get('branches_count', 0)
+
+        return data
 
 
 class FirstChurchSerializer(serializers.Serializer):
