@@ -35,9 +35,7 @@ class Church(BaseModel):
         on_delete=models.CASCADE,
         related_name='churches',
         verbose_name="Denominação",
-        blank=True,
-        null=True,
-        help_text="Denominação à qual esta igreja pertence (opcional)"
+        help_text="Denominação à qual esta igreja pertence"
     )
     
     # Dados básicos da igreja
