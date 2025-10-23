@@ -11,11 +11,12 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Count, Q
 from datetime import datetime, date
 
-from .models import Member, MembershipStatusLog
+from .models import Member, MembershipStatusLog, MinisterialFunctionHistory
 from .serializers import (
     MemberSerializer, MemberListSerializer, MemberCreateSerializer, 
     MemberUpdateSerializer, MemberSummarySerializer,
-    MembershipStatusLogSerializer, MemberStatusChangeSerializer
+    MembershipStatusLogSerializer, MemberStatusChangeSerializer,
+    MinisterialFunctionHistorySerializer
 )
 
 
@@ -34,7 +35,7 @@ class MemberViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """QuerySet otimizado com select_related e filtros por igreja"""
         # Filtrar apenas membros da igreja do usuário logado
-        queryset = Member.objects.select_related('church', 'spouse', 'responsible')
+        queryset = Member.objects.select_related('church', 'branch', 'spouse', 'responsible')
         
         # Usar igreja ativa do usuário
         from apps.accounts.models import ChurchUser
@@ -45,6 +46,11 @@ class MemberViewSet(viewsets.ModelViewSet):
         else:
             # Se não tem igreja ativa, retornar queryset vazio
             queryset = queryset.none()
+
+        active_branch = ChurchUser.objects.get_active_branch_for_user(self.request.user)
+        request_branch = getattr(self.request, 'branch', None) or active_branch
+        if request_branch:
+            queryset = queryset.filter(branch=request_branch)
         
         # Filtrar apenas membros ativos por padrão
         if self.action != 'all':
@@ -60,9 +66,23 @@ class MemberViewSet(viewsets.ModelViewSet):
         active_church = ChurchUser.objects.get_active_church_for_user(self.request.user)
         
         if active_church:
-            serializer.save(church=active_church)
+            branch = serializer.validated_data.get('branch')
+            if branch and branch.church_id != active_church.id:
+                raise ValidationError("A filial selecionada não pertence à igreja ativa.")
+            if not branch:
+                branch = ChurchUser.objects.get_active_branch_for_user(self.request.user)
+            serializer.save(church=active_church, branch=branch)
         else:
             raise ValidationError("Usuário não tem igreja ativa configurada")
+
+    def perform_update(self, serializer):
+        from django.core.exceptions import ValidationError
+
+        branch = serializer.validated_data.get('branch', serializer.instance.branch)
+        if branch and branch.church_id != serializer.instance.church_id:
+            raise ValidationError("A filial selecionada não pertence à mesma igreja do membro.")
+
+        serializer.save(branch=branch)
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""
@@ -510,15 +530,29 @@ class MemberViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             formatted_cpf = f"{cpf_digits[:3]}.{cpf_digits[3:6]}.{cpf_digits[6:9]}-{cpf_digits[9:]}"
-            existing_cpfs = UserProfile.objects.filter(cpf__isnull=False).exclude(user=request.user)
-            if any(''.join(filter(str.isdigit, existing.cpf or '')) == cpf_digits for existing in existing_cpfs):
-                return Response(
-                    {'error': 'CPF já cadastrado no sistema.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            if formatted_cpf != user_profile.cpf:
-                user_profile.cpf = formatted_cpf
-                profile_update_fields.add('cpf')
+        # Verificar duplicidade de CPF apenas no escopo da denominação (ou igreja se não houver denom)
+        duplicate_in_scope = False
+        if formatted_cpf:
+            if active_church and active_church.denomination_id:
+                duplicate_in_scope = Member.objects.filter(
+                    cpf=formatted_cpf,
+                    is_active=True,
+                    church__denomination_id=active_church.denomination_id
+                ).exists()
+            elif active_church:
+                duplicate_in_scope = Member.objects.filter(
+                    cpf=formatted_cpf,
+                    is_active=True,
+                    church=active_church
+                ).exists()
+        if duplicate_in_scope:
+            return Response(
+                {'error': 'CPF já cadastrado nesta denominação.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if formatted_cpf != getattr(user_profile, 'cpf', None):
+            user_profile.cpf = formatted_cpf
+            profile_update_fields.add('cpf')
 
         birth_date_input = request.data.get('birth_date')
         if birth_date_input:
@@ -676,8 +710,6 @@ class MemberViewSet(viewsets.ModelViewSet):
             'rg': '',
             'city': '',
             'state': '',
-            'baptism_date': None,
-            'conversion_date': None,
             'notes': 'Membro criado automaticamente via conversão de Church Admin'
         }
         
@@ -721,3 +753,44 @@ class MemberViewSet(viewsets.ModelViewSet):
                 {'error': f'Erro ao criar registro de membro: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class MinisterialFunctionHistoryViewSet(viewsets.ModelViewSet):
+    """Gerencia histórico de função ministerial"""
+    serializer_class = MinisterialFunctionHistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['member__full_name', 'function', 'notes']
+    filterset_fields = ['member', 'function', 'is_active']
+    ordering_fields = ['start_date', 'end_date', 'created_at']
+    ordering = ['-start_date']
+
+    def get_queryset(self):
+        qs = MinisterialFunctionHistory.objects.select_related('member')
+        member_id = self.request.query_params.get('member')
+        if member_id:
+            qs = qs.filter(member_id=member_id)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    @action(detail=True, methods=['patch'])
+    def end_period(self, request, pk=None):
+        from datetime import date
+        obj = self.get_object()
+        end_date_str = request.data.get('end_date')
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            end_date = date.today()
+        obj.end_date = end_date
+        try:
+            obj.full_clean()
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        obj.save(update_fields=['end_date', 'updated_at'])
+        return Response(self.get_serializer(obj).data)

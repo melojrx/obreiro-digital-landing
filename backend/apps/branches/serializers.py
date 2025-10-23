@@ -37,12 +37,14 @@ class BranchSerializer(serializers.ModelSerializer):
 
 class BranchCreateSerializer(serializers.ModelSerializer):
     """Serializer para criação de Branch"""
-    
+    # Compatibilidade: aceitar is_headquarters mapeando para is_main
+    is_headquarters = serializers.BooleanField(source='is_main', required=False)
+
     class Meta:
         model = Branch
         fields = [
             'church', 'name', 'description', 'address', 'city', 'state',
-            'zipcode', 'phone', 'email', 'capacity', 'is_headquarters',
+            'zipcode', 'phone', 'email', 'capacity', 'is_headquarters', 'is_main',
             'latitude', 'longitude'
         ]
 
@@ -52,12 +54,14 @@ class BranchSummarySerializer(serializers.ModelSerializer):
     
     church_name = serializers.CharField(source='church.name', read_only=True)
     members_count = serializers.ReadOnlyField()
+    # Compatibilidade: expor is_headquarters como alias de is_main
+    is_headquarters = serializers.BooleanField(source='is_main', read_only=True)
     
     class Meta:
         model = Branch
         fields = [
             'id', 'name', 'city', 'state', 'church_name', 'capacity',
-            'members_count', 'is_headquarters', 'is_active'
+            'members_count', 'is_headquarters', 'is_main', 'is_active'
         ]
 
 

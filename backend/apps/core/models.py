@@ -87,27 +87,45 @@ class TenantQuerySet(models.QuerySet):
 class TenantManager(models.Manager):
     """
     Manager para models multi-tenant. Filtra automaticamente pela
-    igreja do usuário logado, obtida a partir do request.
+    igreja/denominação do usuário logado, obtida a partir do request.
     """
+
     def get_queryset(self):
         """
         Sobrescreve o queryset padrão para aplicar o filtro de tenant.
         """
-        from .middleware import get_current_request # Importação movida para cá
-        
+        from .middleware import get_current_request  # Importação movida para cá
+
         qs = TenantQuerySet(self.model, using=self._db).filter(is_active=True)
-        
+
         request = get_current_request()
-        if request and hasattr(request, 'church') and request.church:
-            return qs.for_church(request.church)
-        
-        # Se não houver request ou church (ex: em scripts, shell),
-        # retorna o queryset de ativos, mas sem filtro de tenant.
-        # Adicionar um warning aqui pode ser útil em desenvolvimento.
-        # import warnings
-        # warnings.warn("TenantManager usado sem um request de igreja no contexto.")
+        if not request:
+            return qs
+
+        church = getattr(request, 'church', None)
+        denomination = getattr(request, 'denomination', None)
+
+        if church:
+            qs = qs.for_church(church)
+        elif denomination:
+            # Filtra por denominação quando o modelo possui relação church
+            church_field = self._get_church_field_name()
+            if church_field:
+                filter_kwargs = {f"{church_field}__denomination": denomination}
+                qs = qs.filter(**filter_kwargs)
+
         return qs
-    
+
+    def _get_church_field_name(self):
+        """
+        Retorna o nome do campo que referencia Church, se existir.
+        Útil para aplicar filtros por denominação.
+        """
+        for field in self.model._meta.get_fields():
+            if getattr(field, 'related_model', None) and field.related_model.__name__ == 'Church':
+                return field.name
+        return None
+
     def all_for_church(self, church):
         """
         Retorna TODOS os registros para uma igreja, incluindo os inativos.

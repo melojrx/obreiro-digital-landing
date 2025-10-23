@@ -165,8 +165,9 @@ class Branch(BaseModel):
         default=True,
         help_text="Se o QR code está ativo para registro de visitantes"
     )
-
-    is_headquarters = models.BooleanField(
+    
+    # Matriz da igreja (renomeado de is_headquarters)
+    is_main = models.BooleanField(
         "Filial Matriz",
         default=False,
         help_text="Indica se esta filial representa a igreja sede"
@@ -220,6 +221,23 @@ class Branch(BaseModel):
             models.Index(fields=['state', 'city']),
             models.Index(fields=['latitude', 'longitude']),
         ]
+        constraints = [
+            # Garante no máximo uma filial matriz por igreja
+            models.UniqueConstraint(
+                fields=['church'],
+                condition=models.Q(is_main=True),
+                name='unique_main_branch_per_church'
+            ),
+        ]
+
+    # Alias de compatibilidade temporária para código legado
+    @property
+    def is_headquarters(self):
+        return self.is_main
+    
+    @is_headquarters.setter
+    def is_headquarters(self, value: bool):
+        self.is_main = bool(value)
     
     def __str__(self):
         return f"{self.name} - {self.church.short_name}"

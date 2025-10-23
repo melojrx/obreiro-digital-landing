@@ -148,6 +148,8 @@ export const API_ENDPOINTS = {
     statistics: '/members/statistics/',
     profile: (id: number) => `/members/${id}/profile/`,
     updateStatus: (id: number) => `/members/${id}/update_status/`,
+    // Histórico de status de membresia (auditoria simples)
+    statusHistory: (id: number) => `/members/${id}/status_history/`,
     export: '/members/export/',
     availableForSpouse: '/members/available_for_spouse/',
   },
@@ -230,5 +232,12 @@ export const API_ENDPOINTS = {
     stats: (id: number) => `/activities/ministries/${id}/stats/`,
     activities: (id: number) => `/activities/ministries/${id}/activities/`,
     public: '/activities/ministries/public/',
+  },
+
+  // Histórico de Função Ministerial
+  ministerialFunctionHistory: {
+    list: '/ministerial-function-history/',
+    detail: (id: number) => `/ministerial-function-history/${id}/`,
+    endPeriod: (id: number) => `/ministerial-function-history/${id}/end_period/`,
   },
 } as const; 

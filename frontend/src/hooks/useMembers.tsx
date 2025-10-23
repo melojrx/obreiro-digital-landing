@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { membersService, Member, MemberDashboard, MemberSummary, PaginatedResponse } from '@/services/membersService';
 import { toast } from 'sonner';
+import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 
 interface MembersFilters {
   search: string;
@@ -36,16 +38,12 @@ interface UseMembersResult {
 }
 
 export const useMembers = (): UseMembersResult => {
-  // State
-  const [members, setMembers] = useState<Member[]>([]);
-  const [dashboard, setDashboard] = useState<MemberDashboard | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [dashboardLoading, setDashboardLoading] = useState(false);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [totalMembers, setTotalMembers] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
-  const [hasPrevious, setHasPrevious] = useState(false);
-  
+  const queryClient = useQueryClient();
+  const activeChurch = useCurrentActiveChurch();
+
+  const churchId = activeChurch?.id ?? null;
+  const branchId = activeChurch?.active_branch?.id ?? null;
+
   const [filters, setFilters] = useState<MembersFilters>({
     search: '',
     status: '',
@@ -53,51 +51,37 @@ export const useMembers = (): UseMembersResult => {
     page: 1,
   });
 
-  // Load dashboard data
-  const loadDashboard = useCallback(async () => {
-    try {
-      setDashboardLoading(true);
-      const dashboardData = await membersService.getDashboard();
-      setDashboard(dashboardData);
-    } catch (error) {
-      console.error('Erro ao carregar dashboard:', error);
-      // Não mostrar toast para dashboard, pois pode não ter permissão
-    } finally {
-      setDashboardLoading(false);
-    }
-  }, []);
+  const params = useMemo(() => ({
+    page: filters.page,
+    search: filters.search || undefined,
+    is_active: filters.status === 'active' ? true : filters.status === 'inactive' ? false : undefined,
+    ministerial_function: filters.ministerial_function || undefined,
+    ordering: 'full_name',
+    // Se quiser forçar filtro explícito por branch no servidor
+    ...(branchId ? { branch: branchId } : {}),
+  }), [filters, branchId]);
 
-  // Load members data
-  const loadMembers = useCallback(async () => {
-    try {
-      setMembersLoading(true);
-      
-      // Preparar parâmetros da API
-      const params = {
-        page: filters.page,
-        search: filters.search || undefined,
-        is_active: filters.status === 'active' ? true : filters.status === 'inactive' ? false : undefined,
-        ministerial_function: filters.ministerial_function || undefined,
-        ordering: 'full_name',
-      };
-      
-      // Buscar lista de membros (MemberSummary)
-      const membersData: PaginatedResponse<MemberSummary> = await membersService.getMembers(params);
-      
-      // Converter MemberSummary para Member completo
-      const fullMembers = await Promise.all(
-        membersData.results.map(async (summary) => {
+  const dashboardQuery = useQuery<MemberDashboard>({
+    queryKey: ['members', 'dashboard', { churchId, branchId }],
+    queryFn: () => membersService.getDashboard(),
+    enabled: !!churchId,
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const membersQuery = useQuery<PaginatedResponse<Member>>({
+    queryKey: ['members', 'list', { churchId, branchId, params }],
+    queryFn: async () => {
+      const data: PaginatedResponse<MemberSummary> = await membersService.getMembers(params as any);
+      const results = await Promise.all(
+        data.results.map(async (summary) => {
           try {
-            // Tentar buscar dados completos do membro
             return await membersService.getMember(summary.id);
           } catch (error) {
-            console.warn(`Erro ao carregar membro ${summary.id}, usando dados básicos:`, error);
-            
-            // Se falhar, criar um Member básico a partir do summary
+            // Fallback mínimo em caso de erro no detalhe
             return {
               ...summary,
               church: 0,
-              church_name: summary.church_name,
               birth_date: '',
               gender: 'N' as const,
               marital_status: 'single' as const,
@@ -109,100 +93,61 @@ export const useMembers = (): UseMembersResult => {
               accept_whatsapp: true,
               created_at: '',
               updated_at: '',
+              is_active: true,
             } as Member;
           }
         })
       );
-      
-      setMembers(fullMembers);
-      setTotalMembers(membersData.count);
-      setHasNext(!!membersData.next);
-      setHasPrevious(!!membersData.previous);
-      
-    } catch (error) {
-      console.error('Erro ao carregar membros:', error);
-      toast.error('Erro ao carregar lista de membros');
-      setMembers([]);
-    } finally {
-      setMembersLoading(false);
-    }
-  }, [filters.page, filters.search, filters.status]);
+      return { ...data, results } as PaginatedResponse<Member>;
+    },
+    enabled: !!churchId,
+    keepPreviousData: true,
+    staleTime: 10_000,
+  });
 
-  // Refresh all data
-  const refreshData = useCallback(async () => {
-    setLoading(true);
-    await Promise.all([
-      loadDashboard(),
-      loadMembers(),
-    ]);
-    setLoading(false);
-  }, [loadDashboard, loadMembers]);
-
-  // Delete member
-  const deleteMember = useCallback(async (id: number) => {
-    try {
-      await membersService.deleteMember(id);
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => membersService.deleteMember(id),
+    onSuccess: () => {
       toast.success('Membro excluído com sucesso');
-      
-      // Refresh data after deletion
-      await loadMembers();
-    } catch (error) {
-      console.error('Erro ao excluir membro:', error);
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+    },
+    onError: () => {
       toast.error('Erro ao excluir membro');
-      throw error;
-    }
-  }, [loadMembers]);
+    },
+  });
 
-  // Effect para carregar dados quando filtros mudarem
-  useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
+  const deleteMember = async (id: number) => {
+    await deleteMutation.mutateAsync(id);
+  };
 
-  // Effect para carregar dashboard apenas uma vez
-  useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
+  const refreshData = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['members', 'dashboard'] }),
+      queryClient.invalidateQueries({ queryKey: ['members', 'list'] }),
+    ]);
+  };
 
-  // Effect inicial para definir loading como false após primeira carga
-  useEffect(() => {
-    const initialLoad = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([
-          loadDashboard(),
-          loadMembers(),
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initialLoad();
-  }, []); // Executar apenas uma vez
+  const totalMembers = membersQuery.data?.count || 0;
+  const hasNext = !!membersQuery.data?.next;
+  const hasPrevious = !!membersQuery.data?.previous;
+  const membersLoading = membersQuery.isLoading;
+  const dashboardLoading = dashboardQuery.isLoading;
+  const loading = membersLoading || dashboardLoading;
 
   return {
-    // Data
-    members,
-    dashboard,
-    
-    // Loading states
+    members: membersQuery.data?.results || [],
+    dashboard: dashboardQuery.data || null,
     loading,
     dashboardLoading,
     membersLoading,
-    
-    // Filters
     filters,
     setFilters,
-    
-    // Actions
-    loadMembers,
-    loadDashboard,
+    loadMembers: async () => { await membersQuery.refetch(); },
+    loadDashboard: async () => { await dashboardQuery.refetch(); },
     refreshData,
     deleteMember,
-    
-    // Pagination
     totalMembers,
     hasNext,
     hasPrevious,
   };
-}; 
+};

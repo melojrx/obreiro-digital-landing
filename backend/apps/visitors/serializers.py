@@ -79,27 +79,47 @@ class VisitorSerializer(serializers.ModelSerializer):
     
     # Campos de relacionamento
     church = serializers.PrimaryKeyRelatedField(required=False, allow_null=True, read_only=True)
-    branch = serializers.PrimaryKeyRelatedField(required=False, allow_null=True, read_only=True)
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.filter(is_active=True),
+        required=False,
+        allow_null=True
+    )
     
-    def validate(self, data):
-        """Validações customizadas para atualização"""
-        print(f"[DEBUG] VisitorSerializer - Data recebido: {data}")
-        print(f"[DEBUG] VisitorSerializer - Tipo dos dados: {type(data)}")
-        
-        # Se não há dados, retornar erro
-        if not data:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            church = getattr(request, 'church', None)
+            if church is None:
+                from apps.accounts.models import ChurchUser
+                church = ChurchUser.objects.get_active_church_for_user(request.user)
+            if church:
+                self.fields['branch'].queryset = Branch.objects.filter(church=church, is_active=True)
+
+    def validate(self, attrs):
+        if not attrs and not self.partial:
             raise serializers.ValidationError("Nenhum dado foi enviado para atualização")
-        
-        # Converter birth_date vazio para None
-        if 'birth_date' in data and data['birth_date'] == '':
-            data['birth_date'] = None
-        
-        # Validar apenas nome como obrigatório (city e state são opcionais agora)
-        if not self.instance:  # Apenas em criação
-            if not data.get('full_name'):
-                raise serializers.ValidationError("Campo 'full_name' é obrigatório")
-        
-        return data
+
+        if 'birth_date' in attrs and attrs['birth_date'] == '':
+            attrs['birth_date'] = None
+
+        if not self.instance and not attrs.get('branch'):
+            raise serializers.ValidationError({'branch': "Filial é obrigatória para criar visitante"})
+        if not self.instance and not attrs.get('full_name'):
+            raise serializers.ValidationError("Campo 'full_name' é obrigatório")
+
+        attrs = super().validate(attrs)
+        branch = attrs.get('branch') or getattr(self.instance, 'branch', None)
+        if branch:
+            request = self.context.get('request')
+            church = getattr(request, 'church', None) if request else None
+            if church is None and request and request.user.is_authenticated:
+                from apps.accounts.models import ChurchUser
+                church = ChurchUser.objects.get_active_church_for_user(request.user)
+            if church and branch.church_id != church.id:
+                raise serializers.ValidationError({'branch': 'Filial selecionada não pertence à igreja ativa.'})
+            attrs['church'] = branch.church
+        return attrs
     
     class Meta:
         model = Visitor
@@ -115,7 +135,7 @@ class VisitorSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'is_active'
         ]
         read_only_fields = [
-            'id', 'uuid', 'church', 'church_name', 'branch', 'branch_name', 'age', 
+            'id', 'uuid', 'church', 'church_name', 'branch_name', 'age', 
             'converted_member_name', 'follow_up_status_display',
             'qr_code_used', 'registration_source', 'user_agent', 'ip_address',
             'created_at', 'updated_at'

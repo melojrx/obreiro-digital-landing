@@ -39,7 +39,10 @@ const EditarVisitante: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateVisitor(Number(id), data);
+      await updateVisitor(Number(id), {
+        ...data,
+        branch: data.branch ?? visitor?.branch,
+      });
       toast.success('Visitante atualizado com sucesso!');
       navigate(`/visitantes/${id}`);
     } catch (error) {

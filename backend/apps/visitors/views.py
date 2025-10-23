@@ -4,7 +4,7 @@ Sistema de QR Code para registro de visitantes
 """
 
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
@@ -12,6 +12,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Count, Q
+from django.core.exceptions import ValidationError
 from datetime import timedelta
 
 from .models import Visitor
@@ -22,6 +23,7 @@ from .serializers import (
 )
 from apps.branches.models import Branch
 from apps.core.permissions import IsMemberUser
+from apps.core.throttling import QRCodeAnonRateThrottle, QRCodeUserRateThrottle
 
 
 # =====================================
@@ -30,6 +32,7 @@ from apps.core.permissions import IsMemberUser
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@throttle_classes([QRCodeAnonRateThrottle])
 def validate_qr_code(request, qr_code_uuid):
     """
     Valida se o QR Code é válido e retorna informações da filial
@@ -63,6 +66,7 @@ def validate_qr_code(request, qr_code_uuid):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([QRCodeAnonRateThrottle])
 def register_visitor(request, qr_code_uuid):
     """
     Registra um novo visitante via QR Code
@@ -145,28 +149,27 @@ class VisitorViewSet(viewsets.ModelViewSet):
         """
         Filtra visitantes pela igreja do usuário
         """
-        user = self.request.user
-        
+        request = self.request
+        user = request.user
+
         if user.is_superuser:
             return Visitor.objects.all()
-        
-        # Buscar igreja do usuário
-        try:
+
+        church = getattr(request, 'church', None)
+        if church is None and user.is_authenticated:
             from apps.accounts.models import ChurchUser
-            church_user = ChurchUser.objects.filter(user=user, is_active=True).first()
-            
-            if church_user and church_user.church:
-                # Filtrar visitantes apenas da igreja do usuário
-                return Visitor.objects.filter(
-                    church=church_user.church,
-                    is_active=True
-                )
-            else:
-                # Se usuário não tem igreja associada, retornar queryset vazio
-                return Visitor.objects.none()
-        except Exception as e:
-            print(f"❌ Erro ao filtrar visitantes por igreja: {e}")
+            church = ChurchUser.objects.get_active_church_for_user(user)
+
+        if not church:
             return Visitor.objects.none()
+
+        queryset = Visitor.objects.filter(church=church, is_active=True)
+
+        branch = getattr(request, 'branch', None)
+        if branch:
+            queryset = queryset.filter(branch=branch)
+
+        return queryset
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""
@@ -215,49 +218,27 @@ class VisitorViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Associa igreja e filial automaticamente ao criar visitante"""
-        user = self.request.user
-        
-        # Buscar dados da igreja do usuário
-        try:
-            from apps.accounts.models import ChurchUser
-            church_user = ChurchUser.objects.filter(user=user, is_active=True).first()
-            
-            if church_user and church_user.church:
-                church = church_user.church
-                # Buscar primeira filial ativa da igreja
-                branch = church.branches.filter(is_active=True).first()
-                
-                print(f"💾 Criando visitante para igreja: {church.name} (ID: {church.id})")
-                if branch:
-                    print(f"💾 Branch: {branch.name} (ID: {branch.id})")
-                else:
-                    print(f"⚠️ Igreja {church.name} não tem filiais ativas!")
-                
-                serializer.save(
-                    church=church,
-                    branch=branch,
-                    registration_source='admin_manual',
-                    user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-                    ip_address=self.request.META.get('REMOTE_ADDR')
-                )
-            else:
-                print(f"⚠️ Usuário {user.email} não tem igreja associada")
-                # Se não tem igreja associada, salvar apenas com campos obrigatórios
-                serializer.save(
-                    registration_source='admin_manual',
-                    user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-                    ip_address=self.request.META.get('REMOTE_ADDR')
-                )
-        except Exception as e:
-            print(f"❌ Erro ao buscar igreja do usuário: {e}")
-            import traceback
-            traceback.print_exc()
-            # Em caso de erro, salvar apenas com campos obrigatórios
-            serializer.save(
-                registration_source='admin_manual',
-                user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-                ip_address=self.request.META.get('REMOTE_ADDR')
-            )
+        branch = serializer.validated_data.get('branch')
+        if not branch:
+            raise ValidationError({'branch': 'Filial é obrigatória para cadastrar visitante.'})
+
+        serializer.save(
+            church=branch.church,
+            branch=branch,
+            registration_source='admin_manual',
+            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+            ip_address=self.request.META.get('REMOTE_ADDR')
+        )
+
+    def perform_update(self, serializer):
+        branch = serializer.validated_data.get('branch', serializer.instance.branch)
+        if branch and serializer.instance.church_id and branch.church_id != serializer.instance.church_id:
+            raise ValidationError({'branch': 'Filial selecionada não pertence à igreja do visitante.'})
+
+        serializer.save(
+            church=branch.church if branch else serializer.instance.church,
+            branch=branch
+        )
     
     @action(detail=False, methods=['get'])
     def stats(self, request):

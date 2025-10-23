@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Member, MembershipStatus, membershipStatusService, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
+import { Member, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
 import { useAuth } from '@/hooks/useAuth';
-import { MembershipStatusHistory } from './MembershipStatusHistory';
-import { MembershipStatusModal } from './MembershipStatusModal';
+import { MinisterialFunctionTimeline } from './MinisterialFunctionTimeline';
+import { MembershipStatusLogTimeline } from './MembershipStatusLogTimeline';
+import { ministerialFunctionHistoryService, membershipStatusLogService, type MinisterialFunctionHistoryItem, type MembershipStatusLogResponse } from '@/services/memberHistoryService';
 import { useToast } from '@/hooks/use-toast';
 
 interface MemberDetailsProps {
@@ -35,10 +36,11 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
   const getMinisterialFunctionDisplay = (ministerialFunction: string) => {
     return MINISTERIAL_FUNCTION_CHOICES[ministerialFunction as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || 'Membro';
   };
-  const [membershipStatuses, setMembershipStatuses] = useState<MembershipStatus[]>(member.membership_statuses || []);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [editingStatus, setEditingStatus] = useState<MembershipStatus | undefined>(undefined);
-  const [isLoadingStatuses, setIsLoadingStatuses] = useState(false);
+  // Histórico antigo removido (aba "Ministerial")
+  const [ministerialHistory, setMinisterialHistory] = useState<MinisterialFunctionHistoryItem[]>([]);
+  const [isLoadingMinisterialHistory, setIsLoadingMinisterialHistory] = useState(false);
+  const [statusLog, setStatusLog] = useState<MembershipStatusLogResponse | null>(null);
+  const [isLoadingStatusLog, setIsLoadingStatusLog] = useState(false);
 
   // Formatar status para exibição
   const getStatusBadge = (status: string, display: string) => {
@@ -82,95 +84,44 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
     return age;
   };
 
-  // Funções para gerenciar status ministerial
-  const loadMembershipStatuses = async () => {
+
+  // Handlers antigos removidos
+
+  // Submit antigo removido
+
+  // Carregar históricos (função ministerial e status de membresia) ao montar
+  useEffect(() => {
     if (!member.id) return;
-    
-    setIsLoadingStatuses(true);
-    try {
-      const statuses = await membershipStatusService.getMemberHistory(member.id);
-      setMembershipStatuses(statuses);
-    } catch (error) {
-      console.error('Erro ao carregar histórico de status:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar o histórico de status ministerial.',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoadingStatuses(false);
-    }
-  };
 
-  const handleAddStatus = () => {
-    setEditingStatus(undefined);
-    setIsStatusModalOpen(true);
-  };
-
-  const handleEditStatus = (status: MembershipStatus) => {
-    setEditingStatus(status);
-    setIsStatusModalOpen(true);
-  };
-
-  const handleDeleteStatus = async (status: MembershipStatus) => {
-    if (!confirm(`Tem certeza que deseja remover o status "${status.status_display}"?`)) {
-      return;
-    }
-    
-    try {
-      await membershipStatusService.deleteStatus(status.id);
-      await loadMembershipStatuses(); // Recarrega a lista
-      toast({
-        title: 'Sucesso',
-        description: 'Status ministerial removido com sucesso.',
-      });
-    } catch (error) {
-      console.error('Erro ao remover status:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível remover o status ministerial.',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleStatusSubmit = async (data: any) => {
-    try {
-      if (editingStatus) {
-        // Atualizar status existente
-        await membershipStatusService.updateStatus(editingStatus.id, data);
-        toast({
-          title: 'Sucesso',
-          description: 'Status ministerial atualizado com sucesso.',
-        });
-      } else {
-        // Criar novo status
-        await membershipStatusService.createStatus(data);
-        toast({
-          title: 'Sucesso',
-          description: 'Status ministerial adicionado com sucesso.',
-        });
+    // Histórico de função ministerial
+    const loadMinisterial = async () => {
+      setIsLoadingMinisterialHistory(true);
+      try {
+        const items = await ministerialFunctionHistoryService.listByMember(member.id);
+        setMinisterialHistory(items);
+      } catch (error) {
+        console.error('Erro ao carregar histórico de função ministerial:', error);
+      } finally {
+        setIsLoadingMinisterialHistory(false);
       }
-      
-      await loadMembershipStatuses(); // Recarrega a lista
-      setIsStatusModalOpen(false);
-    } catch (error) {
-      console.error('Erro ao salvar status:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível salvar o status ministerial.',
-        variant: 'destructive'
-      });
-      throw error; // Re-lança o erro para o modal não fechar
-    }
-  };
+    };
 
-  // Carrega o histórico de status ao montar o componente
-  // useEffect(() => {
-  //   if (member.id && (!membershipStatuses || membershipStatuses.length === 0)) {
-  //     loadMembershipStatuses();
-  //   }
-  // }, [member.id]);
+    // Histórico de status de membresia (auditoria)
+    const loadStatusLog = async () => {
+      setIsLoadingStatusLog(true);
+      try {
+        const data = await membershipStatusLogService.getMemberStatusLog(member.id);
+        setStatusLog(data);
+      } catch (error) {
+        console.error('Erro ao carregar histórico de status de membresia:', error);
+      } finally {
+        setIsLoadingStatusLog(false);
+      }
+    };
+
+    loadMinisterial();
+    loadStatusLog();
+  }, [member.id]);
 
   return (
     <div className="space-y-6">
@@ -257,7 +208,7 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
 
       {/* Abas de Informações */}
       <Tabs defaultValue="personal" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="personal" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             Pessoais
@@ -270,10 +221,7 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
             <Heart className="h-4 w-4" />
             Eclesiásticos
           </TabsTrigger>
-          <TabsTrigger value="ministerial" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Ministerial
-          </TabsTrigger>
+          {/* Aba Ministerial removida */}
           <TabsTrigger value="additional" className="flex items-center gap-2">
             <Briefcase className="h-4 w-4" />
             Adicionais
@@ -521,19 +469,9 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                   </div>
                   
                   
-                  {member.baptism_date && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Data do Batismo</label>
-                      <p className="text-gray-900">{formatDate(member.baptism_date)}</p>
-                    </div>
-                  )}
+                  {/* Data do Batismo removida da exibição */}
                   
-                  {member.conversion_date && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Data de Conversão</label>
-                      <p className="text-gray-900">{formatDate(member.conversion_date)}</p>
-                    </div>
-                  )}
+                  {/* Data de Conversão removida */}
                 </div>
                 
                 <div className="space-y-4">
@@ -544,12 +482,7 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                     </p>
                   </div>
                   
-                  {member.ordination_date && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Data de Ordenação</label>
-                      <p className="text-gray-900">{formatDate(member.ordination_date)}</p>
-                    </div>
-                  )}
+                  {/* Data de Ordenação removida */}
                   
                   {member.previous_church && (
                     <div>
@@ -568,21 +501,24 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Dados Ministeriais */}
-        <TabsContent value="ministerial" className="space-y-6">
-          <MembershipStatusHistory
-            memberStatuses={membershipStatuses}
-            memberId={member.id}
+          {/* Histórico de Função Ministerial */}
+          <MinisterialFunctionTimeline
+            items={ministerialHistory}
             memberName={member.full_name}
-            canEdit={canEdit}
-            onAddStatus={handleAddStatus}
-            onEditStatus={handleEditStatus}
-            onDeleteStatus={handleDeleteStatus}
-            isLoading={isLoadingStatuses}
+            isLoading={isLoadingMinisterialHistory}
+          />
+
+          {/* Histórico de Status de Membresia (auditoria) */}
+          <MembershipStatusLogTimeline
+            data={statusLog}
+            isLoading={isLoadingStatusLog}
+            memberName={member.full_name}
+            membershipDate={member.membership_date}
           />
         </TabsContent>
+
+        {/* Aba Ministerial removida: histórico agora em Eclesiásticos */}
 
         {/* Informações Adicionais */}
         <TabsContent value="additional" className="space-y-6">
@@ -648,15 +584,7 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
       </Tabs>
       
       {/* Modal para adicionar/editar status ministerial */}
-      <MembershipStatusModal
-        isOpen={isStatusModalOpen}
-        onClose={() => setIsStatusModalOpen(false)}
-        onSubmit={handleStatusSubmit}
-        memberId={member.id}
-        memberName={member.full_name}
-        status={editingStatus}
-        isLoading={false}
-      />
+      {/* Modal removido */}
     </div>
   );
 }; 

@@ -219,19 +219,23 @@ class DataIntegrityCheckers:
     """
     
     @staticmethod
-    def check_duplicate_cpf(cpf, exclude_member_id=None):
-        """Verifica CPF duplicado"""
+    def check_duplicate_cpf(cpf, church=None, exclude_member_id=None):
+        """Verifica CPF duplicado no escopo da denominação (ou igreja se denominação ausente)."""
         if not cpf:
             return True
         
         from apps.members.models import Member
         
-        query = Member.objects.filter(cpf=cpf)
+        query = Member.objects.filter(cpf=cpf, is_active=True)
         if exclude_member_id:
             query = query.exclude(id=exclude_member_id)
+        if church and getattr(church, 'denomination_id', None):
+            query = query.filter(church__denomination_id=church.denomination_id)
+        elif church:
+            query = query.filter(church=church)
         
         if query.exists():
-            raise ValidationError(f"CPF {cpf} já está em uso por outro membro")
+            raise ValidationError(f"CPF {cpf} já está em uso na denominação")
         
         return True
     

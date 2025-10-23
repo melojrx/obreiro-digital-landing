@@ -32,6 +32,10 @@ class MemberManager(TenantManager):
     def for_church(self, church):
         """Membros de uma igreja específica"""
         return self.get_queryset().filter(church=church)
+
+    def for_branch(self, branch):
+        """Membros de uma filial específica"""
+        return self.get_queryset().filter(branch=branch)
     
     def active_for_church(self, church):
         """Membros ativos de uma igreja"""
@@ -78,6 +82,16 @@ class Member(BaseModel):
         verbose_name="Igreja",
         help_text="Igreja à qual o membro pertence"
     )
+
+    branch = models.ForeignKey(
+        'branches.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='members',
+        verbose_name="Filial",
+        help_text="Filial de referência do membro"
+    )
     
     # Usuário do sistema (opcional)
     user = models.OneToOneField(
@@ -105,9 +119,10 @@ class Member(BaseModel):
     cpf = models.CharField(
         "CPF",
         max_length=14,
-        unique=True,
+        blank=True,
+        null=True,
         validators=[validate_cpf],
-        help_text="CPF do membro (obrigatório)"
+        help_text="CPF do membro (opcional)"
     )
     
     rg = models.CharField(
@@ -261,12 +276,7 @@ class Member(BaseModel):
     )
     
     # Datas importantes
-    conversion_date = models.DateField(
-        "Data de Conversão",
-        blank=True,
-        null=True,
-        help_text="Data da conversão/aceitação de Jesus"
-    )
+    # Removido: conversion_date (migrado/abolido)
     
     baptism_date = models.DateField(
         "Data do Batismo",
@@ -308,12 +318,7 @@ class Member(BaseModel):
         help_text="Função/cargo ministerial"
     )
     
-    ordination_date = models.DateField(
-        "Data de Ordenação",
-        blank=True,
-        null=True,
-        help_text="Data de ordenação ministerial (se aplicável)"
-    )
+    # Removido: ordination_date (migrado/abolido)
     
     ministries = models.ManyToManyField(
         'activities.Ministry',
@@ -418,11 +423,11 @@ class Member(BaseModel):
             models.Index(fields=['church', 'full_name']),
             models.Index(fields=['church', 'is_active']),
             models.Index(fields=['church', 'membership_status']),
+            models.Index(fields=['church', 'branch']),
             models.Index(fields=['ministerial_function']),
             models.Index(fields=['cpf']),
             models.Index(fields=['birth_date']),
             models.Index(fields=['membership_date']),
-            models.Index(fields=['conversion_date']),
         ]
     
     def __str__(self):
@@ -439,6 +444,9 @@ class Member(BaseModel):
         
         # Validar dados do cônjuge
         self._validate_spouse_data()
+
+        if self.branch and self.branch.church_id != self.church_id:
+            raise ValidationError("Filial selecionada não pertence à mesma igreja.")
         
         super().save(*args, **kwargs)
     
@@ -450,28 +458,12 @@ class Member(BaseModel):
         if self.birth_date and self.birth_date > today:
             raise ValidationError("Data de nascimento não pode ser no futuro")
         
-        # Validar data de conversão
-        if self.conversion_date:
-            if self.birth_date and self.conversion_date < self.birth_date:
-                raise ValidationError("Data de conversão não pode ser anterior ao nascimento")
-            if self.conversion_date > today:
-                raise ValidationError("Data de conversão não pode ser no futuro")
-        
         # Validar data de batismo
         if self.baptism_date:
             if self.birth_date and self.baptism_date < self.birth_date:
                 raise ValidationError("Data de batismo não pode ser anterior ao nascimento")
-            if self.conversion_date and self.baptism_date < self.conversion_date:
-                raise ValidationError("Data de batismo não pode ser anterior à conversão")
             if self.baptism_date > today:
                 raise ValidationError("Data de batismo não pode ser no futuro")
-        
-        # Validar data de ordenação
-        if self.ordination_date:
-            if self.birth_date and self.ordination_date < self.birth_date:
-                raise ValidationError("Data de ordenação não pode ser anterior ao nascimento")
-            if self.ordination_date > today:
-                raise ValidationError("Data de ordenação não pode ser no futuro")
         
         # Validar data de membresia
         if self.membership_date:
@@ -515,18 +507,7 @@ class Member(BaseModel):
             )
         return 0
     
-    @property
-    def conversion_age(self):
-        """Idade na data de conversão"""
-        if self.conversion_date and self.birth_date:
-            return self.conversion_date.year - self.birth_date.year - (
-                (self.conversion_date.month, self.conversion_date.day) < (self.birth_date.month, self.birth_date.day)
-            )
-        return None
-    
-    def get_conversion_age(self):
-        """Método para obter idade na conversão - compatibilidade"""
-        return self.conversion_age
+    # Removido: conversion_age (compatibilidade não necessária)
     
     @property
     def is_minor(self):
@@ -671,18 +652,18 @@ class MembershipStatus(BaseModel):
     status = models.CharField(
         "Status",
         max_length=100,
-        choices=MinisterialFunctionChoices.choices,
-        help_text="Status ministerial específico"
+        choices=MembershipStatusChoices.choices,
+        help_text="Status de membresia"
     )
     
-    ordination_date = models.DateField(
-        "Data de Ordenação",
+    effective_date = models.DateField(
+        "Data Efetiva",
         blank=True,
         null=True,
         help_text="Data de início do status"
     )
     
-    termination_date = models.DateField(
+    end_date = models.DateField(
         "Data de Término",
         blank=True,
         null=True,
@@ -698,10 +679,10 @@ class MembershipStatus(BaseModel):
     class Meta:
         verbose_name = "Status de Membresia"
         verbose_name_plural = "Status de Membresia"
-        ordering = ['-ordination_date', '-created_at']
+        ordering = ['-effective_date', '-created_at']
         indexes = [
-            models.Index(fields=['member', '-ordination_date']),
-            models.Index(fields=['status', '-ordination_date']),
+            models.Index(fields=['member', '-effective_date']),
+            models.Index(fields=['status', '-effective_date']),
         ]
     
     def __str__(self):
@@ -710,12 +691,12 @@ class MembershipStatus(BaseModel):
     @property
     def is_current(self):
         """Verifica se é um status atual (sem data de término)"""
-        return self.termination_date is None
+        return self.end_date is None
     
     def save(self, *args, **kwargs):
         """Validações no save"""
-        if self.termination_date and self.ordination_date:
-            if self.termination_date <= self.ordination_date:
+        if self.end_date and self.effective_date:
+            if self.end_date <= self.effective_date:
                 raise ValidationError("Data de término deve ser posterior à data de ordenação")
         
         super().save(*args, **kwargs)
@@ -826,3 +807,91 @@ class MembershipStatusLog(BaseModel):
         return f"{self.member.full_name}: {self.old_status} → {self.new_status}"
 
 
+class MinisterialFunctionHistory(BaseModel):
+    """
+    Histórico de Função Ministerial do membro.
+    Registra alterações de função com período de vigência.
+    """
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='ministerial_function_history',
+        verbose_name="Membro"
+    )
+
+    function = models.CharField(
+        "Função",
+        max_length=100,
+        choices=MinisterialFunctionChoices.choices,
+        help_text="Função ministerial atribuída"
+    )
+
+    start_date = models.DateField(
+        "Data de Início",
+        help_text="Data de início da função"
+    )
+
+    end_date = models.DateField(
+        "Data de Fim",
+        null=True,
+        blank=True,
+        help_text="Data de término da função (vazio se atual)"
+    )
+
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ministerial_function_changes_made',
+        verbose_name="Alterado por"
+    )
+
+    notes = models.TextField(
+        "Observações",
+        blank=True,
+        help_text="Observações sobre a mudança de função"
+    )
+
+    class Meta:
+        verbose_name = "Histórico de Função Ministerial"
+        verbose_name_plural = "Histórico de Funções Ministeriais"
+        ordering = ['-start_date', '-created_at']
+        indexes = [
+            models.Index(fields=['member', '-start_date']),
+            models.Index(fields=['function', '-start_date']),
+        ]
+        constraints = [
+            # Garante apenas uma função 'atual' (sem end_date) por membro
+            models.UniqueConstraint(
+                fields=['member'],
+                condition=models.Q(end_date__isnull=True),
+                name='unique_current_ministerial_function_per_member'
+            )
+        ]
+
+    def __str__(self):
+        status = 'atual' if not self.end_date else f"até {self.end_date}"
+        return f"{self.member.full_name} - {self.get_function_display()} ({self.start_date} {status})"
+
+    @property
+    def is_current(self):
+        return self.end_date is None
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.end_date and self.end_date <= self.start_date:
+            raise ValidationError("Data de fim deve ser posterior à data de início")
+        
+        # Evitar sobreposição de períodos para este membro
+        from django.db.models import Q
+        qs = MinisterialFunctionHistory.objects.filter(member=self.member).exclude(pk=self.pk)
+        new_start = self.start_date
+        new_end = self.end_date
+        # Considerar None como infinito futuro
+        overlaps = qs.filter(
+            Q(end_date__isnull=True, start_date__lte=new_end if new_end else new_start) |
+            Q(end_date__isnull=False, start_date__lte=(new_end or new_start)) & Q(end_date__gte=new_start)
+        )
+        if overlaps.exists():
+            raise ValidationError("Período informado se sobrepõe a outro registro de função ministerial deste membro")

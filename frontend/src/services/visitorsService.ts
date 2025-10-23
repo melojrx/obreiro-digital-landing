@@ -246,6 +246,7 @@ export const createVisitor = async (visitorData: Partial<Visitor>): Promise<Visi
     zipcode: visitorData.zipcode || '',
     ministry_interest: visitorData.ministry_interest || '',
     observations: visitorData.observations || '',
+    branch: visitorData.branch,
   };
   
   const response = await api.post(API_ENDPOINTS.visitors.create, cleanedData);

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ChurchSelector } from "./ChurchSelector";
+import { BranchSelector } from "./BranchSelector";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -42,9 +43,10 @@ const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Center - Church Selector */}
-          <div className="hidden lg:flex flex-1 justify-center">
+          {/* Center - Selectors */}
+          <div className="hidden lg:flex flex-1 justify-center gap-2">
             <ChurchSelector />
+            <BranchSelector />
           </div>
 
           {/* Right side - Actions */}
@@ -140,9 +142,12 @@ const Header: React.FC = () => {
         </div>
       )}
 
-      {/* Mobile Church Selector */}
+      {/* Mobile Selectors */}
       <div className="px-4 py-3 border-t border-gray-100 lg:hidden">
-        <ChurchSelector />
+        <div className="flex flex-col gap-2">
+          <ChurchSelector />
+          <BranchSelector />
+        </div>
       </div>
     </header>
   );

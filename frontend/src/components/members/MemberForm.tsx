@@ -53,7 +53,7 @@ const phoneRegex = /^\(\d{2}\) \d{4,5}-\d{4}$/;
 
 const memberSchema = z.object({
   full_name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  cpf: z.string().min(1, 'CPF é obrigatório'),
+  cpf: z.string().optional(),
   rg: z.string().optional(),
   birth_date: z.string().min(1, 'Data de nascimento é obrigatória'),
   gender: z.enum(['M', 'F'], { required_error: 'Selecione o gênero' }),
@@ -89,15 +89,13 @@ const memberSchema = z.object({
     (val) => !val || val === '' || /^\d{5}-?\d{3}$/.test(val),
     { message: 'CEP deve estar no formato XXXXX-XXX' }
   ),
-  baptism_date: z.string().optional(),
+  // baptism_date removido do cadastro
   previous_church: z.string().optional(),
   transfer_letter: z.boolean().optional(),
   
-  // Campos ministeriais restaurados
+  // Campos ministeriais
   membership_status: z.string().optional(),
-  conversion_date: z.string().optional(),
   ministerial_function: z.string().optional(),
-  ordination_date: z.string().optional(),
   
   profession: z.string().optional(),
   education_level: z.string().optional(),
@@ -218,15 +216,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       city: member?.city || '',
       state: member?.state || '',
       zipcode: member?.zipcode || '',
-      baptism_date: member?.baptism_date || '',
+      // baptism_date removido do cadastro
       previous_church: member?.previous_church || '',
       transfer_letter: member?.transfer_letter || false,
       
-      // Campos ministeriais restaurados
+      // Campos ministeriais
       membership_status: member?.membership_status || 'active',
-      conversion_date: member?.conversion_date || '',
       ministerial_function: member?.ministerial_function || 'member',
-      ordination_date: member?.ordination_date || '',
       
       profession: member?.profession || '',
       education_level: member?.education_level || '',
@@ -331,12 +327,15 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         city: data.city || undefined,
         state: data.state || undefined,
         zipcode: data.zipcode || undefined,
-        baptism_date: data.baptism_date || undefined,
+        // baptism_date removido do payload
         previous_church: data.previous_church || undefined,
         transfer_letter: data.transfer_letter || undefined,
         profession: data.profession || undefined,
         education_level: data.education_level || undefined,
         notes: data.notes || undefined,
+        // Campos ministeriais
+        membership_status: data.membership_status || undefined,
+        ministerial_function: data.ministerial_function || undefined,
         accept_sms: data.accept_sms,
         accept_email: data.accept_email,
         accept_whatsapp: data.accept_whatsapp,
@@ -1068,19 +1067,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="baptism_date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Data do Batismo</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {/* Campo de Data do Batismo removido do cadastro */}
 
 
                     <FormField
@@ -1188,44 +1175,15 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="conversion_date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Data de Conversão</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Data da conversão/aceitação de Jesus
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="ordination_date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Data de Ordenação</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Data de ordenação ministerial (se aplicável)
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {/* Campo de Data de Conversão removido */}
+                    {/* Campo de Data de Ordenação removido */}
                   </div>
                 </CardContent>
               </Card>
               
-              {/* Acesso ao Sistema */}
-              <Card>
+              {/* Acesso ao Sistema - será movido para 'Informações Adicionais' */}
+              {/* REMOVIDO desta aba */}
+              {/* <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5" />
@@ -1402,7 +1360,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                     </div>
                   )}
                 </CardContent>
-              </Card>
+              </Card> */}
             </TabsContent>
 
             {/* Informações Adicionais */}
@@ -1483,6 +1441,183 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       </FormItem>
                     )}
                   />
+                </CardContent>
+              </Card>
+
+              {/* Acesso ao Sistema (movido para Informações Adicionais) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Acesso ao Sistema
+                  </CardTitle>
+                  <CardDescription>
+                    Configure se este membro terá acesso ao sistema de gestão
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="create_system_user"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Usuário terá acesso ao sistema?</FormLabel>
+                          <FormDescription>
+                            Marque para criar um usuário que poderá fazer login no sistema
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  {form.watch('create_system_user') && (
+                    <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
+                      <h4 className="font-medium text-blue-900 flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Configurações de Acesso ao Sistema
+                      </h4>
+                      
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <p className="text-sm text-yellow-800">
+                          <strong>Importante:</strong> Ao marcar esta opção, será criado um usuário que poderá fazer login no sistema.
+                          Escolha o papel adequado baseado nas responsabilidades da pessoa na igreja.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="system_role"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Papel no Sistema *</FormLabel>
+                              <Select 
+                                onValueChange={field.onChange} 
+                                defaultValue={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o papel" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {availableRoles.map((role) => (
+                                    <SelectItem key={role.value} value={role.value}>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{role.label}</span>
+                                        <span className="text-xs text-gray-500">{role.description}</span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                Define as permissões do usuário no sistema
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="user_email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>E-mail para Login *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="email" 
+                                  placeholder="email@exemplo.com" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                E-mail que será usado para fazer login no sistema
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="user_password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Senha Inicial *</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="password" 
+                                placeholder="Digite uma senha inicial (mínimo 8 caracteres)" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Senha inicial para acesso. O usuário poderá alterá-la posteriormente.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {form.watch('system_role') && (
+                        <div className="p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            Papel Selecionado: {availableRoles.find(r => r.value === form.watch('system_role'))?.label}
+                          </h5>
+                          <p className="text-sm text-blue-700">
+                            {availableRoles.find(r => r.value === form.watch('system_role'))?.description}
+                          </p>
+                          
+                          <div className="mt-2 text-xs text-blue-600">
+                            <strong>O que este papel pode fazer:</strong>
+                            <ul className="list-disc pl-5 space-y-1">
+                              <li>Permissões variam por papel e igreja</li>
+                              {form.watch('system_role') === 'church_admin' && (
+                                <>
+                                  <li>Gerenciar dados da igreja e membros</li>
+                                  <li>Gerenciar filiais e atividades</li>
+                                  <li>Acessar relatórios consolidados</li>
+                                </>
+                              )}
+                              {form.watch('system_role') === 'pastor' && (
+                                <>
+                                  <li>Gestão pastoral e administrativa</li>
+                                  <li>Relatórios ministeriais</li>
+                                </>
+                              )}
+                              {form.watch('system_role') === 'secretary' && (
+                                <>
+                                  <li>Gestão de cadastros</li>
+                                  <li>Relatórios básicos</li>
+                                </>
+                              )}
+                              {form.watch('system_role') === 'leader' && (
+                                <>
+                                  <li>Liderança de ministérios e atividades</li>
+                                </>
+                              )}
+                              {form.watch('system_role') === 'member' && (
+                                <>
+                                  <li>Visualizar informações básicas</li>
+                                  <li>Atualizar próprio perfil</li>
+                                </>
+                              )}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

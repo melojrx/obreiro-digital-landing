@@ -358,7 +358,7 @@ class Church(BaseModel):
     @property
     def can_add_branches(self):
         """Verifica se pode adicionar mais filiais"""
-        current_branches = self.branches.filter(is_active=True, is_headquarters=False).count()
+        current_branches = self.branches.filter(is_active=True, is_main=False).count()
         return self.max_branches < 0 or current_branches < self.max_branches
     
     def update_statistics(self):
@@ -418,7 +418,7 @@ class Church(BaseModel):
         if self.total_members > self.max_members:
             issues.append(f"Excedeu limite de membros: {self.total_members}/{self.max_members}")
 
-        current_branches = self.branches.filter(is_active=True, is_headquarters=False).count()
+        current_branches = self.branches.filter(is_active=True, is_main=False).count()
         if self.max_branches >= 0 and current_branches > self.max_branches:
             issues.append(f"Excedeu limite de filiais: {current_branches}/{self.max_branches}")
         

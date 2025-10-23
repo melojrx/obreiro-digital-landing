@@ -22,9 +22,9 @@ export const ChurchSelector: React.FC = () => {
     return null;
   }
 
-  const handleChurchSelect = (churchId: number) => {
-    if (activeChurch?.id !== churchId) {
-      setActiveChurch.mutate(churchId);
+  const handleChurchSelect = (churchId: number, branchId?: number) => {
+    if (activeChurch?.id !== churchId || activeChurch?.active_branch?.id !== branchId) {
+      setActiveChurch.mutate({ churchId, branchId });
     }
   };
 
@@ -52,9 +52,16 @@ export const ChurchSelector: React.FC = () => {
                 {activeChurch?.name || 'Selecione uma igreja'}
               </span>
               {activeChurch && (
-                <span className="text-xs text-muted-foreground">
-                  {activeChurch.city}, {activeChurch.state}
-                </span>
+                <>
+                  <span className="text-xs text-muted-foreground">
+                    {activeChurch.city}, {activeChurch.state}
+                  </span>
+                  {activeChurch.active_branch && (
+                    <span className="text-xs text-muted-foreground">
+                      Filial ativa: {activeChurch.active_branch.name}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -72,7 +79,7 @@ export const ChurchSelector: React.FC = () => {
         {userChurches.churches.map((church) => (
           <DropdownMenuItem
             key={church.id}
-            onClick={() => handleChurchSelect(church.id)}
+            onClick={() => handleChurchSelect(church.id, church.active_branch?.id)}
             className="flex items-center gap-3 p-3 cursor-pointer"
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -90,15 +97,19 @@ export const ChurchSelector: React.FC = () => {
                   </Badge>
                 </div>
                 
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
                     <span>{church.city}, {church.state}</span>
                   </div>
-                  
                   {church.denomination_name && (
                     <span className="truncate">
                       {church.denomination_name}
+                    </span>
+                  )}
+                  {church.active_branch && (
+                    <span className="truncate">
+                      Filial ativa: {church.active_branch.name}
                     </span>
                   )}
                 </div>

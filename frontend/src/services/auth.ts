@@ -51,7 +51,8 @@ export interface FinalizeRegistrationData {
   cpf: string;
   
   // Dados de endereço do usuário (etapa 2)
-  denomination_id?: number;
+  denomination_id?: number | 'outros';
+  denomination_other_name?: string;
   user_zipcode?: string;
   user_address?: string;
   user_city?: string;
@@ -125,10 +126,14 @@ export interface UserChurch {
   role: string;
   role_label: string;
   user_role: string; // backward compatibility
+  active_branch?: {
+    id: number;
+    name: string;
+  } | null;
 }
 
 export interface Denomination {
-  id: number;
+  id: number | 'outros';
   name: string;
   short_name?: string;
   display_name: string;
@@ -268,7 +273,13 @@ export const authService = {
    */
   async finalizeRegistration(data: FinalizeRegistrationData): Promise<{ user: User; token: string }> {
     try {
-      const response = await api.post<{ user: User; token: string; message: string }>('/auth/finalize-registration/', data);
+      const payload: FinalizeRegistrationData = { ...data };
+
+      if (typeof payload.denomination_id === 'string') {
+        payload.denomination_id = payload.denomination_id.trim() as FinalizeRegistrationData['denomination_id'];
+      }
+
+      const response = await api.post<{ user: User; token: string; message: string }>('/auth/finalize-registration/', payload);
       
       // Salvar token e usuário
       localStorage.setItem('auth_token', response.data.token);
@@ -301,7 +312,27 @@ export const authService = {
   async getAvailableDenominations(): Promise<Denomination[]> {
     try {
       const response = await api.get<Denomination[]>('/denominations/available_for_registration/');
-      return response.data;
+      // Filtrar a opção semântico-legacy "Outras Denominações" do backend
+      const list = (response.data ?? []).filter((item) => {
+        // Manter apenas itens reais (id numérico) que não representem "Outras Denominações"
+        // e nunca filtrar nosso item sintético 'outros' (id string)
+        if (typeof item.id !== 'number') return true;
+        const name = (item.name || '').toLowerCase();
+        const shortName = (item.short_name || '').toLowerCase();
+        const isLegacyOutras = name.includes('outras denominações') || shortName === 'outras';
+        return !isLegacyOutras;
+      });
+      const hasOther = list.some(item => item.id === 'outros');
+      if (!hasOther) {
+        list.push({
+          id: 'outros',
+          name: 'Outros',
+          short_name: 'Outros',
+          display_name: 'Outros',
+          churches_count: 0,
+        });
+      }
+      return list;
     } catch (error) {
       throw handleApiError(error);
     }

@@ -205,7 +205,7 @@ class ChurchCreateSerializer(serializers.ModelSerializer):
                 email=church.email,
                 qr_code_active=True,
                 is_active=True,
-                is_headquarters=True
+                is_main=True
             )
             logger.info(f"✅ Filial matriz criada com QR Code para igreja '{church.name}'")
             logger.info(f"   QR Code UUID: {main_branch.qr_code_uuid}")
@@ -414,7 +414,7 @@ class ChurchStatisticsSerializer(serializers.ModelSerializer):
         """Retorna contagem de filiais ativas"""
         if not hasattr(obj, 'branches'):
             return 0
-        return obj.branches.filter(is_active=True, is_headquarters=False).count()
+        return obj.branches.filter(is_active=True, is_main=False).count()
     
     def get_members_by_age_group(self, obj):
         """Estatísticas de membros por faixa etária"""

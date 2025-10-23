@@ -20,7 +20,7 @@ from apps.core.permissions import (
 )
 
 
-class DenominationViewSet(viewsets.ModelViewSet):
+class DenominationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet para denominações
     """
@@ -82,7 +82,14 @@ class DenominationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
     def available_for_registration(self, request):
         """Denominações disponíveis para cadastro público"""
-        denominations = Denomination.objects.filter(is_active=True).order_by('name')
+        # Filtrar lista pública removendo a entrada genérica "Outras Denominações"
+        denominations = (
+            Denomination.objects
+            .filter(is_active=True)
+            .exclude(name__iexact='Outras Denominações')
+            .exclude(short_name__iexact='Outras')
+            .order_by('name')
+        )
         serializer = DenominationSummarySerializer(denominations, many=True)
         return Response(serializer.data)
     

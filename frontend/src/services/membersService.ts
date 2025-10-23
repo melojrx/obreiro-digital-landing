@@ -90,11 +90,9 @@ export interface Member {
   previous_church?: string;
   transfer_letter: boolean;
   
-  // Campos ministeriais restaurados
+  // Campos ministeriais
   membership_status: string;
-  conversion_date?: string;
   ministerial_function: string;
-  ordination_date?: string;
   
   // Novos campos da estrutura MembershipStatus
   membership_statuses: MembershipStatus[];
@@ -208,9 +206,7 @@ export interface CreateMemberData {
   
   // Campos ministeriais restaurados
   membership_status?: string;
-  conversion_date?: string;
   ministerial_function?: string;
-  ordination_date?: string;
   
   profession?: string;
   education_level?: string;

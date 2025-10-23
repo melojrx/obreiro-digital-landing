@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   getVisitors,
@@ -7,6 +8,7 @@ import {
   type Visitor,
   type VisitorStats
 } from '@/services/visitorsService';
+import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 
 interface VisitorFilters {
   search?: string;
@@ -32,92 +34,65 @@ interface UseVisitorsReturn {
 }
 
 export const useVisitors = (): UseVisitorsReturn => {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [stats, setStats] = useState<VisitorStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [visitorsLoading, setVisitorsLoading] = useState(false);
-  const [totalVisitors, setTotalVisitors] = useState(0);
+  const queryClient = useQueryClient();
+  const activeChurch = useCurrentActiveChurch();
+
+  const churchId = activeChurch?.id ?? null;
+  const branchId = activeChurch?.active_branch?.id ?? null;
+
   const [filters, setFilters] = useState<VisitorFilters>({
     page: 1,
     per_page: 10,
   });
 
-  // Buscar estatísticas
-  const fetchStats = useCallback(async () => {
-    try {
-      setStatsLoading(true);
-      const data = await getVisitorStats();
-      setStats(data);
-      setTotalVisitors(data.total);
-    } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error);
-      toast.error('Erro ao carregar estatísticas dos visitantes');
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
+  const sanitizedFilters = useMemo(() => ({
+    ...filters,
+    // Se quiser forçar filtro explícito por branch no servidor (além do middleware)
+    ...(branchId ? { branch: String(branchId) } : {}),
+  }), [filters, branchId]);
 
-  // Buscar visitantes
-  const fetchVisitors = useCallback(async () => {
-    try {
-      setVisitorsLoading(true);
-      const data = await getVisitors(filters);
-      setVisitors(data);
-    } catch (error) {
-      console.error('Erro ao buscar visitantes:', error);
-      toast.error('Erro ao carregar visitantes');
-    } finally {
-      setVisitorsLoading(false);
-    }
-  }, [filters]);
+  const statsQuery = useQuery<VisitorStats>({
+    queryKey: ['visitors', 'stats', { churchId, branchId }],
+    queryFn: () => getVisitorStats(),
+    enabled: !!churchId, // só busca após conhecer a active church
+    staleTime: 30_000,
+  });
 
-  // Buscar dados iniciais
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      setLoading(true);
-      await Promise.all([fetchStats(), fetchVisitors()]);
-      setLoading(false);
-    };
+  const visitorsQuery = useQuery<Visitor[]>({
+    queryKey: ['visitors', 'list', { churchId, branchId, filters: sanitizedFilters }],
+    queryFn: () => getVisitors(sanitizedFilters),
+    enabled: !!churchId,
+    keepPreviousData: true,
+    staleTime: 10_000,
+  });
 
-    fetchInitialData();
-  }, []);
-
-  // Buscar visitantes quando filtros mudarem
-  useEffect(() => {
-    if (!loading) {
-      fetchVisitors();
-    }
-  }, [filters, loading]);
-
-  // Deletar visitante
-  const deleteVisitor = async (visitorId: number) => {
-    try {
-      await deleteVisitorService(visitorId);
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deleteVisitorService(id),
+    onSuccess: () => {
       toast.success('Visitante excluído com sucesso');
-      
-      // Atualizar lista local
-      setVisitors(prev => prev.filter(v => v.id !== visitorId));
-      setTotalVisitors(prev => prev - 1);
-      
-      // Recarregar estatísticas
-      fetchStats();
-    } catch (error) {
-      console.error('Erro ao excluir visitante:', error);
+      queryClient.invalidateQueries({ queryKey: ['visitors'] });
+    },
+    onError: () => {
       toast.error('Erro ao excluir visitante');
-      throw error;
-    }
+    },
+  });
+
+  const totalVisitors = statsQuery.data?.total || 0;
+  const loading = statsQuery.isLoading || visitorsQuery.isLoading;
+  const statsLoading = statsQuery.isLoading;
+  const visitorsLoading = visitorsQuery.isLoading;
+
+  const deleteVisitor = async (visitorId: number) => {
+    await deleteMutation.mutateAsync(visitorId);
   };
 
-  // Refetch
   const refetch = () => {
-    fetchStats();
-    fetchVisitors();
+    queryClient.invalidateQueries({ queryKey: ['visitors'] });
   };
 
   return {
-    visitors,
-    stats,
+    visitors: visitorsQuery.data || [],
+    stats: statsQuery.data || null,
     loading,
     statsLoading,
     visitorsLoading,

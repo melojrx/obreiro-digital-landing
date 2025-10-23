@@ -12,10 +12,12 @@ from rest_framework.response import Response
 from apps.core.models import GenderChoices, RoleChoices, validate_cpf
 
 from .auth_serializers import CustomAuthTokenSerializer
+from apps.core.throttling import AuthAnonRateThrottle, AuthUserRateThrottle
 from .models import ChurchUser, CustomUser, UserProfile
 
 class CustomAuthToken(ObtainAuthToken):
     serializer_class = CustomAuthTokenSerializer
+    throttle_classes = [AuthAnonRateThrottle, AuthUserRateThrottle]
     
     def post(self, request, *args, **kwargs):
         print('🔍 DEBUG - Login Request Data:', request.data)
@@ -67,7 +69,11 @@ def my_churches(request):
             'denomination_name': church.denomination.name if church.denomination else None,
             'role': church_user.get_role_display(),
             'role_code': church_user.role,
-            'is_active': church_user.is_user_active_church
+            'is_active': church_user.is_user_active_church,
+            'active_branch': {
+                'id': church_user.active_branch.id,
+                'name': church_user.active_branch.name
+            } if church_user.active_branch else None
         })
     
     return Response({
@@ -89,6 +95,12 @@ def active_church(request):
             {'error': 'Usuário não tem igreja ativa configurada'},
             status=status.HTTP_404_NOT_FOUND
         )
+
+    church_user = ChurchUser.objects.get(
+        user=user,
+        church=active_church,
+        is_active=True
+    )
     
     return Response({
         'active_church': {
@@ -97,7 +109,11 @@ def active_church(request):
             'short_name': active_church.short_name,
             'city': active_church.city,
             'state': active_church.state,
-            'denomination_name': active_church.denomination.name if active_church.denomination else None
+            'denomination_name': active_church.denomination.name if active_church.denomination else None,
+            'active_branch': {
+                'id': church_user.active_branch.id,
+                'name': church_user.active_branch.name
+            } if church_user.active_branch else None
         }
     })
 
@@ -107,6 +123,7 @@ def set_active_church(request):
     """Define qual igreja é ativa para o usuário"""
     user = request.user
     church_id = request.data.get('church_id')
+    branch_id = request.data.get('branch_id')
     
     if not church_id:
         return Response(
@@ -130,6 +147,17 @@ def set_active_church(request):
         
         # Marcar a nova igreja como ativa
         church_user.is_user_active_church = True
+        if branch_id:
+            try:
+                branch = church_user.church.branches.get(id=branch_id, is_active=True)
+            except church_user.church.branches.model.DoesNotExist:
+                return Response(
+                    {'error': 'Filial não encontrada ou inativa para esta igreja'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            church_user.active_branch = branch
+        else:
+            church_user.active_branch = None
         church_user.save()
         
         return Response({
@@ -137,7 +165,11 @@ def set_active_church(request):
             'active_church': {
                 'id': church_user.church.id,
                 'name': church_user.church.name,
-                'short_name': church_user.church.short_name
+                'short_name': church_user.church.short_name,
+                'active_branch': {
+                    'id': church_user.active_branch.id,
+                    'name': church_user.active_branch.name
+                } if church_user.active_branch else None
             }
         })
         
@@ -249,6 +281,10 @@ def my_church(request):
         'role': church_user.get_role_display(),  # Label legível (ex: "Admin de Igreja")
         'role_label': church_user.get_role_display(),  # Mantido para compatibilidade
         'user_role': church_user.role,  # Código do papel (ex: "CHURCH_ADMIN")
+        'active_branch': {
+            'id': church_user.active_branch.id,
+            'name': church_user.active_branch.name
+        } if church_user.active_branch else None
     })
 
 @api_view(['POST'])
@@ -443,14 +479,70 @@ def finalize_registration(request):
                 intended_role=intended_role  # Salvar papel pretendido no formato correto
             )
             
-            # Salvar denominação pretendida se fornecida
-            if data.get('denomination_id'):
-                from apps.denominations.models import Denomination
+            # Tratar denominação (selecionada ou criada via "Outros")
+            from apps.denominations.models import Denomination
+
+            denomination = None
+            denomination_id = data.get('denomination_id')
+            denomination_other_name = data.get('denomination_other_name')
+            selected_other = isinstance(denomination_id, str) and denomination_id.lower() in ['outros', 'outro', 'other']
+
+            if denomination_id and not selected_other:
                 try:
-                    denomination = Denomination.objects.get(id=data['denomination_id'])
-                    profile.intended_denomination = denomination
+                    denomination = Denomination.objects.get(id=denomination_id)
                 except Denomination.DoesNotExist:
-                    pass
+                    return Response(
+                        {'error': 'Denominação selecionada não foi encontrada.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            if (selected_other or denomination_other_name) and denomination is None:
+                other_name = denomination_other_name or data.get('denomination_name')
+                if not other_name:
+                    return Response(
+                        {'error': 'Informe o nome da denominação quando selecionar "Outros".'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                required_address_fields = {
+                    'user_address': 'Endereço',
+                    'user_city': 'Cidade',
+                    'user_state': 'Estado',
+                    'user_zipcode': 'CEP',
+                }
+                missing_address = [label for field, label in required_address_fields.items() if not data.get(field)]
+                if missing_address:
+                    return Response(
+                        {'error': f'Campos obrigatórios para criar a denominação automática: {", ".join(missing_address)}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                address_parts = [data.get('user_address')]
+                if data.get('user_number'):
+                    address_parts.append(f"nº {data['user_number']}")
+                if data.get('user_complement'):
+                    address_parts.append(data['user_complement'])
+                if data.get('user_neighborhood'):
+                    address_parts.append(f"Bairro {data['user_neighborhood']}")
+                headquarters_address = ', '.join(filter(None, address_parts))
+
+                denomination = Denomination.objects.create(
+                    name=other_name,
+                    short_name=other_name[:50],
+                    description="Denominação criada automaticamente a partir do cadastro.",
+                    administrator=user,
+                    email=data['email'],
+                    phone=data['phone'],
+                    website='',
+                    headquarters_address=headquarters_address,
+                    headquarters_city=data['user_city'],
+                    headquarters_state=data['user_state'],
+                    headquarters_zipcode=data['user_zipcode'],
+                    cnpj=None
+                )
+
+            if denomination:
+                profile.intended_denomination = denomination
             
             # Salvar dados de endereço do usuário no perfil (se fornecidos)
             if data.get('user_zipcode'):
@@ -492,6 +584,12 @@ def finalize_registration(request):
                     'avatar': profile.avatar.url if profile.avatar else None,
                 }
             }
+
+            if profile.intended_denomination:
+                user_data['intended_denomination'] = {
+                    'id': profile.intended_denomination.id,
+                    'name': profile.intended_denomination.name
+                }
             
             return Response({
                 'token': token.key,

@@ -244,6 +244,32 @@ class ChurchUserManager(models.Manager):
         except Exception:
             return None
 
+    def get_active_branch_for_user(self, user):
+        """Retorna a filial ativa (se configurada) para um usuário"""
+        try:
+            active_church_user = self.get_queryset().filter(
+                user=user,
+                is_active=True,
+                is_user_active_church=True
+            ).select_related('active_branch').first()
+
+            if active_church_user and active_church_user.active_branch:
+                return active_church_user.active_branch
+
+            # Fallback: primeira filial ativa atribuída ao usuário
+            fallback = self.get_queryset().filter(
+                user=user,
+                is_active=True
+            ).select_related('active_branch').first()
+
+            if fallback and fallback.active_branch:
+                return fallback.active_branch
+
+        except Exception:
+            pass
+
+        return None
+
 
 class UserProfile(BaseModel):
     """
@@ -528,6 +554,16 @@ class ChurchUser(BaseModel):
         verbose_name="Filiais Gerenciadas",
         help_text="Filiais específicas que este usuário pode gerenciar"
     )
+
+    active_branch = models.ForeignKey(
+        'branches.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='active_users',
+        verbose_name="Filial Ativa",
+        help_text="Filial padrão utilizada nas operações do usuário"
+    )
     
     # Data de ingresso na igreja
     joined_at = models.DateTimeField(
@@ -593,6 +629,10 @@ class ChurchUser(BaseModel):
                 user=self.user, 
                 is_user_active_church=True
             ).exclude(pk=self.pk).update(is_user_active_church=False)
+
+        # Garantir coerência entre active_branch e church
+        if self.active_branch and self.active_branch.church_id != self.church_id:
+            raise ValidationError("A filial ativa precisa pertencer à mesma igreja.")
         
         super().save(*args, **kwargs)
     
@@ -705,6 +745,11 @@ class ChurchUser(BaseModel):
         """Verifica se o usuário tem uma permissão específica"""
         return getattr(self, f'can_{permission_name}', False)
     
+    @property
+    def branch(self):
+        """Compatibilidade legada: retorna a filial ativa"""
+        return self.active_branch
+
     @property
     def is_admin(self):
         """Verifica se o usuário é administrador"""

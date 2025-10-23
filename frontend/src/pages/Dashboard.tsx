@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useMainDashboard } from '@/hooks/useDashboard';
 import { useActivities } from '@/hooks/useActivities';
+import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { api } from '@/config/api';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
@@ -31,6 +32,7 @@ const Dashboard = () => {
     const { data: activities = [], isLoading: activitiesLoading } = useActivities({});
     const [showConvertModal, setShowConvertModal] = useState(false);
     const [shouldShowConvertButton, setShouldShowConvertButton] = useState(false);
+    const activeChurchInfo = useCurrentActiveChurch();
     
     // Verificar se o usuário é Church Admin
     const isChurchAdmin = userChurch?.user_role === 'church_admin' || userChurch?.role === 'CHURCH_ADMIN';
@@ -126,7 +128,7 @@ const Dashboard = () => {
                         Dashboard
                     </h1>
                     <p className="text-gray-600 mt-1">
-                        Bem-vindo, {user?.full_name?.split(' ')[0] || 'admin'}! Aqui está o resumo da sua igreja.
+                        Bem-vindo, {user?.full_name?.split(' ')[0] || 'admin'}! {activeChurchInfo ? `Você está visualizando a igreja ${activeChurchInfo.short_name || activeChurchInfo.name}${activeChurchInfo.active_branch ? ` • Filial ${activeChurchInfo.active_branch.name}` : ''}.` : 'Aqui está o resumo da sua igreja.'}
                     </p>
                 </div>
 

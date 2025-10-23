@@ -7,6 +7,7 @@ import { MembersTable } from '@/components/members/MembersTable';
 import { MembersFilters } from '@/components/members/MembersFilters';
 import { Button } from '@/components/ui/button';
 import { useMembers } from '@/hooks/useMembers';
+import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 import {
@@ -23,6 +24,7 @@ import {
 const Membros: React.FC = () => {
   const navigate = useNavigate();
   const permissions = usePermissions();
+  const activeChurch = useCurrentActiveChurch();
   
   console.log('🔍 Membros - Permissões do usuário:', permissions);
   console.log('🔍 Membros - canCreateMembers:', permissions.canCreateMembers);
@@ -88,6 +90,11 @@ const Membros: React.FC = () => {
             <p className="text-gray-600 mt-1">
               Gerencie os membros da sua igreja
             </p>
+            {activeChurch?.active_branch && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Filial ativa: <span className="font-medium">{activeChurch.active_branch.name}</span>
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             {(permissions.canCreateMembers || process.env.NODE_ENV === 'development') && (

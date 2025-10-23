@@ -6,15 +6,23 @@ import { VisitorForm, VisitorFormData } from '@/components/visitors/VisitorForm'
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { createVisitor } from '@/services/visitorsService';
+import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 
 const NovoVisitante: React.FC = () => {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+  const activeChurch = useCurrentActiveChurch();
 
   const handleSubmit = async (data: VisitorFormData) => {
     try {
+      const branchId = activeChurch?.active_branch?.id;
+      if (!branchId) {
+        toast.error('Defina uma filial ativa antes de cadastrar visitantes.');
+        return;
+      }
+
       setSaving(true);
-      const visitor = await createVisitor(data);
+      const visitor = await createVisitor({ ...data, branch: branchId });
       toast.success('Visitante cadastrado com sucesso!');
       navigate(`/visitantes/${visitor.id}`);
     } catch (error) {

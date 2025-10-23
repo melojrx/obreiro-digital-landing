@@ -8,6 +8,7 @@ import { getAddressByCEP, CEPAddress, APIError } from '@/services/utils';
 const CadastroEtapa2 = () => {
   const [formData, setFormData] = useState({
     denomination_id: '',
+    denomination_other_name: '',
     user_zipcode: '',
     user_address: '',
     user_city: '',
@@ -61,6 +62,7 @@ const CadastroEtapa2 = () => {
       setFormData(prev => ({
         ...prev,
         denomination_id: source.denomination_id?.toString() || source.denomination_id || '',
+        denomination_other_name: source.denomination_other_name || '',
         user_zipcode: source.user_zipcode || source.church_zipcode || '',
         user_address: source.user_address || source.church_address || '',
         user_city: source.user_city || source.church_city || '',
@@ -98,14 +100,25 @@ const CadastroEtapa2 = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [name]: value
+      };
+
+      if (name === 'denomination_id' && value !== 'outros' && prev.denomination_other_name) {
+        updated.denomination_other_name = '';
+      }
+
+      return updated;
+    });
 
     // Persistir snapshot local da etapa 2
     try {
       const snapshot = { ...formData, [name]: value };
+      if (name === 'denomination_id' && value !== 'outros') {
+        snapshot.denomination_other_name = '';
+      }
       localStorage.setItem('registration_step2_data', JSON.stringify(snapshot));
     } catch {}
     
@@ -123,6 +136,8 @@ const CadastroEtapa2 = () => {
 
     if (!formData.denomination_id) {
       newErrors.denomination_id = 'Denominação é obrigatória';
+    } else if (formData.denomination_id === 'outros' && !formData.denomination_other_name.trim()) {
+      newErrors.denomination_other_name = 'Informe o nome da denominação';
     }
 
     if (!formData.user_zipcode) {
@@ -233,8 +248,16 @@ const CadastroEtapa2 = () => {
 
     console.log('✅ Validação passou!');
 
+    const denominationIdValue = formData.denomination_id;
+    // Preservar 'outros' como string para a etapa 3 validar corretamente
+    const normalizedDenominationId =
+      denominationIdValue && /^\d+$/.test(denominationIdValue)
+        ? parseInt(denominationIdValue, 10)
+        : denominationIdValue || undefined;
+
     const profileData = {
-      denomination_id: formData.denomination_id ? parseInt(formData.denomination_id) : undefined,
+      denomination_id: normalizedDenominationId as any,
+      denomination_other_name: formData.denomination_other_name || undefined,
       user_zipcode: formData.user_zipcode || undefined,
       user_address: formData.user_address,
       user_city: formData.user_city || undefined,
@@ -434,6 +457,28 @@ const CadastroEtapa2 = () => {
                 <p className="mt-1 text-sm text-red-600">{errors.denomination_id}</p>
               )}
             </div>
+
+            {formData.denomination_id === 'outros' && (
+              <div>
+                <label htmlFor="denomination_other_name" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Nome da denominação*
+                </label>
+                <input
+                  id="denomination_other_name"
+                  name="denomination_other_name"
+                  type="text"
+                  value={formData.denomination_other_name}
+                  onChange={handleInputChange}
+                  className={`block w-full px-3 py-3 border rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 bg-white/70 ${
+                    errors.denomination_other_name ? 'border-red-300' : 'border-gray-200'
+                  }`}
+                  placeholder="Informe o nome completo da denominação"
+                />
+                {errors.denomination_other_name && (
+                  <p className="mt-1 text-sm text-red-600">{errors.denomination_other_name}</p>
+                )}
+              </div>
+            )}
 
             {/* Divider */}
             <div className="border-t border-slate-200 my-6">

@@ -184,7 +184,7 @@ class BranchViewSet(viewsets.ModelViewSet):
             'can_create': True,
             'remaining_slots': None,
             'max_allowed': None,
-            'current_count': church.branches.filter(is_active=True, is_headquarters=False).count(),
+            'current_count': church.branches.filter(is_active=True, is_main=False).count(),
             'subscription_plan': church.subscription_plan,
             'subscription_plan_display': church.get_subscription_plan_display(),
             'message': None,

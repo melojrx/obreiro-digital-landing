@@ -22,7 +22,7 @@ export const useMainDashboard = () => {
   const activeChurch = useCurrentActiveChurch();
 
   return useQuery({
-    queryKey: [...DASHBOARD_QUERY_KEYS.mainDashboard(), activeChurch?.id],
+    queryKey: [...DASHBOARD_QUERY_KEYS.mainDashboard(), activeChurch?.id, activeChurch?.active_branch?.id],
     queryFn: async () => {
       const response = await api.get<DashboardData>('/churches/main-dashboard/');
       return response.data;
