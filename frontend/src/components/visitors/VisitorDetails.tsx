@@ -152,8 +152,11 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
                         className="w-full border rounded-md px-3 py-2 text-sm"
                         placeholder="(00) 00000-0000"
                         value={convertPhone}
-                        onChange={(e) => setConvertPhone(e.target.value)}
+                        onChange={(e) => setConvertPhone(formatPhone(e.target.value))}
                       />
+                      {!phoneValid && (
+                        <p className="mt-1 text-xs text-red-600">Formato inválido. Ex: (85) 98765-4321</p>
+                      )}
                     </div>
                   )}
                   {!visitor.birth_date && (
@@ -167,6 +170,9 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
                         value={convertBirthDate}
                         onChange={(e) => setConvertBirthDate(e.target.value)}
                       />
+                      {!birthValid && (
+                        <p className="mt-1 text-xs text-red-600">Informe a data de nascimento.</p>
+                      )}
                     </div>
                   )}
                   <div>
@@ -191,6 +197,7 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
                       handleConvert();
                     }} 
                     className="bg-green-600 hover:bg-green-700"
+                    disabled={(!phoneValid) || (!birthValid)}
                   >
                     Converter em Membro
                   </Button>
@@ -514,3 +521,16 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
     </div>
   );
 };
+  // Helpers de formatação/validação de telefone (Brasil)
+  const formatPhone = (value: string): string => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 6) return numbers.replace(/(\d{2})(\d{0,4})/, '($1) $2');
+    if (numbers.length <= 10) return numbers.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    return numbers.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+  };
+  const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+  const phoneRequired = !visitor.phone;
+  const phoneValid = !phoneRequired || (convertPhone && phoneRegex.test(convertPhone));
+  const birthRequired = !visitor.birth_date;
+  const birthValid = !birthRequired || !!convertBirthDate;
