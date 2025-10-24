@@ -33,7 +33,7 @@ interface VisitorDetailsProps {
   onEdit: () => void;
   onDelete: () => void;
   onBack: () => void;
-  onConvertToMember: (notes?: string) => void;
+  onConvertToMember: (payload?: { conversion_notes?: string; birth_date?: string; phone?: string }) => void;
   onUpdateFollowUp: (status: string, notes?: string) => void;
   canEdit: boolean;
   canDelete: boolean;
@@ -52,6 +52,8 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
   canConvert,
 }) => {
   const [conversionNotes, setConversionNotes] = useState('');
+  const [convertPhone, setConvertPhone] = useState('');
+  const [convertBirthDate, setConvertBirthDate] = useState('');
   const [followUpNotes, setFollowUpNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [showConvertDialog, setShowConvertDialog] = useState(false);
@@ -59,9 +61,16 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
   const [isUpdatingFollowUp, setIsUpdatingFollowUp] = useState(false);
 
   const handleConvert = () => {
-    onConvertToMember(conversionNotes);
+    const payload: { conversion_notes?: string; birth_date?: string; phone?: string } = {
+      conversion_notes: conversionNotes || ''
+    };
+    if (!visitor.phone && convertPhone) payload.phone = convertPhone;
+    if (!visitor.birth_date && convertBirthDate) payload.birth_date = convertBirthDate;
+    onConvertToMember(payload);
     setShowConvertDialog(false);
     setConversionNotes('');
+    setConvertPhone('');
+    setConvertBirthDate('');
   };
 
   const handleFollowUp = async () => {
@@ -135,6 +144,31 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+                  {!visitor.phone && (
+                    <div>
+                      <Label htmlFor="convert-phone">Telefone do membro (obrigatório)</Label>
+                      <input
+                        id="convert-phone"
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        placeholder="(00) 00000-0000"
+                        value={convertPhone}
+                        onChange={(e) => setConvertPhone(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {!visitor.birth_date && (
+                    <div>
+                      <Label htmlFor="convert-birth">Data de Nascimento (obrigatória)</Label>
+                      <input
+                        id="convert-birth"
+                        type="date"
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        max={new Date().toISOString().split('T')[0]}
+                        value={convertBirthDate}
+                        onChange={(e) => setConvertBirthDate(e.target.value)}
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="conversion-notes">Notas da conversão (opcional)</Label>
                     <Textarea

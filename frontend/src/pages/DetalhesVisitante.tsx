@@ -70,11 +70,11 @@ const DetalhesVisitante: React.FC = () => {
     }
   };
 
-  const handleConvertToMember = async (notes?: string) => {
+  const handleConvertToMember = async (payload?: { conversion_notes?: string; birth_date?: string; phone?: string }) => {
     if (!id || !visitor) return;
 
     try {
-      const result = await convertVisitorToMember(Number(id), notes);
+      const result = await convertVisitorToMember(Number(id), payload);
       toast.success(result.message);
       
       // Recarregar dados do visitante

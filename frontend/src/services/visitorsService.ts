@@ -325,12 +325,22 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
  * Converte visitante em membro
  */
 export const convertVisitorToMember = async (
-  id: number, 
-  notes?: string
-): Promise<{ success: boolean; message: string; member_id?: number }> => {
-  const response = await api.patch(API_ENDPOINTS.visitors.convertToMember(id), {
-    conversion_notes: notes || ''
-  });
+  id: number,
+  data?: { conversion_notes?: string; birth_date?: string; phone?: string; gender?: string; marital_status?: string } | string
+): Promise<{ success: boolean; message: string; member_id?: number; member_name?: string }> => {
+  let payload: any = {};
+  if (typeof data === 'string' || data === undefined) {
+    payload = { conversion_notes: data || '' };
+  } else {
+    payload = {
+      conversion_notes: data.conversion_notes || '',
+    };
+    if (data.birth_date) payload.birth_date = data.birth_date; // YYYY-MM-DD
+    if (data.phone) payload.phone = data.phone;
+    if (data.gender) payload.gender = data.gender;
+    if (data.marital_status) payload.marital_status = data.marital_status;
+  }
+  const response = await api.patch(API_ENDPOINTS.visitors.convertToMember(id), payload);
   return response.data;
 };
 
