@@ -519,6 +519,7 @@ class MemberViewSet(viewsets.ModelViewSet):
                 request.user.phone = formatted_phone
                 user_update_fields.add('phone')
 
+        formatted_cpf = None  # garantir definição para evitar UnboundLocalError
         cpf_input = request.data.get('cpf')
         if cpf_input:
             cpf_digits = ''.join(filter(str.isdigit, str(cpf_input)))
@@ -550,7 +551,7 @@ class MemberViewSet(viewsets.ModelViewSet):
                 {'error': 'CPF já cadastrado nesta denominação.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        if formatted_cpf != getattr(user_profile, 'cpf', None):
+        if formatted_cpf and formatted_cpf != getattr(user_profile, 'cpf', None):
             user_profile.cpf = formatted_cpf
             profile_update_fields.add('cpf')
 
@@ -686,8 +687,18 @@ class MemberViewSet(viewsets.ModelViewSet):
             )
 
         # Dados do membro: puxar tudo automaticamente do perfil
+        # Determinar filial para vincular o membro (preferir filial ativa do usuário; senão matriz)
+        active_branch = ChurchUser.objects.get_active_branch_for_user(request.user)
+        if not active_branch:
+            try:
+                from apps.branches.models import Branch
+                active_branch = Branch.objects.filter(church=active_church, is_main=True).first()
+            except Exception:
+                active_branch = None
+
         member_data = {
             'church': active_church.id,
+            'branch': active_branch.id if active_branch else None,
             'user': request.user.id,
             'full_name': request.user.full_name,
             'email': request.user.email,
@@ -728,6 +739,18 @@ class MemberViewSet(viewsets.ModelViewSet):
         
         try:
             with transaction.atomic():
+                # Garantir que ChurchUser.active_branch esteja setado (se vazio)
+                try:
+                    church_user = ChurchUser.objects.filter(user=request.user, church=active_church, is_active=True).first()
+                    if church_user and not church_user.active_branch:
+                        if not active_branch:
+                            from apps.branches.models import Branch
+                            active_branch = Branch.objects.filter(church=active_church, is_main=True).first()
+                        if active_branch:
+                            church_user.active_branch = active_branch
+                            church_user.save(update_fields=['active_branch'])
+                except Exception:
+                    pass
                 # Criar o registro de membro
                 member = serializer.save()
                 

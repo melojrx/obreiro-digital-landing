@@ -58,7 +58,13 @@ export function ConvertAdminToMemberModal({
   isOpen,
   onClose,
 }: ConvertAdminToMemberModalProps) {
-  const { user, refreshUserData } = useAuth();
+  const { user, refreshUserData, userChurch } = useAuth();
+  const branchName = useMemo(() => {
+    const b = userChurch?.active_branch;
+    const church = userChurch?.name || '';
+    // fallback: Matriz
+    return b?.name || (church ? `${church} - Matriz` : 'Matriz');
+  }, [userChurch]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -285,6 +291,11 @@ export function ConvertAdminToMemberModal({
           <DialogDescription>
             Você está prestes a criar seu registro como membro da igreja. 
             Seus dados pessoais do perfil serão utilizados automaticamente.
+            <br />
+            <span className="text-slate-700">
+              Vínculo: sua filiação será associada à filial <span className="font-semibold">{branchName}</span>.
+              Caso nenhuma filial ativa esteja configurada, utilizaremos a Matriz.
+            </span>
           </DialogDescription>
         </DialogHeader>
 

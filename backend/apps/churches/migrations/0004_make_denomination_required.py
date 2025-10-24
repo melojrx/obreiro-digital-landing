@@ -45,6 +45,10 @@ class Migration(migrations.Migration):
         ('churches', '0003_add_qr_code_to_church'),
     ]
 
+    # Importante: desabilitar atomicidade para evitar o erro de
+    # "pending trigger events" ao alternar FK após inserts na mesma transação
+    atomic = False
+
     operations = [
         migrations.RunPython(backfill_church_denomination, migrations.RunPython.noop),
         migrations.AlterField(
@@ -59,4 +63,3 @@ class Migration(migrations.Migration):
             ),
         ),
     ]
-
