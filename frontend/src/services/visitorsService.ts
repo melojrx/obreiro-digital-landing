@@ -257,7 +257,20 @@ export const createVisitor = async (visitorData: Partial<Visitor>): Promise<Visi
  * Atualiza dados de um visitante
  */
 export const updateVisitor = async (id: number, visitorData: Partial<Visitor>): Promise<Visitor> => {
-  const response = await api.patch(API_ENDPOINTS.visitors.update(id), visitorData);
+  // Normalizar payload para evitar 400 por campos em branco
+  const cleanedData: any = { ...visitorData };
+  if (cleanedData.birth_date === '') cleanedData.birth_date = null;
+  // Strings opcionais devem ir como string vazia
+  const stringFields = [
+    'cpf', 'email', 'phone', 'city', 'state', 'address', 'neighborhood',
+    'zipcode', 'ministry_interest', 'observations'
+  ];
+  stringFields.forEach((field) => {
+    if (cleanedData[field] === undefined || cleanedData[field] === null) return;
+    if (typeof cleanedData[field] !== 'string') return;
+    // manter string vazia quando vier vazia; trim não obrigatório para não alterar intenção
+  });
+  const response = await api.patch(API_ENDPOINTS.visitors.update(id), cleanedData);
   return response.data;
 };
 

@@ -311,6 +311,7 @@ class Visitor(BaseModel):
         # PREPARAR DADOS COM LIMPEZA ADEQUADA
         member_data = {
             'church': self.church,
+            'branch': self.branch,
             'full_name': self.full_name.strip(),
             'birth_date': self.birth_date,
             'marital_status': self.marital_status or 'single',
