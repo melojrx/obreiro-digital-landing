@@ -428,7 +428,9 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-500">Fonte do cadastro</label>
-                <p className="mt-1 capitalize">{visitor.registration_source.replace('_', ' ')}</p>
+                <p className="mt-1 capitalize">
+                  {((visitor.registration_source || 'indefinido') + '').replace(/_/g, ' ')}
+                </p>
               </div>
 
               <div>
