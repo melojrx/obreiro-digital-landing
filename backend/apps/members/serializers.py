@@ -238,6 +238,10 @@ class MemberCreateSerializer(serializers.ModelSerializer):
 
         if church and value.church_id != church.id:
             raise serializers.ValidationError("A filial selecionada não pertence à sua igreja ativa.")
+        # Secretary write guard
+        if request and request.method in ('POST', 'PUT', 'PATCH'):
+            if not self._user_can_write_branch(request.user, value):
+                raise serializers.ValidationError("Sem permissão para escrever nesta filial.")
         return value
 
     def __init__(self, *args, **kwargs):
@@ -248,6 +252,24 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             church = ChurchUser.objects.get_active_church_for_user(request.user)
             if church:
                 self.fields['branch'].queryset = Branch.objects.filter(church=church, is_active=True)
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch or not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(branch.church):
+                    return True
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
     
     def validate_phone(self, value):
         """Validação de telefone"""
@@ -495,7 +517,7 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_branch(self, value):
-        """Validação da filial na atualização"""
+        """Validação da filial na atualização + permissão branch-aware"""
         if not value:
             return value
 
@@ -508,7 +530,30 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
 
         if church and value.church_id != church.id:
             raise serializers.ValidationError("A filial selecionada não pertence à mesma igreja.")
+
+        request = self.context.get('request')
+        if request and request.method in ('PUT', 'PATCH'):
+            if not self._user_can_write_branch(request.user, value):
+                raise serializers.ValidationError("Sem permissão para editar membro nesta filial.")
         return value
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch or not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(branch.church):
+                    return True
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
     
     def validate_email(self, value):
         """Validação de email na atualização"""
@@ -647,6 +692,12 @@ class MembershipStatusSerializer(serializers.ModelSerializer):
             member = attrs.get('member') or getattr(self.instance, 'member', None)
             if member and getattr(member, 'branch', None):
                 attrs['branch'] = member.branch
+        
+        # Coerência church ↔ branch do status
+        member = attrs.get('member') or getattr(self.instance, 'member', None)
+        branch = attrs.get('branch') or getattr(self.instance, 'branch', None)
+        if member and branch and member.church_id != branch.church_id:
+            raise serializers.ValidationError({'branch': 'Filial do status deve pertencer à mesma igreja do membro.'})
 
         # Validar unicidade de status atual (sem end_date)
         if not attrs.get('end_date'):
@@ -661,7 +712,31 @@ class MembershipStatusSerializer(serializers.ModelSerializer):
                         "Já existe um status atual para este membro. Finalize o status atual antes de criar outro."
                     )
 
+        # Secretary branch-aware para escrita
+        request = self.context.get('request')
+        if request and request.method in ('POST', 'PUT', 'PATCH') and branch:
+            if not self._user_can_write_branch(request.user, branch):
+                raise serializers.ValidationError({'branch': 'Sem permissão para alterar status nesta filial.'})
+
         return attrs
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch or not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(branch.church):
+                    return True
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
 
 
 class MinisterialFunctionHistorySerializer(serializers.ModelSerializer):

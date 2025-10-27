@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMainDashboard } from '@/hooks/useDashboard';
 import { useActivities } from '@/hooks/useActivities';
 import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
+import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/config/api';
 import { membersService } from '@/services/membersService';
 import AppLayout from '@/components/layout/AppLayout';
@@ -36,6 +37,7 @@ const Dashboard = () => {
     const [showTransferCard, setShowTransferCard] = useState(false);
     const [transferring, setTransferring] = useState(false);
     const activeChurchInfo = useCurrentActiveChurch();
+    const permissions = usePermissions();
     
     // Verificar se o usuário é Church Admin
     const isChurchAdmin = userChurch?.user_role === 'church_admin' || userChurch?.role === 'CHURCH_ADMIN';
@@ -131,7 +133,7 @@ const Dashboard = () => {
                         Dashboard
                     </h1>
                     <p className="text-gray-600 mt-1">
-                        Bem-vindo, {user?.full_name?.split(' ')[0] || 'admin'}! {activeChurchInfo ? `Você está visualizando a igreja ${activeChurchInfo.short_name || activeChurchInfo.name}${activeChurchInfo.active_branch ? ` • Filial ${activeChurchInfo.active_branch.name}` : ''}.` : 'Aqui está o resumo da sua igreja.'}
+                        Bem-vindo, {user?.full_name?.split(' ')[0] || 'admin'}! {activeChurchInfo ? `Você está visualizando a igreja ${activeChurchInfo.short_name || activeChurchInfo.name}.` : 'Aqui está o resumo da sua igreja.'}
                     </p>
                 </div>
 
@@ -202,7 +204,7 @@ const Dashboard = () => {
                     </div>
                     <div className="lg:col-span-1 space-y-6 lg:space-y-8">
                         <QuickActions />
-                        <RecentVisitors />
+                        {permissions.canViewVisitors && <RecentVisitors />}
                         <RecentActivities />
                     </div>
                 </div>

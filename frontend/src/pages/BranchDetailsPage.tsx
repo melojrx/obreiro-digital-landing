@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { buildMediaUrl, SERVER_BASE_URL } from '@/config/api';
 import { QrCode, Download, ExternalLink, RotateCcw, Copy } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const BranchDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -61,6 +62,7 @@ const BranchDetailsPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [visitorStats, setVisitorStats] = useState<any>(null);
+  const permissions = usePermissions();
 
   const loadBranch = useCallback(async () => {
     if (!id || isNaN(Number(id))) {
@@ -223,32 +225,40 @@ const BranchDetailsPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleEdit}>
-              <Edit className="h-4 w-4 mr-2" /> Editar
-            </Button>
+            {permissions.canManageBranches || permissions.canManageChurch ? (
+              <Button variant="outline" size="sm" onClick={handleEdit}>
+                <Edit className="h-4 w-4 mr-2" /> Editar
+              </Button>
+            ) : null}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleToggleQR}>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  {branch.qr_code_active ? 'Desativar QR' : 'Ativar QR'}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleRegenerateQR}>
-                  <History className="h-4 w-4 mr-2" /> Regenerar QR
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600" onClick={() => setConfirmDelete(true)}>
-                  <AlertCircle className="h-4 w-4 mr-2" /> Excluir
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {(permissions.canManageBranches || permissions.canManageChurch) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleToggleQR}>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {branch.qr_code_active ? 'Desativar QR' : 'Ativar QR'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleRegenerateQR}>
+                    <History className="h-4 w-4 mr-2" /> Regenerar QR
+                  </DropdownMenuItem>
+                  {permissions.canManageChurch && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-red-600" onClick={() => setConfirmDelete(true)}>
+                        <AlertCircle className="h-4 w-4 mr-2" /> Excluir
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
 
@@ -404,7 +414,7 @@ const BranchDetailsPage: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">QR Code Ativo</Label>
-                <Switch checked={!!branch.qr_code_active} onCheckedChange={handleToggleQR} />
+                <Switch checked={!!branch.qr_code_active} onCheckedChange={handleToggleQR} disabled={!(permissions.canManageBranches || permissions.canManageChurch)} />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -421,6 +431,7 @@ const BranchDetailsPage: React.FC = () => {
                 size="sm"
                 onClick={handleRegenerateQR}
                 className="w-full text-orange-600 border-orange-200 hover:bg-orange-50"
+                disabled={!(permissions.canManageBranches || permissions.canManageChurch)}
               >
                 <RotateCcw className="h-4 w-4 mr-1" /> Regenerar QR Code
               </Button>

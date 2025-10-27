@@ -5,9 +5,11 @@ import AppLayout from '@/components/layout/AppLayout';
 import { MemberForm } from '@/components/members/MemberForm';
 import { membersService, CreateMemberData } from '@/services/membersService';
 import { toast } from 'sonner';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const NovoMembro: React.FC = () => {
   const navigate = useNavigate();
+  const permissions = usePermissions();
 
   const handleSubmit = async (data: CreateMemberData) => {
     try {
@@ -57,11 +59,21 @@ const NovoMembro: React.FC = () => {
 
   return (
     <AppLayout>
-      <MemberForm
-        title="Novo Membro"
-        onSubmit={handleSubmit}
-        onCancel={handleCancel}
-      />
+      {!permissions.canCreateMembers ? (
+        <div className="p-6">
+          <h2 className="text-lg font-semibold">Acesso negado</h2>
+          <p className="text-sm text-gray-600">Você não tem permissão para cadastrar membros.</p>
+          <div className="mt-4">
+            <button className="text-blue-600" onClick={handleCancel}>Voltar</button>
+          </div>
+        </div>
+      ) : (
+        <MemberForm
+          title="Novo Membro"
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+        />
+      )}
     </AppLayout>
   );
 };

@@ -6,6 +6,7 @@ import { VisitorForm, VisitorFormData } from '@/components/visitors/VisitorForm'
 import { getVisitor, updateVisitor, type Visitor } from '@/services/visitorsService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const EditarVisitante: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,7 @@ const EditarVisitante: React.FC = () => {
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const permissions = usePermissions();
 
   useEffect(() => {
     const loadVisitor = async () => {
@@ -90,6 +92,17 @@ const EditarVisitante: React.FC = () => {
 
   return (
     <AppLayout>
+      {!permissions.canEditVisitors ? (
+        <div className="p-6">
+          <h2 className="text-lg font-semibold">Acesso negado</h2>
+          <p className="text-sm text-gray-600">Você não tem permissão para editar visitantes.</p>
+          <div className="mt-4">
+            <Button variant="outline" onClick={() => navigate(`/visitantes/${id}`)}>
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+            </Button>
+          </div>
+        </div>
+      ) : (
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -119,6 +132,7 @@ const EditarVisitante: React.FC = () => {
           />
         </div>
       </div>
+      )}
     </AppLayout>
   );
 };

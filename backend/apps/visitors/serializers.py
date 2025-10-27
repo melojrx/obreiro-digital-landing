@@ -96,6 +96,26 @@ class VisitorSerializer(serializers.ModelSerializer):
             if church:
                 self.fields['branch'].queryset = Branch.objects.filter(church=church, is_active=True)
 
+    def _user_can_write_branch(self, user, branch):
+        if not branch or not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            # ChurchAdmin (igreja/denom)
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(branch.church):
+                    return True
+            # Secretary/gestor com permissão de membros
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
+
     def validate(self, attrs):
         if not attrs and not self.partial:
             raise serializers.ValidationError("Nenhum dado foi enviado para atualização")
@@ -123,6 +143,10 @@ class VisitorSerializer(serializers.ModelSerializer):
                 church = ChurchUser.objects.get_active_church_for_user(request.user)
             if church and branch.church_id != church.id:
                 raise serializers.ValidationError({'branch': 'Filial selecionada não pertence à igreja ativa.'})
+            # Secretary write guard
+            if request and request.method in ('POST', 'PUT', 'PATCH'):
+                if not self._user_can_write_branch(request.user, branch):
+                    raise serializers.ValidationError({'branch': 'Sem permissão para escrever nesta filial.'})
             attrs['church'] = branch.church
         return attrs
     

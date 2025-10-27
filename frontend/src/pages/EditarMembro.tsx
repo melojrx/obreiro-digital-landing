@@ -4,6 +4,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import { MemberForm } from '@/components/members/MemberForm';
 import { membersService, CreateMemberData, Member } from '@/services/membersService';
 import { toast } from 'sonner';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const EditarMembro: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -11,6 +12,7 @@ const EditarMembro: React.FC = () => {
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const permissions = usePermissions();
 
   useEffect(() => {
     const loadMember = async () => {
@@ -84,13 +86,23 @@ const EditarMembro: React.FC = () => {
 
   return (
     <AppLayout>
-      <MemberForm
-        member={member}
-        title={`Editar Membro - ${member.full_name}`}
-        onSubmit={handleSubmit}
-        onCancel={handleCancel}
-        isLoading={saving}
-      />
+      {!permissions.canEditMembers ? (
+        <div className="p-6">
+          <h2 className="text-lg font-semibold">Acesso negado</h2>
+          <p className="text-sm text-gray-600">Você não tem permissão para editar membros.</p>
+          <div className="mt-4">
+            <button className="text-blue-600" onClick={handleCancel}>Voltar</button>
+          </div>
+        </div>
+      ) : (
+        <MemberForm
+          member={member}
+          title={`Editar Membro - ${member.full_name}`}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+          isLoading={saving}
+        />
+      )}
     </AppLayout>
   );
 };

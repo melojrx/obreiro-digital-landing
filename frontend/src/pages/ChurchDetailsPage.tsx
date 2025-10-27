@@ -941,21 +941,25 @@ const ChurchDetailsPage: React.FC = () => {
                                 <Eye className="h-4 w-4 mr-2" />
                                 Ver detalhes
                               </DropdownMenuItem>
-                              {permissions.canCreateBranches && (
+                              {(permissions.canManageBranches || permissions.canManageChurch) && (
                                 <DropdownMenuItem onClick={() => handleOpenEditBranch(branch)}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Editar
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />
+                              {(permissions.canManageBranches || permissions.canManageChurch) && (
                               <DropdownMenuItem onClick={() => handleToggleQRCode(branch)}>
                                 <UserCheck className="h-4 w-4 mr-2" />
                                 {branch.qr_code_active ? 'Desativar QR' : 'Ativar QR'}
                               </DropdownMenuItem>
+                              )}
+                              {(permissions.canManageBranches || permissions.canManageChurch) && (
                               <DropdownMenuItem onClick={() => handleRegenerateQRCode(branch)}>
                                 <History className="h-4 w-4 mr-2" />
                                 Regenerar QR
                               </DropdownMenuItem>
+                              )}
                               {permissions.canManageChurch && (
                                 <>
                                   <DropdownMenuSeparator />

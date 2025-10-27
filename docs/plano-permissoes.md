@@ -62,25 +62,27 @@ Aceite P2
 - Listagens de Visitors e Members respeitam a hierarquia/branches do usuário logado sem duplicar regras. Branches mantém escopo atual (mais amplo) até etapa de refino.
 
 Fase P3 — Validações de coerência (serializers)
-- MembersSerializer/VisitorsSerializer
-  - Validar: `branch.church == church` no payload (quando ambos existirem).
-  - Validar: `SECRETARY` só pode enviar `branch` dentro de `managed_branches`.
-  - Rejeitar update que tente mover objetos para branch de outra igreja.
-- MembershipStatus
-  - Validar branch do status compatível com `member.branch` (se definido) e com igreja do usuário.
+- VisitorsSerializer
+  - Valida church ↔ branch e bloqueia escrita se usuário não puder escrever na filial.
+- MemberCreate/UpdateSerializer
+  - Valida church ↔ branch e bloqueia escrita se usuário não puder escrever na filial.
+- MembershipStatusSerializer
+  - Valida que branch pertence à mesma igreja do membro; bloqueia escrita se usuário não puder escrever na filial.
 
 Aceite P3
 - Payloads inválidos por church/branch retornam 400 com mensagem clara.
 - SECRETARY não consegue “forçar” branch que não administra.
+- Status de membresia respeita a igreja do membro.
 
 Fase P4 — Frontend (gating e UX)
 - `usePermissions`
-  - Expor granularidades: `canManageBranches`, `canToggleQR`, `canRegenerateQR`, `canDeleteBranch`, `canEditBranch`, `canManageMembers`, `canManageVisitors`.
-  - Mapear para `ChurchUser` (CHURCH_ADMIN tudo true; SECRETARY: false para gestão de branches e QR; true para membros/visitantes nas branches).
-- Componentes atualizados
-  - ChurchDetailsPage → esconder/disable ações de QR/editar/excluir conforme permissões.
-  - BranchDetailsPage → trocar botões por read‑only quando não permitido.
-  - Visitors/Members → formular permissões de criação/edição baseadas na branch ativa/selecionada e nas `managed_branches`.
+  - Mantido mapeamento por role; as ações finas usam canManageBranches/canManageChurch/canManageVisitors/canManageMembers.
+- Componentes atualizados (parcial)
+  - ChurchDetailsPage: QR (toggle/regenerar) e Editar/Excluir agora são exibidos conforme canManageBranches/canManageChurch.
+  - BranchDetailsPage: Switch QR e “Regenerar” desabilitados sem permissão; Editar/Menu Ações condicionais.
+  - Visitantes/Membros: telas de Novo/Editar condicionam renderização conforme canCreate/canEdit.
+- Próximos ajustes (se necessário)
+  - Superfícies adicionais (listas e botões avulsos) revisadas conforme necessidade.
 
 Aceite P4
 - Usuário sem permissão não vê/ou não consegue clicar em ações proibidas.

@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { createVisitor } from '@/services/visitorsService';
 import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const NovoVisitante: React.FC = () => {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const activeChurch = useCurrentActiveChurch();
+  const permissions = usePermissions();
 
   const handleSubmit = async (data: VisitorFormData) => {
     try {
@@ -39,6 +41,17 @@ const NovoVisitante: React.FC = () => {
 
   return (
     <AppLayout>
+      {!permissions.canCreateVisitors ? (
+        <div className="p-6">
+          <h2 className="text-lg font-semibold">Acesso negado</h2>
+          <p className="text-sm text-gray-600">Você não tem permissão para cadastrar visitantes.</p>
+          <div className="mt-4">
+            <Button variant="outline" onClick={() => navigate('/visitantes')}>
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+            </Button>
+          </div>
+        </div>
+      ) : (
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -67,6 +80,7 @@ const NovoVisitante: React.FC = () => {
           />
         </div>
       </div>
+      )}
     </AppLayout>
   );
 };
