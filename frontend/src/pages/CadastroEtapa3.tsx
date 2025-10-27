@@ -6,7 +6,8 @@ import { getSubscriptionPlans, SubscriptionPlan } from '@/services/utils';
 
 // Tipos para os dados, podemos mover para um arquivo de tipos depois
 interface ChurchData {
-  denomination_id?: number;
+  denomination_id?: number | 'outros';
+  denomination_other_name?: string;
   user_zipcode?: string;
   user_address?: string;
   user_city?: string;
@@ -75,7 +76,12 @@ const CadastroEtapa3 = () => {
       return;
     }
     
-    if (!step2Data || !step2Data.denomination_id) {
+    const hasDenomination =
+      step2Data &&
+      (step2Data.denomination_id ||
+        (step2Data.denomination_id === 'outros' && step2Data.denomination_other_name));
+
+    if (!step2Data || !hasDenomination) {
       console.log('❌ CadastroEtapa3: Dados da etapa 2 não encontrados, redirecionando...');
       console.log('📦 step2Data recebido:', step2Data);
       navigate('/cadastro/etapa-2', { 
@@ -136,6 +142,12 @@ const CadastroEtapa3 = () => {
     
     try {
       // Combinar TODOS os dados (pessoais + endereço + plano) para o novo endpoint
+      const denominationIdRaw = step2Data.denomination_id;
+      const denomination_id =
+        typeof denominationIdRaw === 'string' && /^\d+$/.test(denominationIdRaw)
+          ? parseInt(denominationIdRaw, 10)
+          : denominationIdRaw;
+
       const finalRegistrationData = {
         // Dados pessoais (etapa 1)
         email: step1Data.email,
@@ -147,7 +159,8 @@ const CadastroEtapa3 = () => {
         cpf: step1Data.cpf,
         
         // Dados de endereço do usuário (etapa 2)
-        denomination_id: step2Data.denomination_id,
+        denomination_id,
+        denomination_other_name: step2Data.denomination_other_name,
         user_zipcode: step2Data.user_zipcode,
         user_address: step2Data.user_address,
         user_city: step2Data.user_city,

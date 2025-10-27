@@ -52,13 +52,22 @@ type ConvertAdminErrorResponse = {
 interface ConvertAdminToMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // Chamado após conversão bem-sucedida, com o membro criado/vinculado
+  onConverted?: (member: import('@/services/membersService').Member) => void;
 }
 
 export function ConvertAdminToMemberModal({
   isOpen,
   onClose,
+  onConverted,
 }: ConvertAdminToMemberModalProps) {
-  const { user, refreshUserData } = useAuth();
+  const { user, refreshUserData, userChurch } = useAuth();
+  const branchName = useMemo(() => {
+    const b = userChurch?.active_branch;
+    const church = userChurch?.name || '';
+    // fallback: Matriz
+    return b?.name || (church ? `${church} - Matriz` : 'Matriz');
+  }, [userChurch]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -215,6 +224,15 @@ export function ConvertAdminToMemberModal({
         console.error('Erro ao atualizar dados do usuário após conversão:', refreshError);
       }
       
+      // Notificar o pai (ex.: Dashboard) sobre a conversão
+      if (onConverted && response?.member) {
+        try {
+          onConverted(response.member);
+        } catch (cbErr) {
+          console.error('Erro no callback onConverted:', cbErr);
+        }
+      }
+
       reset(defaultValues);
       onClose();
     },
@@ -285,6 +303,11 @@ export function ConvertAdminToMemberModal({
           <DialogDescription>
             Você está prestes a criar seu registro como membro da igreja. 
             Seus dados pessoais do perfil serão utilizados automaticamente.
+            <br />
+            <span className="text-slate-700">
+              Vínculo: sua filiação será associada à filial <span className="font-semibold">{branchName}</span>.
+              Caso nenhuma filial ativa esteja configurada, utilizaremos a Matriz.
+            </span>
           </DialogDescription>
         </DialogHeader>
 

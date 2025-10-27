@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Building2,
@@ -68,6 +68,8 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { translateRole } from '@/utils/roleTranslations';
 import { churchService } from '@/services/churchService';
+import { branchService } from '@/services/branchService';
+import EditBranchModal from '@/components/modals/EditBranchModal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ChurchDetails, ChurchStats, AdminUser, BranchDetails } from '@/types/hierarchy';
 
@@ -104,6 +106,10 @@ const ChurchDetailsPage: React.FC = () => {
   const [isCreateBranchModalOpen, setIsCreateBranchModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isEditBranchModalOpen, setIsEditBranchModalOpen] = useState(false);
+  const [branchToEdit, setBranchToEdit] = useState<BranchDetails | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<BranchDetails | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadChurchData = useCallback(async () => {
     if (!id || isNaN(Number(id))) {
@@ -141,10 +147,11 @@ const ChurchDetailsPage: React.FC = () => {
 
   const loadBranches = useCallback(async () => {
     if (!id) return;
-
     try {
-      const response = await churchService.getChurchBranches(Number(id));
-      setBranches(response);
+      // Usar o endpoint de branches para garantir campos de QR (qr_code_active, etc.)
+      const paginated = await branchService.getBranchesByChurch(Number(id), 1, 100);
+      const items = Array.isArray((paginated as any).results) ? (paginated as any).results : (paginated as any).branches || [];
+      setBranches(items as BranchDetails[]);
     } catch (error) {
       console.error('Erro ao carregar filiais:', error);
     }
@@ -228,6 +235,71 @@ const ChurchDetailsPage: React.FC = () => {
   // Função simplificada que abre o modal
   const handleExportData = () => {
     setIsExportModalOpen(true);
+  };
+
+  const updateBranchInState = (updated: BranchDetails) => {
+    setBranches(prev => prev.map(b => (b.id === updated.id ? { ...b, ...updated } : b)) as BranchDetails[]);
+  };
+
+  const orderedBranches = useMemo(() => {
+    return [...branches].sort((a: any, b: any) => {
+      const aMain = (a as any).is_main || (a as any).is_headquarters ? 1 : 0;
+      const bMain = (b as any).is_main || (b as any).is_headquarters ? 1 : 0;
+      return bMain - aMain;
+    });
+  }, [branches]);
+
+  const handleViewBranch = (b: BranchDetails) => {
+    navigate(`/denominacao/branches/${b.id}`);
+  };
+
+  const handleOpenEditBranch = (b: BranchDetails) => {
+    setBranchToEdit(b);
+    setIsEditBranchModalOpen(true);
+  };
+
+  const handleToggleQRCode = async (b: BranchDetails) => {
+    try {
+      const { data } = await branchService.toggleQRCode(b.id);
+      updateBranchInState(data as unknown as BranchDetails);
+      toast({ title: `QR Code ${data.qr_code_active ? 'ativado' : 'desativado'} com sucesso` });
+    } catch (error) {
+      console.error('Erro ao alternar QR Code:', error);
+      toast({ title: 'Erro ao alternar QR Code', variant: 'destructive' });
+    }
+  };
+
+  const handleRegenerateQRCode = async (b: BranchDetails) => {
+    try {
+      const { data } = await branchService.regenerateQRCode(b.id);
+      updateBranchInState(data as unknown as BranchDetails);
+      toast({ title: 'QR Code regenerado com sucesso' });
+    } catch (error) {
+      console.error('Erro ao regenerar QR Code:', error);
+      toast({ title: 'Erro ao regenerar QR Code', variant: 'destructive' });
+    }
+  };
+
+  const handleRequestDeleteBranch = (b: BranchDetails) => {
+    setBranchToDelete(b);
+  };
+
+  const handleConfirmDeleteBranch = async () => {
+    if (!branchToDelete) return;
+    setIsDeleting(true);
+    try {
+      await branchService.deleteBranch(branchToDelete.id);
+      setBranches(prev => prev.filter(x => x.id !== branchToDelete.id));
+      toast({ title: 'Filial excluída com sucesso' });
+      // Atualiza contadores da igreja
+      loadChurchData();
+    } catch (error) {
+      console.error('Erro ao excluir filial:', error);
+      toast({ title: 'Erro ao excluir filial', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+      setBranchToDelete(null);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -814,37 +886,97 @@ const ChurchDetailsPage: React.FC = () => {
             </div>
 
             {branches.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {branches.map((branch) => (
-                  <Card key={branch.id}>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{branch.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-gray-400" />
-                          <span>{branch.city}, {branch.state}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-gray-400" />
-                          <span>{branch.total_visitors} membros</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <UserCheck className="h-4 w-4 text-gray-400" />
-                          <span>{branch.total_visitors} visitantes</span>
-                        </div>
-                        {branch.pastor && (
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-gray-400" />
-                            <span>{branch.pastor.full_name}</span>
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Filial</TableHead>
+                      <TableHead>Localização</TableHead>
+                      <TableHead>QRCode</TableHead>
+                      <TableHead>Criada em</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orderedBranches.map((branch) => (
+                      <TableRow key={branch.id}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium flex items-center gap-2">
+                              {branch.name}
+                              {((branch as any).is_main || (branch as any).is_headquarters) && (
+                                <Badge variant="default">Matriz</Badge>
+                              )}
+                            </span>
+                            {branch.email && (
+                              <span className="text-xs text-muted-foreground">{branch.email}</span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-sm text-gray-700">
+                            <MapPin className="h-4 w-4 text-gray-400" />
+                            <span>{branch.city}, {branch.state}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={branch.qr_code_active ? 'default' : 'secondary'}>
+                            {branch.qr_code_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(branch.created_at).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleViewBranch(branch)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Ver detalhes
+                              </DropdownMenuItem>
+                              {(permissions.canManageBranches || permissions.canManageChurch) && (
+                                <DropdownMenuItem onClick={() => handleOpenEditBranch(branch)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              {(permissions.canManageBranches || permissions.canManageChurch) && (
+                              <DropdownMenuItem onClick={() => handleToggleQRCode(branch)}>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                {branch.qr_code_active ? 'Desativar QR' : 'Ativar QR'}
+                              </DropdownMenuItem>
+                              )}
+                              {(permissions.canManageBranches || permissions.canManageChurch) && (
+                              <DropdownMenuItem onClick={() => handleRegenerateQRCode(branch)}>
+                                <History className="h-4 w-4 mr-2" />
+                                Regenerar QR
+                              </DropdownMenuItem>
+                              )}
+                              {permissions.canManageChurch && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem className="text-red-600" onClick={() => handleRequestDeleteBranch(branch)}>
+                                    <AlertCircle className="h-4 w-4 mr-2" />
+                                    Excluir
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
             ) : (
               <div className="text-center py-8">
                 <Building className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -1029,6 +1161,18 @@ const ChurchDetailsPage: React.FC = () => {
             onSuccess={handleBranchCreated}
           />
 
+          {/* Editar Filial */}
+          <EditBranchModal
+            isOpen={isEditBranchModalOpen}
+            branch={branchToEdit}
+            onClose={() => setIsEditBranchModalOpen(false)}
+            onSuccess={(updated) => {
+              updateBranchInState(updated);
+              // Atualiza métricas da igreja após edição, se necessário
+              loadChurchData();
+            }}
+          />
+
           <ShareChurchModal
             isOpen={isShareModalOpen}
             onClose={() => setIsShareModalOpen(false)}
@@ -1042,6 +1186,26 @@ const ChurchDetailsPage: React.FC = () => {
           />
         </>
       )}
+
+      {/* Confirmação de Exclusão de Filial */}
+      <AlertDialog open={!!branchToDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir filial?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A filial será removida do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBranchToDelete(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteBranch} disabled={isDeleting}>
+              {isDeleting ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };

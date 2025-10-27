@@ -4,6 +4,7 @@ import { api, API_ENDPOINTS } from '@/config/api';
 export interface MembershipStatus {
   id: number;
   member: number;
+  branch?: number | null;
   member_name: string;
   status: string;
   status_display: string;
@@ -65,7 +66,14 @@ export interface Member {
   id: number;
   church: number;
   church_name: string;
+  branch?: number | null;
+  branch_name?: string;
   user?: number;  // ID do usuário vinculado (opcional)
+  // Acesso ao sistema (campos derivados do backend)
+  has_system_access?: boolean;
+  system_user_email?: string | null;
+  system_user_role?: string | null;
+  system_user_role_label?: string | null;
   full_name: string;
   cpf?: string;
   rg?: string;
@@ -90,11 +98,9 @@ export interface Member {
   previous_church?: string;
   transfer_letter: boolean;
   
-  // Campos ministeriais restaurados
+  // Campos ministeriais
   membership_status: string;
-  conversion_date?: string;
   ministerial_function: string;
-  ordination_date?: string;
   
   // Novos campos da estrutura MembershipStatus
   membership_statuses: MembershipStatus[];
@@ -129,6 +135,7 @@ export interface MemberSummary {
   phone?: string;
   age: number;
   church_name: string;
+  branch_name?: string;
   membership_date: string;
   is_active: boolean;
 }
@@ -178,6 +185,10 @@ export interface CreateMembershipStatusData {
   status: string;
   effective_date?: string;
   end_date?: string;
+  // Novos campos compatíveis com o backend
+  ordination_start_date?: string;
+  ordination_end_date?: string;
+  branch?: number;
   reason?: string;
   // Campos de compatibilidade
   termination_date?: string;
@@ -186,6 +197,8 @@ export interface CreateMembershipStatusData {
 
 export interface CreateMemberData {
   church: number;
+  // Associar filial na criação (se ausente, backend tenta usar filial ativa do usuário)
+  branch?: number;
   full_name: string;
   cpf?: string;
   rg?: string;
@@ -208,9 +221,7 @@ export interface CreateMemberData {
   
   // Campos ministeriais restaurados
   membership_status?: string;
-  conversion_date?: string;
   ministerial_function?: string;
-  ordination_date?: string;
   
   profession?: string;
   education_level?: string;
@@ -452,6 +463,42 @@ export const membersService = {
     );
     return response.data;
   },
+
+  // Verificar status de membresia do usuário atual (sem filtrar por filial)
+  async getMyMembershipStatus(): Promise<{
+    church_id: number;
+    is_member: boolean;
+    member_id?: number | null;
+    branch?: { id: number; name: string } | null;
+    active_branch?: { id: number; name: string } | null;
+    can_transfer: boolean;
+    target_branch_id?: number | null;
+  }> {
+    const response = await api.get(API_ENDPOINTS.members.me.status);
+    return response.data;
+  },
+
+  // Transferir lotação do membro do usuário atual para outra filial
+  async transferMyMembership(branchId: number): Promise<{ message: string; member: Member }> {
+    const response = await api.post(API_ENDPOINTS.members.me.transferBranch, {
+      branch_id: branchId,
+    });
+    return response.data;
+  },
+
+  // Transferência assistida de um membro (admin/secretário) para outra filial da mesma igreja
+  async transferBranch(memberId: number, branchId: number): Promise<{ message: string; member: Member }> {
+    const response = await api.post(API_ENDPOINTS.members.transferBranch(memberId), {
+      branch_id: branchId,
+    });
+    return response.data;
+  },
+
+  // Criação de usuário do sistema a partir da edição do membro
+  async createSystemUser(memberId: number, data: { system_role: string; user_email: string; user_password: string }): Promise<{ message: string; member: Member }> {
+    const response = await api.post(API_ENDPOINTS.members.createSystemUser(memberId), data);
+    return response.data;
+  },
 };
 
 // Serviço para MembershipStatus
@@ -482,13 +529,18 @@ export const membershipStatusService = {
   // Criar novo status
   async createStatus(data: CreateMembershipStatusData): Promise<MembershipStatus> {
     console.log('🔍 membershipStatusService.createStatus - Dados enviados:', data);
-    const response = await api.post(API_ENDPOINTS.membershipStatus.create, data);
+    const payload = { ...data } as any;
+    // Compat: se vier termination_date, mapear para end_date se end_date ausente
+    if (payload.termination_date && !payload.end_date) payload.end_date = payload.termination_date;
+    const response = await api.post(API_ENDPOINTS.membershipStatus.create, payload);
     return response.data;
   },
 
   // Atualizar status existente
   async updateStatus(id: number, data: Partial<CreateMembershipStatusData>): Promise<MembershipStatus> {
-    const response = await api.patch(API_ENDPOINTS.membershipStatus.update(id), data);
+    const payload = { ...data } as any;
+    if (payload.termination_date && !payload.end_date) payload.end_date = payload.termination_date;
+    const response = await api.patch(API_ENDPOINTS.membershipStatus.update(id), payload);
     return response.data;
   },
 

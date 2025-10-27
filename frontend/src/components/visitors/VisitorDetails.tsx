@@ -33,7 +33,7 @@ interface VisitorDetailsProps {
   onEdit: () => void;
   onDelete: () => void;
   onBack: () => void;
-  onConvertToMember: (notes?: string) => void;
+  onConvertToMember: (payload?: { conversion_notes?: string; birth_date?: string; phone?: string }) => void;
   onUpdateFollowUp: (status: string, notes?: string) => void;
   canEdit: boolean;
   canDelete: boolean;
@@ -52,16 +52,39 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
   canConvert,
 }) => {
   const [conversionNotes, setConversionNotes] = useState('');
+  const [convertPhone, setConvertPhone] = useState('');
+  const [convertBirthDate, setConvertBirthDate] = useState('');
   const [followUpNotes, setFollowUpNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false);
   const [isUpdatingFollowUp, setIsUpdatingFollowUp] = useState(false);
 
+  // Helpers de formatação/validação de telefone (Brasil)
+  const formatPhone = (value: string): string => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 6) return numbers.replace(/(\d{2})(\d{0,4})/, '($1) $2');
+    if (numbers.length <= 10) return numbers.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    return numbers.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+  };
+  const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+  const phoneRequired = !visitor.phone;
+  const phoneValid = !phoneRequired || (convertPhone && phoneRegex.test(convertPhone));
+  const birthRequired = !visitor.birth_date;
+  const birthValid = !birthRequired || !!convertBirthDate;
+
   const handleConvert = () => {
-    onConvertToMember(conversionNotes);
+    const payload: { conversion_notes?: string; birth_date?: string; phone?: string } = {
+      conversion_notes: conversionNotes || ''
+    };
+    if (!visitor.phone && convertPhone) payload.phone = convertPhone;
+    if (!visitor.birth_date && convertBirthDate) payload.birth_date = convertBirthDate;
+    onConvertToMember(payload);
     setShowConvertDialog(false);
     setConversionNotes('');
+    setConvertPhone('');
+    setConvertBirthDate('');
   };
 
   const handleFollowUp = async () => {
@@ -135,6 +158,37 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+                  {!visitor.phone && (
+                    <div>
+                      <Label htmlFor="convert-phone">Telefone do membro (obrigatório)</Label>
+                      <input
+                        id="convert-phone"
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        placeholder="(00) 00000-0000"
+                        value={convertPhone}
+                        onChange={(e) => setConvertPhone(formatPhone(e.target.value))}
+                      />
+                      {!phoneValid && (
+                        <p className="mt-1 text-xs text-red-600">Formato inválido. Ex: (85) 98765-4321</p>
+                      )}
+                    </div>
+                  )}
+                  {!visitor.birth_date && (
+                    <div>
+                      <Label htmlFor="convert-birth">Data de Nascimento (obrigatória)</Label>
+                      <input
+                        id="convert-birth"
+                        type="date"
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        max={new Date().toISOString().split('T')[0]}
+                        value={convertBirthDate}
+                        onChange={(e) => setConvertBirthDate(e.target.value)}
+                      />
+                      {!birthValid && (
+                        <p className="mt-1 text-xs text-red-600">Informe a data de nascimento.</p>
+                      )}
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="conversion-notes">Notas da conversão (opcional)</Label>
                     <Textarea
@@ -157,6 +211,7 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
                       handleConvert();
                     }} 
                     className="bg-green-600 hover:bg-green-700"
+                    disabled={(!phoneValid) || (!birthValid)}
                   >
                     Converter em Membro
                   </Button>
@@ -428,7 +483,9 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-500">Fonte do cadastro</label>
-                <p className="mt-1 capitalize">{visitor.registration_source.replace('_', ' ')}</p>
+                <p className="mt-1 capitalize">
+                  {((visitor.registration_source || 'indefinido') + '').replace(/_/g, ' ')}
+                </p>
               </div>
 
               <div>

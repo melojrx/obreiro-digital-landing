@@ -6,15 +6,12 @@ import {
   UserPlus, 
   Calendar,
   MessageSquare,
-  FileText,
   Settings,
   LogOut,
   Church,
-  Heart,
   HandHeart,
   Menu,
-  ChevronLeft,
-  TreePine
+  ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/hooks/useSidebar';
@@ -45,46 +42,34 @@ const Sidebar: React.FC = () => {
 
   const navigation: NavItem[] = [
     {
-      title: 'PRINCIPAL',
+      title: 'Menu Principal',
       icon: LayoutDashboard,
       href: '/dashboard',
       children: [
         { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+        // Igrejas (exibido apenas se o usuário tiver permissão para gerenciar)
+        ...(permissions.canCreateChurches ? [
+          { title: 'Igrejas', icon: Church, href: '/denominacao/churches' }
+        ] : []),
         { title: 'Membros', icon: Users, href: '/membros' },
+        { title: 'Ministérios', icon: Church, href: '/ministerios' },
         { title: 'Visitantes', icon: UserPlus, href: '/visitantes' },
         { title: 'Atividades', icon: Calendar, href: '/atividades' },
       ]
     },
-    // Seção hierárquica - Para Church Admins (papel principal do SaaS)
-    // Church Admin pode criar múltiplas igrejas, filiais e gerenciar tudo
-    ...(permissions.canViewHierarchyMenu ? [{
-      title: 'GESTÃO HIERÁRQUICA',
-      icon: TreePine,
-      href: '#',
-      children: [
-        // Gerenciar Igrejas - Church Admin pode criar múltiplas igrejas na denominação
-        ...(permissions.canCreateChurches ? [
-          { title: 'Gerenciar Igrejas', icon: Church, href: '/denominacao/churches' }
-        ] : []),
-        // Ministérios - Para todos que têm acesso à gestão hierárquica
-        { title: 'Ministérios', icon: Church, href: '/ministerios' },
-      ]
-    }] : []),
     {
-      title: 'COMUNICAÇÃO',
+      title: 'Comunicação',
       icon: MessageSquare,
       href: '#',
       children: [
-  { title: 'Pedidos de Oração', icon: HandHeart, href: '/pedidos-oracao' },
+        { title: 'Pedidos de Oração', icon: HandHeart, href: '/pedidos-oracao' },
       ]
     },
     {
-      title: 'ADMINISTRAÇÃO',
+      title: 'Administração',
       icon: Settings,
       href: '#',
       children: [
-        // { title: 'Financeiro', icon: DollarSign, href: '/financeiro' },
-        // { title: 'Relatórios', icon: BarChart3, href: '/relatorios' },
         { title: 'Configurações', icon: Settings, href: '/configuracoes' },
       ]
     }

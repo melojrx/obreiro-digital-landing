@@ -2,13 +2,8 @@
 Churches models - Igreja principal do sistema multi-tenant
 Cada igreja é um tenant independente com seus próprios dados
 """
-
-import qrcode
-import uuid
-from io import BytesIO
 from django.db import models
 from django.conf import settings
-from django.core.files import File
 from django.utils import timezone
 from datetime import timedelta
 from apps.core.models import BaseModel, ActiveManager, TenantManager
@@ -35,9 +30,7 @@ class Church(BaseModel):
         on_delete=models.CASCADE,
         related_name='churches',
         verbose_name="Denominação",
-        blank=True,
-        null=True,
-        help_text="Denominação à qual esta igreja pertence (opcional)"
+        help_text="Denominação à qual esta igreja pertence"
     )
     
     # Dados básicos da igreja
@@ -203,32 +196,6 @@ class Church(BaseModel):
         help_text="Calculado automaticamente"
     )
     
-    # =====================================
-    # SISTEMA DE QR CODE PARA IGREJA
-    # =====================================
-    
-    qr_code_uuid = models.UUIDField(
-        "UUID do QR Code",
-        default=uuid.uuid4,
-        editable=False,
-        unique=True,
-        help_text="Identificador único para o QR Code da igreja (sede)"
-    )
-    
-    qr_code_image = models.ImageField(
-        "Imagem do QR Code",
-        upload_to='churches/qr_codes/',
-        blank=True,
-        null=True,
-        help_text="QR Code gerado automaticamente para registro de visitantes na sede"
-    )
-    
-    qr_code_active = models.BooleanField(
-        "QR Code Ativo",
-        default=True,
-        help_text="Permitir registros via QR Code da igreja"
-    )
-    
     allows_visitor_registration = models.BooleanField(
         "Permite Registro de Visitantes",
         default=True,
@@ -273,10 +240,6 @@ class Church(BaseModel):
             # Data de fim da assinatura (30 dias após início)
             if not self.subscription_end_date:
                 self.subscription_end_date = self.subscription_start_date + timedelta(days=30)
-        
-        # Gerar QR Code se não existe
-        if not self.qr_code_image:
-            self.generate_qr_code()
         
         # Formatar campos
         if self.state:
@@ -358,7 +321,7 @@ class Church(BaseModel):
     @property
     def can_add_branches(self):
         """Verifica se pode adicionar mais filiais"""
-        current_branches = self.branches.filter(is_active=True, is_headquarters=False).count()
+        current_branches = self.branches.filter(is_active=True, is_main=False).count()
         return self.max_branches < 0 or current_branches < self.max_branches
     
     def update_statistics(self):
@@ -366,6 +329,8 @@ class Church(BaseModel):
         # Importação local para evitar circular import
         from apps.members.models import Member
         from apps.visitors.models import Visitor
+        from apps.branches.models import Branch
+        from django.db.models import Sum
         
         self.total_members = Member.objects.filter(
             church=self, is_active=True
@@ -374,8 +339,13 @@ class Church(BaseModel):
         self.total_visitors = Visitor.objects.filter(
             church=self, is_active=True
         ).count()
-        
-        self.save(update_fields=['total_members', 'total_visitors', 'updated_at'])
+
+        agg = Branch.objects.filter(church=self, is_active=True).aggregate(
+            total_visitors_registered_sum=Sum('total_visitors_registered')
+        )
+        self.total_visitors_registered = int(agg.get('total_visitors_registered_sum') or 0)
+
+        self.save(update_fields=['total_members', 'total_visitors', 'total_visitors_registered', 'updated_at'])
     
     def get_plan_features(self):
         """Retorna funcionalidades do plano atual"""
@@ -418,83 +388,10 @@ class Church(BaseModel):
         if self.total_members > self.max_members:
             issues.append(f"Excedeu limite de membros: {self.total_members}/{self.max_members}")
 
-        current_branches = self.branches.filter(is_active=True, is_headquarters=False).count()
+        current_branches = self.branches.filter(is_active=True, is_main=False).count()
         if self.max_branches >= 0 and current_branches > self.max_branches:
             issues.append(f"Excedeu limite de filiais: {current_branches}/{self.max_branches}")
         
         return issues
     
-    def generate_qr_code(self):
-        """Gera QR Code para esta igreja (sede)"""
-        # URL do formulário React para a igreja
-        url = f"{settings.FRONTEND_URL}/visit/church/{self.qr_code_uuid}"
-        
-        # Configurações do QR Code
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        
-        # Adicionar dados e otimizar
-        qr.add_data(url)
-        qr.make(fit=True)
-        
-        # Criar imagem
-        img = qr.make_image(
-            fill_color="black",
-            back_color="white"
-        )
-        
-        # Converter para bytes
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        buffer.seek(0)
-        
-        # Salvar no campo ImageField
-        filename = f"church_qr_{self.qr_code_uuid}.png"
-        self.qr_code_image.save(
-            filename,
-            File(buffer),
-            save=False
-        )
-    
-    def regenerate_qr_code(self):
-        """Regenera QR code (para caso de comprometimento de segurança)"""
-        # Deletar imagem antiga se existe
-        if self.qr_code_image:
-            self.qr_code_image.delete(save=False)
-        
-        # Gerar novo UUID
-        self.qr_code_uuid = uuid.uuid4()
-        
-        # Gerar nova imagem
-        self.generate_qr_code()
-        self.save()
-    
-    @property
-    def visitor_registration_url(self):
-        """Retorna URL para registro de visitantes"""
-        return f"{settings.FRONTEND_URL}/visit/church/{self.qr_code_uuid}"
-    
-    @property
-    def qr_code_url(self):
-        """Retorna URL completa da imagem do QR Code"""
-        if self.qr_code_image:
-            request = None
-            # Tentar obter request do contexto
-            try:
-                from django.http import HttpRequest
-                from threading import local
-                _thread_locals = local()
-                request = getattr(_thread_locals, 'request', None)
-            except:
-                pass
-            
-            if request:
-                return request.build_absolute_uri(self.qr_code_image.url)
-            else:
-                # Fallback para URL relativa
-                return self.qr_code_image.url
-        return None
+    # Removidos: gerações/armazenamento de QR na Church (delegado para Branch principal)

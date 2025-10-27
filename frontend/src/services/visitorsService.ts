@@ -246,6 +246,7 @@ export const createVisitor = async (visitorData: Partial<Visitor>): Promise<Visi
     zipcode: visitorData.zipcode || '',
     ministry_interest: visitorData.ministry_interest || '',
     observations: visitorData.observations || '',
+    branch: visitorData.branch,
   };
   
   const response = await api.post(API_ENDPOINTS.visitors.create, cleanedData);
@@ -256,7 +257,20 @@ export const createVisitor = async (visitorData: Partial<Visitor>): Promise<Visi
  * Atualiza dados de um visitante
  */
 export const updateVisitor = async (id: number, visitorData: Partial<Visitor>): Promise<Visitor> => {
-  const response = await api.patch(API_ENDPOINTS.visitors.update(id), visitorData);
+  // Normalizar payload para evitar 400 por campos em branco
+  const cleanedData: any = { ...visitorData };
+  if (cleanedData.birth_date === '') cleanedData.birth_date = null;
+  // Strings opcionais devem ir como string vazia
+  const stringFields = [
+    'cpf', 'email', 'phone', 'city', 'state', 'address', 'neighborhood',
+    'zipcode', 'ministry_interest', 'observations'
+  ];
+  stringFields.forEach((field) => {
+    if (cleanedData[field] === undefined || cleanedData[field] === null) return;
+    if (typeof cleanedData[field] !== 'string') return;
+    // manter string vazia quando vier vazia; trim não obrigatório para não alterar intenção
+  });
+  const response = await api.patch(API_ENDPOINTS.visitors.update(id), cleanedData);
   return response.data;
 };
 
@@ -311,12 +325,22 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
  * Converte visitante em membro
  */
 export const convertVisitorToMember = async (
-  id: number, 
-  notes?: string
-): Promise<{ success: boolean; message: string; member_id?: number }> => {
-  const response = await api.patch(API_ENDPOINTS.visitors.convertToMember(id), {
-    conversion_notes: notes || ''
-  });
+  id: number,
+  data?: { conversion_notes?: string; birth_date?: string; phone?: string; gender?: string; marital_status?: string } | string
+): Promise<{ success: boolean; message: string; member_id?: number; member_name?: string }> => {
+  let payload: any = {};
+  if (typeof data === 'string' || data === undefined) {
+    payload = { conversion_notes: data || '' };
+  } else {
+    payload = {
+      conversion_notes: data.conversion_notes || '',
+    };
+    if (data.birth_date) payload.birth_date = data.birth_date; // YYYY-MM-DD
+    if (data.phone) payload.phone = data.phone;
+    if (data.gender) payload.gender = data.gender;
+    if (data.marital_status) payload.marital_status = data.marital_status;
+  }
+  const response = await api.patch(API_ENDPOINTS.visitors.convertToMember(id), payload);
   return response.data;
 };
 

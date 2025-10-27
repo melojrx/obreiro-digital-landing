@@ -4,22 +4,28 @@ Implementa APIs para gestão de membros
 """
 
 from rest_framework import viewsets, status, permissions
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Count, Q
 from datetime import datetime, date
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 
-from .models import Member, MembershipStatusLog
+from .models import Member, MembershipStatusLog, MinisterialFunctionHistory, MembershipStatus
+from apps.core.mixins import ChurchScopedQuerysetMixin
 from .serializers import (
     MemberSerializer, MemberListSerializer, MemberCreateSerializer, 
     MemberUpdateSerializer, MemberSummarySerializer,
-    MembershipStatusLogSerializer, MemberStatusChangeSerializer
+    MembershipStatusLogSerializer, MemberStatusChangeSerializer,
+    MinisterialFunctionHistorySerializer, MembershipStatusSerializer
 )
 
 
-class MemberViewSet(viewsets.ModelViewSet):
+class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
     """
     ViewSet para CRUD de membros com otimizações
     """
@@ -32,25 +38,50 @@ class MemberViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        """QuerySet otimizado com select_related e filtros por igreja"""
-        # Filtrar apenas membros da igreja do usuário logado
-        queryset = Member.objects.select_related('church', 'spouse', 'responsible')
-        
-        # Usar igreja ativa do usuário
-        from apps.accounts.models import ChurchUser
-        active_church = ChurchUser.objects.get_active_church_for_user(self.request.user)
-        
-        if active_church:
-            queryset = queryset.filter(church=active_church)
-        else:
-            # Se não tem igreja ativa, retornar queryset vazio
-            queryset = queryset.none()
-        
-        # Filtrar apenas membros ativos por padrão
+        """QuerySet otimizado + escopo por igreja/branch/secretário."""
+        queryset = Member.objects.select_related('church', 'branch', 'spouse', 'responsible')
+        scoped = self.filter_queryset_by_scope(self.request, queryset, has_branch=True)
         if self.action != 'all':
-            queryset = queryset.filter(is_active=True)
-        
-        return queryset
+            scoped = scoped.filter(is_active=True)
+        return scoped
+
+    # ==============================
+    # Permissões por ação (P1b)
+    # ==============================
+    def get_permissions(self):
+        # Leitura para autenticados; escrita checada por branch
+        if self.action in ['list', 'retrieve', 'dashboard', 'my_membership_status', 'all']:
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [p() for p in permission_classes]
+
+    def _user_can_manage_church(self, user, church):
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(church):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch:
+            return False
+        if user.is_superuser:
+            return True
+        if self._user_can_manage_church(user, branch.church):
+            return True
+        try:
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                managed = getattr(cu, 'managed_branches', None)
+                if managed is None or not managed.exists():
+                    return True
+                return managed.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
     
     def perform_create(self, serializer):
         """Ao criar, associar à igreja ativa do usuário"""
@@ -60,9 +91,208 @@ class MemberViewSet(viewsets.ModelViewSet):
         active_church = ChurchUser.objects.get_active_church_for_user(self.request.user)
         
         if active_church:
-            serializer.save(church=active_church)
+            branch = serializer.validated_data.get('branch')
+            if branch and branch.church_id != active_church.id:
+                raise ValidationError("A filial selecionada não pertence à igreja ativa.")
+            if not branch:
+                branch = ChurchUser.objects.get_active_branch_for_user(self.request.user)
+            # Checagem de permissão de escrita na branch definida
+            if branch and not self._user_can_write_branch(self.request.user, branch):
+                raise PermissionDenied('Sem permissão para criar membro nesta filial.')
+            serializer.save(church=active_church, branch=branch)
         else:
             raise ValidationError("Usuário não tem igreja ativa configurada")
+
+    def perform_update(self, serializer):
+        from django.core.exceptions import ValidationError
+
+        branch = serializer.validated_data.get('branch', serializer.instance.branch)
+        if branch and not self._user_can_write_branch(self.request.user, branch):
+            raise PermissionDenied('Sem permissão para editar membro desta filial.')
+        if branch and branch.church_id != serializer.instance.church_id:
+            raise ValidationError("A filial selecionada não pertence à mesma igreja do membro.")
+
+        serializer.save(branch=branch)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.branch and not self._user_can_write_branch(request.user, instance.branch):
+            raise PermissionDenied('Sem permissão para excluir membro desta filial.')
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], url_path='create-system-user')
+    def create_system_user(self, request, pk=None):
+        """
+        Cria um usuário do sistema vinculado ao membro (fluxo a partir da edição).
+        Regras:
+        - Membro ainda não pode ter usuário associado
+        - Papel permitido varia conforme quem atribui:
+          * Superuser / quem gerencia a igreja: church_admin, pastor, secretary, leader, member
+          * Secretary na igreja do membro: apenas secretary
+        - Valida e-mail único (usuário ativo) e senha via validators do Django
+        """
+        from apps.accounts.models import ChurchUser
+        from apps.core.models import RoleChoices
+
+        member = self.get_object()
+        if member.user_id:
+            return Response({
+                'error': 'Membro já possui usuário do sistema vinculado.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        system_role = request.data.get('system_role')
+        user_email = request.data.get('user_email')
+        user_password = request.data.get('user_password')
+
+        if not system_role or not user_email or not user_password:
+            return Response({
+                'error': 'Campos obrigatórios ausentes: system_role, user_email, user_password.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Determinar papéis permitidos para o solicitante
+        allowed_roles: list[str] = []
+        user = request.user
+        if user.is_superuser:
+            # Superuser pode atribuir níveis 3, 2 e 1 (alias aceito)
+            allowed_roles = [
+                'denomination_admin',  # alias aceito (mapeado para CHURCH_ADMIN)
+                RoleChoices.CHURCH_ADMIN,
+                RoleChoices.SECRETARY,
+            ]
+        else:
+            church_users = list(user.church_users.filter(is_active=True))
+            can_manage = any(cu.can_manage_church(member.church) for cu in church_users)
+            if can_manage:
+                # Church admins/gestores: níveis 3 (alias), 2 e 1
+                allowed_roles = [
+                    'denomination_admin',  # alias aceito (mapeado)
+                    RoleChoices.CHURCH_ADMIN,
+                    RoleChoices.SECRETARY,
+                ]
+            else:
+                cu = user.church_users.filter(church=member.church, is_active=True).first()
+                if cu and cu.role_effective == RoleChoices.SECRETARY:
+                    allowed_roles = [RoleChoices.SECRETARY]
+
+        if system_role not in allowed_roles:
+            raise PermissionDenied('Sem permissão para atribuir este papel.')
+
+        # Normalizar role (alias)
+        normalized_role = RoleChoices.CHURCH_ADMIN if system_role == 'denomination_admin' else system_role
+
+        # Validar senha
+        try:
+            validate_password(user_password)
+        except DjangoValidationError as e:
+            return Response({'error': 'Senha inválida', 'details': list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        existing_user = User.objects.filter(email=user_email, is_active=True).first()
+
+        if existing_user:
+            # Atualizar senha do usuário existente (admin/secretário criou acesso para alguém já registrado)
+            try:
+                existing_user.set_password(user_password)
+                # Marcar perfil como completo para evitar onboarding
+                if not getattr(existing_user, 'is_profile_complete', False):
+                    existing_user.is_profile_complete = True
+                existing_user.save()
+            except Exception:
+                return Response({'error': 'Não foi possível atualizar a senha do usuário existente.'}, status=status.HTTP_400_BAD_REQUEST)
+            created_user = existing_user
+            created = False
+        else:
+            # Criar usuário novo
+            phone = member.phone or '(00) 0000-0000'
+            created_user = User.objects.create_user(
+                email=user_email,
+                password=user_password,
+                full_name=member.full_name,
+                phone=phone,
+            )
+            created = True
+
+        # Marcar perfil como completo para evitar redirecionar para fluxo de cadastro
+        if not getattr(created_user, 'is_profile_complete', False):
+            created_user.is_profile_complete = True
+            try:
+                created_user.save(update_fields=['is_profile_complete', 'updated_at'])
+            except Exception:
+                created_user.save()
+
+        # Vincular à igreja e papel
+        from apps.accounts.models import ChurchUser as CU
+        church_user, cu_created = CU.objects.get_or_create(
+            user=created_user,
+            church=member.church,
+            defaults={
+                'role': normalized_role,
+                'is_user_active_church': True,
+                'active_branch': member.branch if getattr(member, 'branch', None) else None,
+            }
+        )
+        # Se já existia, garantir papel e flags coerentes
+        if not cu_created:
+            changed = False
+            if church_user.role != normalized_role:
+                church_user.role = normalized_role
+                changed = True
+            if not church_user.is_user_active_church:
+                church_user.is_user_active_church = True
+                changed = True
+            if getattr(member, 'branch', None) and church_user.active_branch_id != member.branch_id:
+                church_user.active_branch = member.branch
+                changed = True
+            if changed:
+                # Reaplicar permissões se o papel mudou
+                try:
+                    if church_user.role != normalized_role:
+                        church_user.set_permissions_by_role()
+                except Exception:
+                    pass
+                church_user.save()
+
+        # Atualizar membro
+        member.user = created_user
+        member.save(update_fields=['user', 'updated_at'])
+
+        return Response({
+            'message': 'Usuário do sistema {} e vinculado ao membro com sucesso.'.format('criado' if created else 'atualizado'),
+            'member': MemberSerializer(member, context={'request': request}).data,
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='transfer-branch')
+    def transfer_branch_admin(self, request, pk=None):
+        """Transfere a lotação (branch) de um membro para outra filial da mesma igreja."""
+        try:
+            target_branch_id = int(request.data.get('branch_id'))
+        except (TypeError, ValueError):
+            return Response({'error': 'branch_id inválido ou não informado'}, status=status.HTTP_400_BAD_REQUEST)
+
+        member = self.get_object()
+
+        from apps.branches.models import Branch
+        try:
+            target_branch = Branch.objects.get(id=target_branch_id, is_active=True)
+        except Branch.DoesNotExist:
+            return Response({'error': 'Filial alvo não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+        if target_branch.church_id != member.church_id:
+            return Response({'error': 'Filial alvo deve pertencer à mesma igreja do membro.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not self._user_can_write_branch(request.user, target_branch):
+            raise PermissionDenied('Sem permissão para transferir para esta filial.')
+
+        old_branch = member.branch
+        member.branch = target_branch
+        member.save(update_fields=['branch', 'updated_at'])
+
+        return Response({
+            'message': 'Membro transferido com sucesso para a filial selecionada',
+            'member': MemberSerializer(member, context={'request': request}).data,
+            'old_branch': {'id': old_branch.id, 'name': old_branch.name} if old_branch else None,
+            'new_branch': {'id': target_branch.id, 'name': target_branch.name},
+        })
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""
@@ -75,6 +305,127 @@ class MemberViewSet(viewsets.ModelViewSet):
         elif self.action == 'dashboard':
             return MemberSummarySerializer
         return MemberSerializer
+
+    @action(detail=False, methods=['get'], url_path='me/status')
+    def my_membership_status(self, request):
+        """
+        Retorna status de membresia do usuário atual na igreja ativa, sem filtrar por filial.
+        Útil para validação no frontend (exibir/ocultar conversão e sugerir transferência).
+        """
+        from apps.accounts.models import ChurchUser
+
+        active_church = ChurchUser.objects.get_active_church_for_user(request.user)
+        if not active_church:
+            return Response(
+                {"error": "Usuário não tem igreja ativa configurada"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Buscar membro pela associação direta ao usuário (não restringir por filial aqui)
+        member = (
+            Member.objects.select_related('branch')
+            .filter(church=active_church, user=request.user, is_active=True)
+            .first()
+        )
+
+        active_branch = ChurchUser.objects.get_active_branch_for_user(request.user)
+
+        data = {
+            "church_id": active_church.id,
+            "is_member": bool(member),
+            "member_id": member.id if member else None,
+            "branch": {
+                "id": member.branch.id,
+                "name": member.branch.name,
+            } if member and member.branch else None,
+            "active_branch": {
+                "id": active_branch.id,
+                "name": active_branch.name,
+            } if active_branch else None,
+        }
+
+        # Pode sugerir transferência se houver filial ativa diferente da atual
+        if member and active_branch and (member.branch_id != active_branch.id):
+            data["can_transfer"] = True
+            data["target_branch_id"] = active_branch.id
+        else:
+            data["can_transfer"] = False
+            data["target_branch_id"] = None
+
+        return Response(data)
+
+    @action(detail=False, methods=['post'], url_path='me/transfer-branch')
+    def transfer_my_branch(self, request):
+        """
+        Transfere a lotação (branch) do membro do usuário atual para a filial informada.
+        Regras:
+        - Usuário deve ser membro da igreja ativa
+        - A filial alvo deve pertencer à mesma igreja
+        - Atualiza também ChurchUser.active_branch para consistência de navegação
+        """
+        from apps.accounts.models import ChurchUser
+        from apps.branches.models import Branch
+
+        try:
+            target_branch_id = int(request.data.get('branch_id'))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "branch_id inválido ou não informado"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        active_church = ChurchUser.objects.get_active_church_for_user(request.user)
+        if not active_church:
+            return Response(
+                {"error": "Usuário não tem igreja ativa configurada"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Buscar membro do usuário
+        member = (
+            Member.objects.select_related('branch')
+            .filter(church=active_church, user=request.user, is_active=True)
+            .first()
+        )
+        if not member:
+            return Response(
+                {"error": "Usuário não possui registro de membro nesta igreja"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validar filial alvo
+        try:
+            target_branch = Branch.objects.get(id=target_branch_id, church=active_church, is_active=True)
+        except Branch.DoesNotExist:
+            return Response(
+                {"error": "Filial inválida para a igreja ativa"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if member.branch_id == target_branch.id:
+            return Response(
+                {"message": "Membro já está lotado nesta filial", "member": MemberSerializer(member).data}
+            )
+
+        # Aplicar transferência
+        member.branch = target_branch
+        member.save(update_fields=['branch', 'updated_at'])
+
+        # Manter ChurchUser.active_branch sincronizado, se existir o vínculo
+        try:
+            church_user = ChurchUser.objects.filter(user=request.user, church=active_church, is_active=True).first()
+            if church_user and getattr(church_user, 'active_branch_id', None) != target_branch.id:
+                church_user.active_branch = target_branch
+                church_user.save(update_fields=['active_branch', 'updated_at'])
+        except Exception:
+            pass
+
+        return Response(
+            {
+                "message": "Transferência de filial realizada com sucesso",
+                "member": MemberSerializer(member).data,
+            }
+        )
     
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
@@ -499,6 +850,7 @@ class MemberViewSet(viewsets.ModelViewSet):
                 request.user.phone = formatted_phone
                 user_update_fields.add('phone')
 
+        formatted_cpf = None  # garantir definição para evitar UnboundLocalError
         cpf_input = request.data.get('cpf')
         if cpf_input:
             cpf_digits = ''.join(filter(str.isdigit, str(cpf_input)))
@@ -510,15 +862,29 @@ class MemberViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             formatted_cpf = f"{cpf_digits[:3]}.{cpf_digits[3:6]}.{cpf_digits[6:9]}-{cpf_digits[9:]}"
-            existing_cpfs = UserProfile.objects.filter(cpf__isnull=False).exclude(user=request.user)
-            if any(''.join(filter(str.isdigit, existing.cpf or '')) == cpf_digits for existing in existing_cpfs):
-                return Response(
-                    {'error': 'CPF já cadastrado no sistema.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            if formatted_cpf != user_profile.cpf:
-                user_profile.cpf = formatted_cpf
-                profile_update_fields.add('cpf')
+        # Verificar duplicidade de CPF apenas no escopo da denominação (ou igreja se não houver denom)
+        duplicate_in_scope = False
+        if formatted_cpf:
+            if active_church and active_church.denomination_id:
+                duplicate_in_scope = Member.objects.filter(
+                    cpf=formatted_cpf,
+                    is_active=True,
+                    church__denomination_id=active_church.denomination_id
+                ).exists()
+            elif active_church:
+                duplicate_in_scope = Member.objects.filter(
+                    cpf=formatted_cpf,
+                    is_active=True,
+                    church=active_church
+                ).exists()
+        if duplicate_in_scope:
+            return Response(
+                {'error': 'CPF já cadastrado nesta denominação.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if formatted_cpf and formatted_cpf != getattr(user_profile, 'cpf', None):
+            user_profile.cpf = formatted_cpf
+            profile_update_fields.add('cpf')
 
         birth_date_input = request.data.get('birth_date')
         if birth_date_input:
@@ -652,8 +1018,18 @@ class MemberViewSet(viewsets.ModelViewSet):
             )
 
         # Dados do membro: puxar tudo automaticamente do perfil
+        # Determinar filial para vincular o membro (preferir filial ativa do usuário; senão matriz)
+        active_branch = ChurchUser.objects.get_active_branch_for_user(request.user)
+        if not active_branch:
+            try:
+                from apps.branches.models import Branch
+                active_branch = Branch.objects.filter(church=active_church, is_main=True).first()
+            except Exception:
+                active_branch = None
+
         member_data = {
             'church': active_church.id,
+            'branch': active_branch.id if active_branch else None,
             'user': request.user.id,
             'full_name': request.user.full_name,
             'email': request.user.email,
@@ -676,8 +1052,6 @@ class MemberViewSet(viewsets.ModelViewSet):
             'rg': '',
             'city': '',
             'state': '',
-            'baptism_date': None,
-            'conversion_date': None,
             'notes': 'Membro criado automaticamente via conversão de Church Admin'
         }
         
@@ -696,6 +1070,18 @@ class MemberViewSet(viewsets.ModelViewSet):
         
         try:
             with transaction.atomic():
+                # Garantir que ChurchUser.active_branch esteja setado (se vazio)
+                try:
+                    church_user = ChurchUser.objects.filter(user=request.user, church=active_church, is_active=True).first()
+                    if church_user and not church_user.active_branch:
+                        if not active_branch:
+                            from apps.branches.models import Branch
+                            active_branch = Branch.objects.filter(church=active_church, is_main=True).first()
+                        if active_branch:
+                            church_user.active_branch = active_branch
+                            church_user.save(update_fields=['active_branch'])
+                except Exception:
+                    pass
                 # Criar o registro de membro
                 member = serializer.save()
                 
@@ -721,3 +1107,83 @@ class MemberViewSet(viewsets.ModelViewSet):
                 {'error': f'Erro ao criar registro de membro: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class MinisterialFunctionHistoryViewSet(viewsets.ModelViewSet):
+    """Gerencia histórico de função ministerial"""
+    serializer_class = MinisterialFunctionHistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['member__full_name', 'function', 'notes']
+    filterset_fields = ['member', 'function', 'is_active']
+    ordering_fields = ['start_date', 'end_date', 'created_at']
+    ordering = ['-start_date']
+
+    def get_queryset(self):
+        qs = MinisterialFunctionHistory.objects.select_related('member')
+        member_id = self.request.query_params.get('member')
+        if member_id:
+            qs = qs.filter(member_id=member_id)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    @action(detail=True, methods=['patch'])
+    def end_period(self, request, pk=None):
+        from datetime import date
+        obj = self.get_object()
+        end_date_str = request.data.get('end_date')
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            end_date = date.today()
+        obj.end_date = end_date
+        try:
+            obj.full_clean()
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        obj.save(update_fields=['end_date', 'updated_at'])
+        return Response(self.get_serializer(obj).data)
+
+
+class MembershipStatusViewSet(viewsets.ModelViewSet):
+    """CRUD de status de membresia (ordenações) com escopo por igrejas do usuário."""
+    serializer_class = MembershipStatusSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['member', 'status']
+    ordering_fields = ['effective_date', 'created_at']
+    ordering = ['-effective_date']
+
+    def get_queryset(self):
+        qs = MembershipStatus.objects.select_related('member', 'branch')
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        # Escopo pelas igrejas onde o usuário possui vínculo ativo
+        from apps.accounts.models import ChurchUser
+        church_ids = ChurchUser.objects.filter(user=user, is_active=True).values_list('church_id', flat=True)
+        if not church_ids:
+            return qs.none()
+        qs = qs.filter(member__church_id__in=list(church_ids))
+
+        # Filtro por is_current (end_date nula)
+        is_current = self.request.query_params.get('is_current')
+        if is_current is not None:
+            val = str(is_current).lower() in ('1', 'true', 't', 'yes', 'y')
+            if val:
+                qs = qs.filter(end_date__isnull=True)
+            else:
+                qs = qs.filter(end_date__isnull=False)
+        return qs
+
+    def perform_create(self, serializer):
+        # Serializer já faz fallback de branch para member.branch e valida status atual único
+        serializer.save()
+
+    def perform_update(self, serializer):
+        serializer.save()

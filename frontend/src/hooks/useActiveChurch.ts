@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { activeChurchService, UserChurch, ActiveChurch } from '@/services/activeChurchService';
+import { activeChurchService, UserChurch, ActiveChurch, SetActiveChurchRequest, SetActiveChurchResponse } from '@/services/activeChurchService';
 
 // Query Keys
 export const ACTIVE_CHURCH_QUERY_KEYS = {
@@ -38,8 +38,8 @@ export const useActiveChurch = () => {
 export const useSetActiveChurch = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (churchId: number) => activeChurchService.setActiveChurch(churchId),
+  return useMutation<SetActiveChurchResponse, unknown, SetActiveChurchRequest>({
+    mutationFn: (variables: SetActiveChurchRequest) => activeChurchService.setActiveChurch(variables),
     onSuccess: (data) => {
       // Invalidar todas as queries relacionadas à igreja ativa
       queryClient.invalidateQueries({ queryKey: ACTIVE_CHURCH_QUERY_KEYS.all });

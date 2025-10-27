@@ -268,6 +268,7 @@ class Visitor(BaseModel):
             models.Index(fields=['church', 'branch']),
             models.Index(fields=['church', 'converted_to_member']),
             models.Index(fields=['qr_code_used']),
+            models.Index(fields=['branch', 'created_at']),
         ]
     
     def __str__(self):
@@ -311,6 +312,7 @@ class Visitor(BaseModel):
         # PREPARAR DADOS COM LIMPEZA ADEQUADA
         member_data = {
             'church': self.church,
+            'branch': self.branch,
             'full_name': self.full_name.strip(),
             'birth_date': self.birth_date,
             'marital_status': self.marital_status or 'single',

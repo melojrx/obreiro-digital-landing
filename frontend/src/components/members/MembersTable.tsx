@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, Phone, Mail, Info } from 'lucide-react';
+import { Eye, Edit, Trash2, Phone, Mail, Info, MoveRight as MoveRightIcon, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,20 +27,24 @@ import {
 } from '@/components/ui/hover-card';
 import { Member, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
 import { usePermissions } from '@/hooks/usePermissions';
+import TransferMemberModal from '@/components/members/TransferMemberModal';
 
 interface MembersTableProps {
   members: Member[];
   onEdit?: (member: Member) => void;
   onDelete?: (member: Member) => void;
+  onTransferSuccess?: (member: Member) => void;
 }
 
 export const MembersTable: React.FC<MembersTableProps> = ({
   members,
   onEdit,
   onDelete,
+  onTransferSuccess,
 }) => {
   const navigate = useNavigate();
   const permissions = usePermissions();
+  const [transferMember, setTransferMember] = React.useState<Member | null>(null);
 
   const getMinisterialFunctionDisplay = (ministerialFunction: string) => {
     return MINISTERIAL_FUNCTION_CHOICES[ministerialFunction as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || 'Membro';
@@ -85,6 +89,8 @@ export const MembersTable: React.FC<MembersTableProps> = ({
     navigate(`/membros/${member.id}/editar`);
   };
 
+  const canTransfer = permissions.canManageMembers || permissions.canManageChurch;
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('pt-BR');
@@ -115,6 +121,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                 <TableHead className="w-12"></TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Contato</TableHead>
+                <TableHead>Filial</TableHead>
                 <TableHead>Função</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Membro desde</TableHead>
@@ -134,7 +141,15 @@ export const MembersTable: React.FC<MembersTableProps> = ({
               </TableCell>
               <TableCell>
                 <div>
-                  <div className="font-medium text-gray-900">{member.full_name}</div>
+                  <div className="font-medium text-gray-900 flex items-center gap-2">
+                    {member.full_name}
+                    {(member.has_system_access || member.user) && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1" title="Usuário com acesso ao sistema">
+                        <Shield className="h-3 w-3 text-green-600" />
+                        Acesso
+                      </Badge>
+                    )}
+                  </div>
                   {member.birth_date && (
                     <div className="text-sm text-gray-500">
                       {new Date().getFullYear() - new Date(member.birth_date).getFullYear()} anos
@@ -157,6 +172,9 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                     </div>
                   )}
                 </div>
+              </TableCell>
+              <TableCell>
+                <span className="text-sm text-gray-900">{member.branch_name || '—'}</span>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
@@ -230,6 +248,12 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                         Editar
                       </DropdownMenuItem>
                     )}
+                    {canTransfer && (
+                      <DropdownMenuItem onClick={() => setTransferMember(member)}>
+                        <MoveRightIcon className="mr-2 h-4 w-4" />
+                        Transferir
+                      </DropdownMenuItem>
+                    )}
                     {permissions.canDeleteMembers && onDelete && (
                       <>
                         <DropdownMenuSeparator />
@@ -258,15 +282,23 @@ export const MembersTable: React.FC<MembersTableProps> = ({
           <div key={member.id} className="bg-white border rounded-lg p-4 space-y-3">
             {/* Header do Card */}
             <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={member.photo} alt={member.full_name} />
-                  <AvatarFallback className="text-sm">
-                    {getInitials(member.full_name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h4 className="font-medium text-gray-900">{member.full_name}</h4>
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={member.photo} alt={member.full_name} />
+                    <AvatarFallback className="text-sm">
+                      {getInitials(member.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                  <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                    {member.full_name}
+                    {(member.has_system_access || member.user) && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1" title="Usuário com acesso ao sistema">
+                        <Shield className="h-3 w-3 text-green-600" />
+                        Acesso
+                      </Badge>
+                    )}
+                  </h4>
                   {member.birth_date && (
                     <p className="text-sm text-gray-500">
                       {new Date().getFullYear() - new Date(member.birth_date).getFullYear()} anos
@@ -296,6 +328,12 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                     <DropdownMenuItem onClick={() => handleEdit(member)}>
                       <Edit className="mr-2 h-4 w-4" />
                       Editar
+                    </DropdownMenuItem>
+                  )}
+                  {canTransfer && (
+                    <DropdownMenuItem onClick={() => setTransferMember(member)}>
+                      <MoveRightIcon className="mr-2 h-4 w-4" />
+                      Transferir
                     </DropdownMenuItem>
                   )}
                   {permissions.canDeleteMembers && onDelete && (
@@ -334,6 +372,13 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                 </div>
               </div>
               
+              <div>
+                <span className="text-gray-500 block">Filial:</span>
+                <div className="mt-1 text-gray-900">
+                  {member.branch_name || '—'}
+                </div>
+              </div>
+
               <div>
                 <span className="text-gray-500 block">Função:</span>
                 <div className="mt-1">
@@ -390,6 +435,15 @@ export const MembersTable: React.FC<MembersTableProps> = ({
           </div>
         ))}
       </div>
+      {/* Modal de Transferência */}
+      <TransferMemberModal
+        isOpen={!!transferMember}
+        member={transferMember}
+        onClose={() => setTransferMember(null)}
+        onTransferred={(m) => {
+          onTransferSuccess?.(m);
+        }}
+      />
     </div>
   );
-}; 
+};

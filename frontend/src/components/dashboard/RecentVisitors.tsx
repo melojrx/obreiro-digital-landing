@@ -10,7 +10,8 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import { Avatar, AvatarFallback } from '../ui/avatar';
-import { getRecentVisitors, formatFollowUpStatus, type Visitor } from '../../services/visitorsService';
+import { getVisitors, formatFollowUpStatus, type Visitor } from '../../services/visitorsService';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface RecentVisitorsProps {
   className?: string;
@@ -24,14 +25,20 @@ export const RecentVisitors: React.FC<RecentVisitorsProps> = ({
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const permissions = usePermissions();
 
   useEffect(() => {
     const fetchVisitors = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await getRecentVisitors();
-        setVisitors(data.slice(0, limit));
+        if (!permissions.canViewVisitors) {
+          setVisitors([]);
+          return;
+        }
+        // Buscar visitantes mais recentes respeitando escopo de backend
+        const data = await getVisitors({ ordering: '-created_at', page_size: limit });
+        setVisitors(Array.isArray(data) ? data.slice(0, limit) : []);
       } catch (err) {
         console.error('Erro ao buscar visitantes recentes:', err);
         setError('Erro ao carregar visitantes');
@@ -41,7 +48,7 @@ export const RecentVisitors: React.FC<RecentVisitorsProps> = ({
     };
 
     fetchVisitors();
-  }, [limit]);
+  }, [limit, permissions.canViewVisitors]);
 
   const getInitials = (name: string): string => {
     return name

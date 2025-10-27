@@ -79,27 +79,76 @@ class VisitorSerializer(serializers.ModelSerializer):
     
     # Campos de relacionamento
     church = serializers.PrimaryKeyRelatedField(required=False, allow_null=True, read_only=True)
-    branch = serializers.PrimaryKeyRelatedField(required=False, allow_null=True, read_only=True)
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.filter(is_active=True),
+        required=False,
+        allow_null=True
+    )
     
-    def validate(self, data):
-        """Validações customizadas para atualização"""
-        print(f"[DEBUG] VisitorSerializer - Data recebido: {data}")
-        print(f"[DEBUG] VisitorSerializer - Tipo dos dados: {type(data)}")
-        
-        # Se não há dados, retornar erro
-        if not data:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            church = getattr(request, 'church', None)
+            if church is None:
+                from apps.accounts.models import ChurchUser
+                church = ChurchUser.objects.get_active_church_for_user(request.user)
+            if church:
+                self.fields['branch'].queryset = Branch.objects.filter(church=church, is_active=True)
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch or not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            # ChurchAdmin (igreja/denom)
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(branch.church):
+                    return True
+            # Secretary/gestor com permissão de membros
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
+
+    def validate(self, attrs):
+        if not attrs and not self.partial:
             raise serializers.ValidationError("Nenhum dado foi enviado para atualização")
-        
-        # Converter birth_date vazio para None
-        if 'birth_date' in data and data['birth_date'] == '':
-            data['birth_date'] = None
-        
-        # Validar apenas nome como obrigatório (city e state são opcionais agora)
-        if not self.instance:  # Apenas em criação
-            if not data.get('full_name'):
-                raise serializers.ValidationError("Campo 'full_name' é obrigatório")
-        
-        return data
+
+        if 'birth_date' in attrs and attrs['birth_date'] == '':
+            attrs['birth_date'] = None
+
+        if not self.instance and not attrs.get('branch'):
+            raise serializers.ValidationError({'branch': "Filial é obrigatória para criar visitante"})
+        if not self.instance and not attrs.get('full_name'):
+            raise serializers.ValidationError("Campo 'full_name' é obrigatório")
+
+        # Normalização de registration_source (opcional): lower/underscore
+        rs = attrs.get('registration_source') or getattr(self.instance, 'registration_source', None)
+        if rs:
+            attrs['registration_source'] = str(rs).strip().lower().replace(' ', '_')
+
+        attrs = super().validate(attrs)
+        branch = attrs.get('branch') or getattr(self.instance, 'branch', None)
+        if branch:
+            request = self.context.get('request')
+            church = getattr(request, 'church', None) if request else None
+            if church is None and request and request.user.is_authenticated:
+                from apps.accounts.models import ChurchUser
+                church = ChurchUser.objects.get_active_church_for_user(request.user)
+            if church and branch.church_id != church.id:
+                raise serializers.ValidationError({'branch': 'Filial selecionada não pertence à igreja ativa.'})
+            # Secretary write guard
+            if request and request.method in ('POST', 'PUT', 'PATCH'):
+                if not self._user_can_write_branch(request.user, branch):
+                    raise serializers.ValidationError({'branch': 'Sem permissão para escrever nesta filial.'})
+            attrs['church'] = branch.church
+        return attrs
     
     class Meta:
         model = Visitor
@@ -115,7 +164,7 @@ class VisitorSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'is_active'
         ]
         read_only_fields = [
-            'id', 'uuid', 'church', 'church_name', 'branch', 'branch_name', 'age', 
+            'id', 'uuid', 'church', 'church_name', 'branch_name', 'age', 
             'converted_member_name', 'follow_up_status_display',
             'qr_code_used', 'registration_source', 'user_agent', 'ip_address',
             'created_at', 'updated_at'
@@ -175,33 +224,42 @@ class VisitorFollowUpSerializer(serializers.ModelSerializer):
 
 
 class VisitorConversionSerializer(serializers.ModelSerializer):
-    """
-    Serializer para conversão de visitante em membro com validações robustas
-    """
-    
+    """Serializer para conversão de visitante em membro (aceita dados complementares)."""
+
     conversion_notes = serializers.CharField(required=False, allow_blank=True)
-    
+    # Dados complementares opcionais para completar antes da conversão
+    birth_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', 'iso-8601'])
+    phone = serializers.CharField(required=False, allow_blank=True)
+    gender = serializers.CharField(required=False, allow_blank=True)
+    marital_status = serializers.CharField(required=False, allow_blank=True)
+
     class Meta:
         model = Visitor
-        fields = ['conversion_notes']
-        
+        fields = ['conversion_notes', 'birth_date', 'phone', 'gender', 'marital_status']
+
     def validate(self, attrs):
-        """Validações antes da conversão"""
         instance = self.instance
-        
-        # Validações básicas
+
+        # Validar igreja vinculada
         if not instance.church:
             raise serializers.ValidationError("Visitante deve ter uma igreja associada para ser convertido")
-            
-        if not instance.birth_date:
+
+        # birth_date pode vir no payload; exigir que exista no final
+        final_birth_date = attrs.get('birth_date') or instance.birth_date
+        if not final_birth_date:
             raise serializers.ValidationError(
-                "Data de nascimento é obrigatória para conversão. "
-                "Por favor, edite o visitante e adicione a data de nascimento antes de converter."
+                "Data de nascimento é obrigatória para conversão. Informe a data ao converter ou edite o visitante."
             )
-            
+
+        # Nome completo obrigatório
         if not instance.full_name or not instance.full_name.strip():
             raise serializers.ValidationError("Nome completo é obrigatório para conversão")
-        
+
+        # Telefone: Member exige telefone; aceitar via payload ou já salvo
+        final_phone = attrs.get('phone') or instance.phone
+        if not final_phone or not str(final_phone).strip():
+            raise serializers.ValidationError("Telefone é obrigatório para conversão. Informe o telefone ao converter ou edite o visitante.")
+
         # Verificar CPF duplicado se existir e não for vazio
         if instance.cpf and instance.cpf.strip():
             from apps.members.models import Member
@@ -214,13 +272,22 @@ class VisitorConversionSerializer(serializers.ModelSerializer):
                     f"CPF {instance.cpf} já está cadastrado para o membro: {existing.full_name}. "
                     f"Remova ou corrija o CPF do visitante antes de converter."
                 )
-        
+
         return attrs
-        
+
     def update(self, instance, validated_data):
-        """Converte visitante em membro"""
+        """Atualiza dados complementares (se enviados) e converte o visitante em membro."""
+        # Atualizar campos complementares antes da conversão
+        updated = False
+        for field in ['birth_date', 'phone', 'gender', 'marital_status']:
+            if field in validated_data and validated_data[field] not in (None, ''):
+                setattr(instance, field, validated_data[field])
+                updated = True
+        if updated:
+            instance.save(update_fields=[f for f in ['birth_date', 'phone', 'gender', 'marital_status'] if f in validated_data])
+
         notes = validated_data.get('conversion_notes', '')
-        member = instance.convert_to_member(notes=notes)
+        instance.convert_to_member(notes=notes)
         return instance
 
 

@@ -144,12 +144,22 @@ export const API_ENDPOINTS = {
     create: '/members/',
     update: (id: number) => `/members/${id}/`,
     delete: (id: number) => `/members/${id}/`,
+    // Transferência assistida (admin) entre filiais da mesma igreja
+    transferBranch: (id: number) => `/members/${id}/transfer-branch/`,
     dashboard: '/members/dashboard/',
     statistics: '/members/statistics/',
     profile: (id: number) => `/members/${id}/profile/`,
     updateStatus: (id: number) => `/members/${id}/update_status/`,
+    createSystemUser: (id: number) => `/members/${id}/create-system-user/`,
+    // Histórico de status de membresia (auditoria simples)
+    statusHistory: (id: number) => `/members/${id}/status_history/`,
     export: '/members/export/',
     availableForSpouse: '/members/available_for_spouse/',
+    // Rotas do próprio usuário (sem filtrar por filial)
+    me: {
+      status: '/members/me/status/',
+      transferBranch: '/members/me/transfer-branch/',
+    },
   },
   
   // Status de Membresia (Nova estrutura)
@@ -230,5 +240,12 @@ export const API_ENDPOINTS = {
     stats: (id: number) => `/activities/ministries/${id}/stats/`,
     activities: (id: number) => `/activities/ministries/${id}/activities/`,
     public: '/activities/ministries/public/',
+  },
+
+  // Histórico de Função Ministerial
+  ministerialFunctionHistory: {
+    list: '/ministerial-function-history/',
+    detail: (id: number) => `/ministerial-function-history/${id}/`,
+    endPeriod: (id: number) => `/ministerial-function-history/${id}/end_period/`,
   },
 } as const; 

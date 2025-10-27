@@ -7,6 +7,7 @@ import { VisitorsTable } from '@/components/visitors/VisitorsTable';
 import { VisitorsFilters } from '@/components/visitors/VisitorsFilters';
 import { Button } from '@/components/ui/button';
 import { useVisitors } from '@/hooks/useVisitors';
+import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 import {
@@ -23,6 +24,7 @@ import {
 const Visitantes: React.FC = () => {
   const navigate = useNavigate();
   const permissions = usePermissions();
+  const activeChurch = useCurrentActiveChurch();
   
   console.log('🔍 Visitantes - Permissões do usuário:', permissions);
   console.log('🔍 Visitantes - canManageVisitors:', permissions.canManageVisitors);
@@ -88,6 +90,11 @@ const Visitantes: React.FC = () => {
             <p className="text-gray-600 mt-1 text-xs sm:text-sm lg:text-base">
               Gerencie os visitantes registrados via QR Code
             </p>
+            {activeChurch?.active_branch && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Filial ativa: <span className="font-medium">{activeChurch.active_branch.name}</span>
+              </p>
+            )}
           </div>
           <div className="flex flex-col xs:flex-row gap-2 xs:justify-start xl:justify-end">
             <Button

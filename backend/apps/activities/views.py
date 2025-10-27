@@ -153,10 +153,10 @@ class ActivityViewSet(viewsets.ModelViewSet):
 
         queryset = Activity.objects.all()
 
-        church_user = user.church_users.filter(church=self.request.church).first()
+        church_user = user.church_users.filter(church=self.request.church).select_related('active_branch').first()
 
-        if church_user and church_user.branch and church_user.role not in ['church_admin', 'pastor']:
-            queryset = queryset.filter(branch=church_user.branch)
+        if church_user and church_user.active_branch and church_user.role not in ['church_admin', 'pastor']:
+            queryset = queryset.filter(branch=church_user.active_branch)
             
         return queryset
     

@@ -9,8 +9,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Member, MembershipStatusLog, MembershipStatus
+from apps.branches.models import Branch
 from apps.core.models import MembershipStatusChoices, MinisterialFunctionChoices, RoleChoices
 from apps.accounts.models import ChurchUser
+from .models import MinisterialFunctionHistory
 
 User = get_user_model()
 
@@ -22,19 +24,24 @@ class MemberSerializer(serializers.ModelSerializer):
     
     # Campos calculados
     age = serializers.SerializerMethodField()
-    conversion_age = serializers.SerializerMethodField()
     membership_years = serializers.SerializerMethodField()
     full_address = serializers.SerializerMethodField()
     spouse_name = serializers.SerializerMethodField()
     church_name = serializers.CharField(source='church.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
     membership_status_display = serializers.CharField(source='get_membership_status_display', read_only=True)
     ministerial_function_display = serializers.CharField(source='get_ministerial_function_display', read_only=True)
+    # Acesso ao sistema
+    has_system_access = serializers.SerializerMethodField()
+    system_user_email = serializers.SerializerMethodField()
+    system_user_role = serializers.SerializerMethodField()
+    system_user_role_label = serializers.SerializerMethodField()
     
     class Meta:
         model = Member
         fields = [
             # Identificação
-            'id', 'church', 'church_name', 'user',
+            'id', 'church', 'church_name', 'branch', 'branch_name', 'user',
             
             # Dados pessoais
             'full_name', 'cpf', 'rg', 'birth_date', 'age', 'gender', 'marital_status',
@@ -46,27 +53,30 @@ class MemberSerializer(serializers.ModelSerializer):
             'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'zipcode', 'full_address',
             
             # Dados eclesiásticos 
-            'membership_status', 'membership_status_display', 'conversion_date', 'conversion_age',
-            'baptism_date', 'membership_date', 'membership_years', 'previous_church', 
+            'membership_status', 'membership_status_display',
+            'membership_date', 'membership_start_date', 'membership_end_date', 'membership_years', 'previous_church', 
             'transfer_letter',
             
             # Dados ministeriais
-            'ministerial_function', 'ministerial_function_display', 'ordination_date',
+            'ministerial_function', 'ministerial_function_display',
             
             # Dados familiares
             'spouse', 'spouse_name', 'children_count', 'responsible',
             
             # Dados adicionais
             'profession', 'education_level', 'photo', 'notes',
-            
+
             # Preferências
             'accept_sms', 'accept_email', 'accept_whatsapp',
-            
+
             # Controle
-            'is_active', 'created_at', 'updated_at'
+            'is_active', 'created_at', 'updated_at',
+
+            # Acesso ao sistema
+            'has_system_access', 'system_user_email', 'system_user_role', 'system_user_role_label',
         ]
         read_only_fields = [
-            'id', 'church_name', 'age', 'conversion_age', 'membership_years', 'full_address',
+            'id', 'church_name', 'branch_name', 'age', 'membership_years', 'full_address',
             'spouse_name', 'membership_status_display', 'ministerial_function_display',
             'created_at', 'updated_at'
         ]
@@ -75,9 +85,7 @@ class MemberSerializer(serializers.ModelSerializer):
         """Calcula a idade baseada na data de nascimento"""
         return obj.age
     
-    def get_conversion_age(self, obj):
-        """Idade na conversão"""
-        return obj.conversion_age
+    # Removido campo de conversão
     
     def get_membership_years(self, obj):
         """Calcula anos de membresia"""
@@ -93,6 +101,38 @@ class MemberSerializer(serializers.ModelSerializer):
             return obj.spouse.full_name
         return None
 
+    def get_has_system_access(self, obj):
+        try:
+            return bool(obj.user_id)
+        except Exception:
+            return False
+
+    def get_system_user_email(self, obj):
+        try:
+            return obj.user.email if obj.user_id and getattr(obj, 'user', None) else None
+        except Exception:
+            return None
+
+    def get_system_user_role(self, obj):
+        try:
+            if not obj.user_id or not obj.church_id:
+                return None
+            from apps.accounts.models import ChurchUser
+            cu = ChurchUser.objects.filter(user_id=obj.user_id, church_id=obj.church_id, is_active=True).first()
+            return cu.role if cu else None
+        except Exception:
+            return None
+
+    def get_system_user_role_label(self, obj):
+        try:
+            if not obj.user_id or not obj.church_id:
+                return None
+            from apps.accounts.models import ChurchUser
+            cu = ChurchUser.objects.filter(user_id=obj.user_id, church_id=obj.church_id, is_active=True).first()
+            return cu.get_role_display() if cu else None
+        except Exception:
+            return None
+
 
 class MemberListSerializer(serializers.ModelSerializer):
     """
@@ -102,15 +142,16 @@ class MemberListSerializer(serializers.ModelSerializer):
     age = serializers.SerializerMethodField()
     church_name = serializers.CharField(source='church.name', read_only=True)
     membership_status_display = serializers.CharField(source='get_membership_status_display', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
     ministerial_function_display = serializers.CharField(source='get_ministerial_function_display', read_only=True)
     
     class Meta:
         model = Member
         fields = [
             'id', 'user', 'full_name', 'email', 'phone', 'birth_date', 'age',
-            'church_name', 'membership_status', 'membership_status_display',
+            'church_name', 'branch_name', 'membership_status', 'membership_status_display',
             'ministerial_function', 'ministerial_function_display',
-            'membership_date',
+            'membership_date', 'membership_start_date', 'membership_end_date',
             'is_active'
         ]
     
@@ -129,10 +170,7 @@ class MemberCreateSerializer(serializers.ModelSerializer):
     system_role = serializers.ChoiceField(
         choices=[
             (RoleChoices.CHURCH_ADMIN, 'Administrador da Igreja'),
-            (RoleChoices.PASTOR, 'Pastor'),
             (RoleChoices.SECRETARY, 'Secretário(a)'),
-            (RoleChoices.LEADER, 'Líder'),
-            (RoleChoices.MEMBER, 'Membro'),
         ],
         required=False,
         write_only=True
@@ -140,11 +178,17 @@ class MemberCreateSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(required=False, write_only=True)
     user_password = serializers.CharField(min_length=8, required=False, write_only=True)
     
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.none(),
+        required=False,
+        allow_null=True
+    )
+
     class Meta:
         model = Member
         fields = [
             # Campos obrigatórios e principais
-            'church', 'full_name', 'birth_date',
+            'church', 'branch', 'full_name', 'birth_date',
             
             # Documentos
             'cpf', 'rg',
@@ -159,11 +203,11 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'zipcode',
             
             # Dados eclesiásticos
-            'membership_status', 'conversion_date', 'baptism_date', 
+            'membership_status', 'membership_start_date', 'membership_end_date', 
             'previous_church', 'transfer_letter',
             
             # Dados ministeriais
-            'ministerial_function', 'ordination_date',
+            'ministerial_function',
             
             # Dados familiares
             'spouse', 'children_count', 'responsible',
@@ -179,19 +223,90 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate_cpf(self, value):
-        """Validação de CPF"""
-        if not value:
-            raise serializers.ValidationError("CPF é obrigatório.")
-            
-        # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
-        existing = Member.objects.all().filter(
-            cpf=value,
-            is_active=True
-        ).exists()
-        
-        if existing:
-            raise serializers.ValidationError("Este CPF já está cadastrado.")
+        """Validação de CPF (opcional) com unicidade por denominação"""
+        if not value or not str(value).strip():
+            return None
+
+        # Determinar denominação a partir da igreja
+        church = None
+        if self.context.get('request'):
+            from apps.accounts.models import ChurchUser
+            user = self.context['request'].user
+            church = ChurchUser.objects.get_active_church_for_user(user)
+        if not church and self.initial_data:
+            church_id = self.initial_data.get('church')
+            if church_id:
+                from apps.churches.models import Church
+                try:
+                    church = Church.objects.get(id=church_id)
+                except Church.DoesNotExist:
+                    pass
+
+        if church and church.denomination_id:
+            exists = Member.objects.filter(
+                cpf=value,
+                is_active=True,
+                church__denomination_id=church.denomination_id,
+            ).exists()
+        elif church:
+            exists = Member.objects.filter(
+                cpf=value,
+                is_active=True,
+                church=church,
+            ).exists()
+        else:
+            # fallback conservador: permitir
+            exists = False
+
+        if exists:
+            raise serializers.ValidationError("Este CPF já está cadastrado nesta denominação.")
         return value
+
+    def validate_branch(self, value):
+        """Garante que a filial pertença à igreja ativa"""
+        if not value:
+            return value
+
+        request = self.context.get('request')
+        church = None
+        if request:
+            from apps.accounts.models import ChurchUser
+            church = ChurchUser.objects.get_active_church_for_user(request.user)
+
+        if church and value.church_id != church.id:
+            raise serializers.ValidationError("A filial selecionada não pertence à sua igreja ativa.")
+        # Secretary write guard
+        if request and request.method in ('POST', 'PUT', 'PATCH'):
+            if not self._user_can_write_branch(request.user, value):
+                raise serializers.ValidationError("Sem permissão para escrever nesta filial.")
+        return value
+
+    def __init__(self, *args, **kwargs):
+        request = kwargs.get('context', {}).get('request') if kwargs.get('context') else None
+        super().__init__(*args, **kwargs)
+        if request:
+            from apps.accounts.models import ChurchUser
+            church = ChurchUser.objects.get_active_church_for_user(request.user)
+            if church:
+                self.fields['branch'].queryset = Branch.objects.filter(church=church, is_active=True)
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch or not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(branch.church):
+                    return True
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
     
     def validate_phone(self, value):
         """Validação de telefone"""
@@ -238,6 +353,13 @@ class MemberCreateSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         """Validações gerais"""
+        # Compat: se vier apenas membership_date, mapear para membership_start_date
+        md = self.initial_data.get('membership_date') if isinstance(self.initial_data, dict) else None
+        if md and not attrs.get('membership_start_date'):
+            try:
+                attrs['membership_start_date'] = md
+            except Exception:
+                pass
         # Validar idade mínima
         if attrs.get('birth_date'):
             today = date.today()
@@ -279,6 +401,29 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         # Criar o membro
         member = super().create(validated_data)
         
+        # Registrar histórico inicial de função ministerial (se houver)
+        if member.ministerial_function:
+            from datetime import date
+            MinisterialFunctionHistory.objects.create(
+                member=member,
+                function=member.ministerial_function,
+                start_date=date.today(),
+                changed_by=self.context.get('request').user if self.context.get('request') else None,
+                notes='Registro inicial via criação de membro'
+            )
+
+        # Registrar log inicial de status de membresia
+        try:
+            MembershipStatusLog.objects.create(
+                member=member,
+                old_status=member.membership_status,  # Sem status anterior conhecido
+                new_status=member.membership_status,
+                changed_by=self.context.get('request').user if self.context.get('request') else None,
+                reason='Status inicial'
+            )
+        except Exception:  # Evita falha do cadastro por causa do log
+            pass
+        
         # Criar usuário do sistema se solicitado
         if create_system_user and system_role and user_email and user_password:
             try:
@@ -315,7 +460,13 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer para atualização de membros
     """
-    
+
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.none(),
+        required=False,
+        allow_null=True
+    )
+
     class Meta:
         model = Member
         fields = [
@@ -323,24 +474,77 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             'full_name', 'cpf', 'rg', 'birth_date', 'gender', 'marital_status',
             'email', 'phone', 'phone_secondary', 'address', 'number', 'complement', 'neighborhood', 
             'city', 'state', 'zipcode', 
-            'membership_status', 'conversion_date', 'baptism_date', 'previous_church', 'transfer_letter', 
-            'ministerial_function', 'ordination_date', 'spouse', 'children_count', 'responsible', 'profession', 'education_level', 
-            'photo', 'notes', 'accept_sms', 'accept_email', 'accept_whatsapp'
+            'membership_status', 'membership_start_date', 'membership_end_date', 'previous_church', 'transfer_letter', 
+            'ministerial_function', 'spouse', 'children_count', 'responsible', 'profession', 'education_level', 
+            'photo', 'notes', 'accept_sms', 'accept_email', 'accept_whatsapp',
+            'branch'
         ]
     
     def validate_cpf(self, value):
-        """Validação de CPF na atualização"""
-        if not value:
-            raise serializers.ValidationError("CPF é obrigatório.")
-            
-        # Usar .all() para ignorar filtros do TenantManager e verificar todos os membros
-        existing = Member.objects.all().filter(
-            cpf=value,
-            is_active=True
-        ).exclude(pk=self.instance.pk).exists()
+        """Validação de CPF (opcional) na atualização com unicidade por denominação"""
+        if not value or not str(value).strip():
+            return None
         
-        if existing:
-            raise serializers.ValidationError("Este CPF já está cadastrado.")
+        church = getattr(self.instance, 'church', None)
+        if church and church.denomination_id:
+            exists = Member.objects.filter(
+                cpf=value,
+                is_active=True,
+                church__denomination_id=church.denomination_id,
+            ).exclude(pk=self.instance.pk).exists()
+        elif church:
+            exists = Member.objects.filter(
+                cpf=value,
+                is_active=True,
+                church=church,
+            ).exclude(pk=self.instance.pk).exists()
+        else:
+            exists = False
+        
+        if exists:
+            raise serializers.ValidationError("Este CPF já está cadastrado nesta denominação.")
+        return value
+
+    def update(self, instance, validated_data):
+        """Atualiza membro e sincroniza histórico de função quando função muda"""
+        old_function = instance.ministerial_function
+        new_function = validated_data.get('ministerial_function', old_function)
+        old_status = instance.membership_status
+        new_status = validated_data.get('membership_status', old_status)
+        member = super().update(instance, validated_data)
+        
+        if new_function != old_function:
+            from datetime import date, timedelta
+            # Encerrar histórico atual (se existir)
+            current = member.ministerial_function_history.filter(end_date__isnull=True).first()
+            if current:
+                # Encerrar no dia anterior ao novo início
+                end_date = date.today() - timedelta(days=1)
+                if current.start_date and end_date <= current.start_date:
+                    end_date = current.start_date
+                current.end_date = end_date
+                current.save(update_fields=['end_date', 'updated_at'])
+            # Criar novo histórico
+            MinisterialFunctionHistory.objects.create(
+                member=member,
+                function=new_function,
+                start_date=date.today(),
+                changed_by=self.context.get('request').user if self.context.get('request') else None,
+                notes='Atualização via edição de membro'
+            )
+        # Log de mudança de status de membresia
+        if new_status != old_status:
+            try:
+                MembershipStatusLog.objects.create(
+                    member=member,
+                    old_status=old_status,
+                    new_status=new_status,
+                    changed_by=self.context.get('request').user if self.context.get('request') else None,
+                    reason='Alteração via edição do membro'
+                )
+            except Exception:
+                pass
+        return member
         return value
     
     def validate_phone(self, value):
@@ -348,6 +552,45 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("Telefone é obrigatório.")
         return value
+
+    def validate_branch(self, value):
+        """Validação da filial na atualização + permissão branch-aware"""
+        if not value:
+            return value
+
+        church = None
+        if self.instance and hasattr(self.instance, 'church'):
+            church = self.instance.church
+        elif self.context.get('request'):
+            from apps.accounts.models import ChurchUser
+            church = ChurchUser.objects.get_active_church_for_user(self.context['request'].user)
+
+        if church and value.church_id != church.id:
+            raise serializers.ValidationError("A filial selecionada não pertence à mesma igreja.")
+
+        request = self.context.get('request')
+        if request and request.method in ('PUT', 'PATCH'):
+            if not self._user_can_write_branch(request.user, value):
+                raise serializers.ValidationError("Sem permissão para editar membro nesta filial.")
+        return value
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch or not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(branch.church):
+                    return True
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
     
     def validate_email(self, value):
         """Validação de email na atualização"""
@@ -379,6 +622,19 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         
         # Se email é string vazia, retornar None para salvar como NULL no banco
         return value if value and value.strip() else None
+
+    def __init__(self, *args, **kwargs):
+        request = kwargs.get('context', {}).get('request') if kwargs.get('context') else None
+        super().__init__(*args, **kwargs)
+        church = None
+        if self.instance:
+            church = self.instance.church
+        elif request:
+            from apps.accounts.models import ChurchUser
+            church = ChurchUser.objects.get_active_church_for_user(request.user)
+
+        if church:
+            self.fields['branch'].queryset = Branch.objects.filter(church=church, is_active=True)
     
 
 
@@ -438,27 +694,121 @@ class MembershipStatusSerializer(serializers.ModelSerializer):
     
     member_name = serializers.CharField(source='member.full_name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    # Novos aliases para datas de ordenação
+    ordination_start_date = serializers.DateField(source='effective_date', required=False, allow_null=True)
+    ordination_end_date = serializers.DateField(source='end_date', required=False, allow_null=True)
     
     class Meta:
         model = MembershipStatus
         fields = [
-            'id', 'member', 'member_name', 'status', 'status_display',
-            'ordination_date', 'termination_date', 'observation',
-            'is_active', 'created_at', 'updated_at'
+            'id', 'member', 'member_name', 'branch', 'status', 'status_display',
+            'effective_date', 'end_date', 'ordination_start_date', 'ordination_end_date',
+            'observation', 'is_active', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'member_name', 'status_display', 'created_at', 'updated_at']
     
     def validate(self, attrs):
         """Validações específicas"""
-        ordination_date = attrs.get('ordination_date')
-        termination_date = attrs.get('termination_date')
+        # Compat: aceitar ordination_* e mapear para effective_date/end_date
+        initial = getattr(self, 'initial_data', {}) or {}
+        if 'ordination_start_date' in initial and 'effective_date' not in attrs:
+            attrs['effective_date'] = initial.get('ordination_start_date')
+        if 'ordination_end_date' in initial and 'end_date' not in attrs:
+            attrs['end_date'] = initial.get('ordination_end_date')
+
+        effective_date = attrs.get('effective_date')
+        end_date = attrs.get('end_date')
         
-        if termination_date and ordination_date and termination_date <= ordination_date:
+        if end_date and effective_date and end_date <= effective_date:
             raise serializers.ValidationError(
                 "Data de término deve ser posterior à data de ordenação"
             )
         
+        # Definir branch padrão quando não informado: usar branch do membro
+        if attrs.get('branch') is None:
+            member = attrs.get('member') or getattr(self.instance, 'member', None)
+            if member and getattr(member, 'branch', None):
+                attrs['branch'] = member.branch
+        
+        # Coerência church ↔ branch do status
+        member = attrs.get('member') or getattr(self.instance, 'member', None)
+        branch = attrs.get('branch') or getattr(self.instance, 'branch', None)
+        if member and branch and member.church_id != branch.church_id:
+            raise serializers.ValidationError({'branch': 'Filial do status deve pertencer à mesma igreja do membro.'})
+
+        # Validar unicidade de status atual (sem end_date)
+        if not attrs.get('end_date'):
+            from .models import MembershipStatus
+            member = attrs.get('member') or getattr(self.instance, 'member', None)
+            if member:
+                qs = MembershipStatus.objects.filter(member=member, end_date__isnull=True)
+                if self.instance:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise serializers.ValidationError(
+                        "Já existe um status atual para este membro. Finalize o status atual antes de criar outro."
+                    )
+
+        # Secretary branch-aware para escrita
+        request = self.context.get('request')
+        if request and request.method in ('POST', 'PUT', 'PATCH') and branch:
+            if not self._user_can_write_branch(request.user, branch):
+                raise serializers.ValidationError({'branch': 'Sem permissão para alterar status nesta filial.'})
+
         return attrs
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch or not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(branch.church):
+                    return True
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
+
+
+class MinisterialFunctionHistorySerializer(serializers.ModelSerializer):
+    member_name = serializers.CharField(source='member.full_name', read_only=True)
+    is_current = serializers.ReadOnlyField()
+
+    class Meta:
+        model = MinisterialFunctionHistory
+        fields = [
+            'id', 'member', 'member_name', 'function', 'start_date', 'end_date', 'is_current', 'notes'
+        ]
+        read_only_fields = ['id', 'member_name', 'is_current']
+
+    def create(self, validated_data):
+        member = validated_data['member']
+        new_function = validated_data['function']
+        start_date = validated_data['start_date']
+        from datetime import timedelta
+        # Encerrar atual se existir
+        current = member.ministerial_function_history.filter(end_date__isnull=True).first()
+        if current:
+            end_date = start_date - timedelta(days=1)
+            if end_date <= current.start_date:
+                end_date = current.start_date
+            current.end_date = end_date
+            current.save(update_fields=['end_date', 'updated_at'])
+
+        # Criar novo
+        obj = super().create(validated_data)
+
+        # Sincronizar com campo do Member
+        if member.ministerial_function != new_function:
+            member.ministerial_function = new_function
+            member.save(update_fields=['ministerial_function', 'updated_at'])
+        return obj
 
 
 class MemberStatusChangeSerializer(serializers.Serializer):
@@ -481,7 +831,3 @@ class MemberStatusChangeSerializer(serializers.Serializer):
 # Constantes para facilitar o uso nos filtros
 MEMBERSHIP_STATUS_CHOICES = MembershipStatusChoices.choices
 MINISTERIAL_FUNCTION_CHOICES = MinisterialFunctionChoices.choices
-
-
-
-

@@ -189,6 +189,20 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        # Rates gerais
+        "anon": "60/minute",
+        "user": "120/minute",
+        # Escopos específicos (QR público e autenticação)
+        "qr_anon": "30/minute",
+        "qr_user": "120/minute",
+        "auth_anon": "10/minute",
+        "auth_user": "30/minute",
+    },
 }
 
 # =================================
@@ -204,8 +218,11 @@ SPECTACULAR_SETTINGS = {
     "SCHEMA_PATH_PREFIX": "/api/v1/",
     "TAGS": [
         {"name": "auth", "description": "Autenticação e usuários"},
+        {"name": "denominations", "description": "Denominações (read-only para usuários comuns)"},
         {"name": "churches", "description": "Gestão de igrejas"},
+        {"name": "branches", "description": "Filiais e QR Codes"},
         {"name": "members", "description": "Gestão de membros"},
+        {"name": "visitors", "description": "Visitantes e fluxo público"},
         {"name": "activities", "description": "Atividades e eventos"},
     ],
 }

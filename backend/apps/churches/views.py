@@ -121,7 +121,7 @@ class ChurchViewSet(viewsets.ModelViewSet):
             ),
             branches_count=Count(
                 'branches',
-                filter=Q(branches__is_active=True, branches__is_headquarters=False),
+                filter=Q(branches__is_active=True, branches__is_main=False),
                 distinct=True
             ),
             visitors_count=Count(
@@ -235,6 +235,59 @@ class ChurchViewSet(viewsets.ModelViewSet):
         # Atualizar estatísticas da denominação se aplicável
         if instance.denomination:
             instance.denomination.update_statistics()
+
+    # ==============================
+    # Compat: QR Code via Church → Branch principal
+    # ==============================
+    def _get_main_branch(self, church):
+        try:
+            from apps.branches.models import Branch
+            branch = church.branches.filter(is_active=True, is_main=True).first()
+            if not branch:
+                branch = church.branches.filter(is_active=True).first()
+            return branch
+        except Exception:
+            return None
+
+    @action(detail=True, methods=['get'])
+    def qr_code(self, request, pk=None):
+        """Retorna dados de QR da filial principal (compat)."""
+        church = self.get_object()
+        branch = self._get_main_branch(church)
+        if not branch:
+            return Response({'error': 'Igreja não possui filial principal para QR.'}, status=status.HTTP_404_NOT_FOUND)
+        from apps.branches.serializers import BranchQRCodeSerializer
+        serializer = BranchQRCodeSerializer(branch, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def regenerate_qr_code(self, request, pk=None):
+        """Regenera QR da filial principal (compat)."""
+        church = self.get_object()
+        branch = self._get_main_branch(church)
+        if not branch:
+            return Response({'error': 'Igreja não possui filial principal para QR.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            branch.regenerate_qr_code()
+            from apps.branches.serializers import BranchQRCodeSerializer
+            serializer = BranchQRCodeSerializer(branch, context={'request': request})
+            return Response({'message': 'QR code regenerado com sucesso', 'data': serializer.data})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def toggle_qr_code(self, request, pk=None):
+        """Ativa/desativa QR da filial principal (compat)."""
+        church = self.get_object()
+        branch = self._get_main_branch(church)
+        if not branch:
+            return Response({'error': 'Igreja não possui filial principal para QR.'}, status=status.HTTP_404_NOT_FOUND)
+        branch.qr_code_active = not branch.qr_code_active
+        branch.save(update_fields=['qr_code_active', 'updated_at'])
+        status_text = 'ativado' if branch.qr_code_active else 'desativado'
+        from apps.branches.serializers import BranchQRCodeSerializer
+        serializer = BranchQRCodeSerializer(branch, context={'request': request})
+        return Response({'message': f'QR code {status_text} com sucesso', 'data': serializer.data})
     
     # ============================================
     # CUSTOM ACTIONS - ESTATÍSTICAS E RELATÓRIOS
@@ -276,6 +329,7 @@ class ChurchViewSet(viewsets.ModelViewSet):
             logger.info(f"✅ Primeira igreja '{church.name}' criada para {user.email} via onboarding")
             
             # Criar filial matriz automaticamente com QR Code
+            main_branch = None
             try:
                 main_branch = Branch.objects.create(
                     church=church,
@@ -291,12 +345,17 @@ class ChurchViewSet(viewsets.ModelViewSet):
                     phone=church.phone,
                     email=church.email,
                     qr_code_active=True,  # QR Code ativo por padrão
-                    is_active=True
+                    is_active=True,
+                    is_main=True
                 )
                 logger.info(f"✅ Filial matriz criada com QR Code para igreja '{church.name}'")
                 logger.info(f"   QR Code UUID: {main_branch.qr_code_uuid}")
                 logger.info(f"   URL de registro: {main_branch.get_visitor_registration_url()}")
-                
+
+                # Atualizar vínculo do usuário para apontar filial ativa
+                from apps.accounts.models import ChurchUser
+                ChurchUser.objects.filter(user=user, church=church).update(active_branch=main_branch)
+            
             except Exception as branch_error:
                 logger.warning(f"⚠️ Erro ao criar filial matriz: {str(branch_error)}")
                 # Não falhar a criação da igreja se houver erro na filial
@@ -304,12 +363,20 @@ class ChurchViewSet(viewsets.ModelViewSet):
             
             # Retornar dados completos da igreja criada
             response_serializer = ChurchDetailSerializer(church)
+            branch_payload = None
+            if main_branch:
+                try:
+                    from apps.branches.serializers import BranchSerializer
+                    branch_payload = BranchSerializer(main_branch).data
+                except Exception:
+                    branch_payload = None
             
             return Response({
                 'message': 'Igreja criada com sucesso! Bem-vindo ao Obreiro Virtual.',
                 'church': response_serializer.data,
                 'onboarding_completed': True,
-                'main_branch_created': True,  # Informar que filial foi criada
+                'main_branch_created': branch_payload is not None,
+                'branch': branch_payload,
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
@@ -339,7 +406,7 @@ class ChurchViewSet(viewsets.ModelViewSet):
         
         # Assumindo que existe um modelo Branch relacionado
         try:
-            branches = church.branches.filter(is_active=True, is_headquarters=False)
+            branches = church.branches.filter(is_active=True, is_main=False)
             # Usar serializer básico para evitar circular import
             branches_data = []
             for branch in branches:

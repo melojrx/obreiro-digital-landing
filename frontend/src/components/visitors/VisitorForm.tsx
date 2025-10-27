@@ -34,6 +34,7 @@ const visitorSchema = z.object({
   ministry_interest: z.string().optional(),
   observations: z.string().optional(),
   follow_up_status: z.enum(['pending', 'contacted', 'interested', 'not_interested', 'converted']).default('pending'),
+  branch: z.number().int().positive().optional(),
 });
 
 export type VisitorFormData = z.infer<typeof visitorSchema>;
@@ -86,8 +87,15 @@ export const VisitorForm: React.FC<VisitorFormProps> = ({
       ministry_interest: initialData?.ministry_interest || '',
       observations: initialData?.observations || '',
       follow_up_status: initialData?.follow_up_status || 'pending',
+      branch: initialData?.branch,
     }
   });
+
+  useEffect(() => {
+    if (initialData?.branch) {
+      setValue('branch', initialData.branch);
+    }
+  }, [initialData?.branch, setValue]);
 
   // Estados brasileiros
   const estados = [

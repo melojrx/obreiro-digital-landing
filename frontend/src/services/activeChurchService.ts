@@ -10,6 +10,10 @@ export interface UserChurch {
   is_active: boolean;
   city: string;
   state: string;
+  active_branch?: {
+    id: number;
+    name: string;
+  } | null;
 }
 
 export interface ActiveChurch {
@@ -19,6 +23,10 @@ export interface ActiveChurch {
   denomination_name: string | null;
   city: string;
   state: string;
+  active_branch?: {
+    id: number;
+    name: string;
+  } | null;
 }
 
 export interface UserChurchesResponse {
@@ -27,16 +35,13 @@ export interface UserChurchesResponse {
 }
 
 export interface SetActiveChurchRequest {
-  church_id: number;
+  churchId: number;
+  branchId?: number;
 }
 
 export interface SetActiveChurchResponse {
   message: string;
-  active_church: {
-    id: number;
-    name: string;
-    short_name: string;
-  };
+  active_church: ActiveChurch;
 }
 
 export interface ActiveChurchResponse {
@@ -55,9 +60,10 @@ export const activeChurchService = {
   /**
    * Define qual igreja é ativa para o usuário
    */
-  async setActiveChurch(churchId: number): Promise<SetActiveChurchResponse> {
+  async setActiveChurch({ churchId, branchId }: SetActiveChurchRequest): Promise<SetActiveChurchResponse> {
     const response = await api.post<SetActiveChurchResponse>('/auth/set-active-church/', {
       church_id: churchId,
+      branch_id: branchId,
     });
     return response.data;
   },
