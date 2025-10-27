@@ -7,8 +7,6 @@ import {
   Calendar,
   User,
   MoreHorizontal,
-  Eye,
-  Edit,
   UserX
 } from 'lucide-react';
 
@@ -25,17 +23,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import { churchService } from '@/services/churchService';
-import { Member } from '@/types/member';
+import { Member as SimpleMember } from '@/types/member';
+import { membersService, type Member as FullMember } from '@/services/membersService';
+import TransferMemberModal from '@/components/members/TransferMemberModal';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface ChurchMembersCardProps {
   churchId: number;
 }
 
 const ChurchMembersCard: React.FC<ChurchMembersCardProps> = ({ churchId }) => {
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<SimpleMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredMembers, setFilteredMembers] = useState<Member[]>([]);
+  const [filteredMembers, setFilteredMembers] = useState<SimpleMember[]>([]);
+  const [transferMember, setTransferMember] = useState<FullMember | null>(null);
+  const permissions = usePermissions();
 
   useEffect(() => {
     loadMembers();
@@ -64,6 +67,15 @@ const ChurchMembersCard: React.FC<ChurchMembersCardProps> = ({ churchId }) => {
       setMembers([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOpenTransfer = async (memberId: number) => {
+    try {
+      const full = await membersService.getMember(memberId);
+      setTransferMember(full);
+    } catch (err) {
+      console.error('Erro ao carregar dados do membro para transferência:', err);
     }
   };
 
@@ -208,18 +220,12 @@ const ChurchMembersCard: React.FC<ChurchMembersCardProps> = ({ churchId }) => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Ver Detalhes
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-red-600">
-                  <UserX className="h-4 w-4 mr-2" />
-                  Transferir
-                </DropdownMenuItem>
+                {(permissions.canManageMembers || permissions.canManageChurch) && (
+                  <DropdownMenuItem onClick={() => handleOpenTransfer(member.id)}>
+                    <UserX className="h-4 w-4 mr-2" />
+                    Transferir
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -240,6 +246,15 @@ const ChurchMembersCard: React.FC<ChurchMembersCardProps> = ({ churchId }) => {
           </Button>
         )}
       </div>
+      {/* Modal de Transferência */}
+      <TransferMemberModal
+        isOpen={!!transferMember}
+        member={transferMember}
+        onClose={() => setTransferMember(null)}
+        onTransferred={async () => {
+          await loadMembers();
+        }}
+      />
     </div>
   );
 };

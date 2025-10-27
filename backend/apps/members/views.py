@@ -116,6 +116,39 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
         if instance.branch and not self._user_can_write_branch(request.user, instance.branch):
             raise PermissionDenied('Sem permissão para excluir membro desta filial.')
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], url_path='transfer-branch')
+    def transfer_branch_admin(self, request, pk=None):
+        """Transfere a lotação (branch) de um membro para outra filial da mesma igreja."""
+        try:
+            target_branch_id = int(request.data.get('branch_id'))
+        except (TypeError, ValueError):
+            return Response({'error': 'branch_id inválido ou não informado'}, status=status.HTTP_400_BAD_REQUEST)
+
+        member = self.get_object()
+
+        from apps.branches.models import Branch
+        try:
+            target_branch = Branch.objects.get(id=target_branch_id, is_active=True)
+        except Branch.DoesNotExist:
+            return Response({'error': 'Filial alvo não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+        if target_branch.church_id != member.church_id:
+            return Response({'error': 'Filial alvo deve pertencer à mesma igreja do membro.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not self._user_can_write_branch(request.user, target_branch):
+            raise PermissionDenied('Sem permissão para transferir para esta filial.')
+
+        old_branch = member.branch
+        member.branch = target_branch
+        member.save(update_fields=['branch', 'updated_at'])
+
+        return Response({
+            'message': 'Membro transferido com sucesso para a filial selecionada',
+            'member': MemberSerializer(member, context={'request': request}).data,
+            'old_branch': {'id': old_branch.id, 'name': old_branch.name} if old_branch else None,
+            'new_branch': {'id': target_branch.id, 'name': target_branch.name},
+        })
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""

@@ -37,6 +37,7 @@ const Membros: React.FC = () => {
     membersLoading,
     filters,
     setFilters,
+    refreshData,
     deleteMember,
     totalMembers,
   } = useMembers();
@@ -169,6 +170,9 @@ const Membros: React.FC = () => {
             <MembersTable
               members={members}
               onDelete={permissions.canDeleteMembers ? (member) => handleDeleteMember(member.id) : undefined}
+              onTransferSuccess={async () => {
+                await refreshData();
+              }}
             />
           )}
         </div>

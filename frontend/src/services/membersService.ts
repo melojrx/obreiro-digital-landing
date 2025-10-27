@@ -66,6 +66,8 @@ export interface Member {
   id: number;
   church: number;
   church_name: string;
+  branch?: number | null;
+  branch_name?: string;
   user?: number;  // ID do usuário vinculado (opcional)
   full_name: string;
   cpf?: string;
@@ -128,6 +130,7 @@ export interface MemberSummary {
   phone?: string;
   age: number;
   church_name: string;
+  branch_name?: string;
   membership_date: string;
   is_active: boolean;
 }
@@ -471,6 +474,14 @@ export const membersService = {
   // Transferir lotação do membro do usuário atual para outra filial
   async transferMyMembership(branchId: number): Promise<{ message: string; member: Member }> {
     const response = await api.post(API_ENDPOINTS.members.me.transferBranch, {
+      branch_id: branchId,
+    });
+    return response.data;
+  },
+
+  // Transferência assistida de um membro (admin/secretário) para outra filial da mesma igreja
+  async transferBranch(memberId: number, branchId: number): Promise<{ message: string; member: Member }> {
+    const response = await api.post(API_ENDPOINTS.members.transferBranch(memberId), {
       branch_id: branchId,
     });
     return response.data;

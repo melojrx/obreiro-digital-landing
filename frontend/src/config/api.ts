@@ -144,6 +144,8 @@ export const API_ENDPOINTS = {
     create: '/members/',
     update: (id: number) => `/members/${id}/`,
     delete: (id: number) => `/members/${id}/`,
+    // Transferência assistida (admin) entre filiais da mesma igreja
+    transferBranch: (id: number) => `/members/${id}/transfer-branch/`,
     dashboard: '/members/dashboard/',
     statistics: '/members/statistics/',
     profile: (id: number) => `/members/${id}/profile/`,
