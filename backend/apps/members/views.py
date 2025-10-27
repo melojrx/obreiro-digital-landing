@@ -4,6 +4,7 @@ Implementa APIs para gestão de membros
 """
 
 from rest_framework import viewsets, status, permissions
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -57,6 +58,44 @@ class MemberViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_active=True)
         
         return queryset
+
+    # ==============================
+    # Permissões por ação (P1b)
+    # ==============================
+    def get_permissions(self):
+        # Leitura para autenticados; escrita checada por branch
+        if self.action in ['list', 'retrieve', 'dashboard', 'my_membership_status', 'all']:
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [p() for p in permission_classes]
+
+    def _user_can_manage_church(self, user, church):
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(church):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _user_can_write_branch(self, user, branch):
+        if not branch:
+            return False
+        if user.is_superuser:
+            return True
+        if self._user_can_manage_church(user, branch.church):
+            return True
+        try:
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                managed = getattr(cu, 'managed_branches', None)
+                if managed is None or not managed.exists():
+                    return True
+                return managed.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
     
     def perform_create(self, serializer):
         """Ao criar, associar à igreja ativa do usuário"""
@@ -71,6 +110,9 @@ class MemberViewSet(viewsets.ModelViewSet):
                 raise ValidationError("A filial selecionada não pertence à igreja ativa.")
             if not branch:
                 branch = ChurchUser.objects.get_active_branch_for_user(self.request.user)
+            # Checagem de permissão de escrita na branch definida
+            if branch and not self._user_can_write_branch(self.request.user, branch):
+                raise PermissionDenied('Sem permissão para criar membro nesta filial.')
             serializer.save(church=active_church, branch=branch)
         else:
             raise ValidationError("Usuário não tem igreja ativa configurada")
@@ -79,10 +121,18 @@ class MemberViewSet(viewsets.ModelViewSet):
         from django.core.exceptions import ValidationError
 
         branch = serializer.validated_data.get('branch', serializer.instance.branch)
+        if branch and not self._user_can_write_branch(self.request.user, branch):
+            raise PermissionDenied('Sem permissão para editar membro desta filial.')
         if branch and branch.church_id != serializer.instance.church_id:
             raise ValidationError("A filial selecionada não pertence à mesma igreja do membro.")
 
         serializer.save(branch=branch)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.branch and not self._user_can_write_branch(request.user, instance.branch):
+            raise PermissionDenied('Sem permissão para excluir membro desta filial.')
+        return super().destroy(request, *args, **kwargs)
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""

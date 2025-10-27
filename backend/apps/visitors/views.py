@@ -4,6 +4,7 @@ Sistema de QR Code para registro de visitantes
 """
 
 from rest_framework import viewsets, status, permissions
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -170,6 +171,46 @@ class VisitorViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(branch=branch)
 
         return queryset
+
+    # ==============================
+    # Permissões por ação (P1b)
+    # ==============================
+    def get_permissions(self):
+        """Leitura liberada a membros; escrita validada por branch/igreja."""
+        if self.action in ['list', 'retrieve', 'stats', 'branch_stats']:
+            permission_classes = [permissions.IsAuthenticated, IsMemberUser]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def _user_can_manage_church(self, user, church):
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(church):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _user_can_write_branch(self, user, branch):
+        """ChurchAdmin (igreja/denom) ou secretário com branch atribuída."""
+        if not branch:
+            return False
+        if user.is_superuser:
+            return True
+        if self._user_can_manage_church(user, branch.church):
+            return True
+        try:
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_members:
+                # Para SECRETARY, se existirem branches atribuídas, precisa estar contida
+                managed = getattr(cu, 'managed_branches', None)
+                if managed is None or not managed.exists():
+                    return True
+                return managed.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""
@@ -211,6 +252,11 @@ class VisitorViewSet(viewsets.ModelViewSet):
                 'details': serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Checagem de permissão baseada na branch do payload
+        target_branch = serializer.validated_data.get('branch')
+        if not self._user_can_write_branch(request.user, target_branch):
+            raise PermissionDenied('Sem permissão para cadastrar visitante nesta filial.')
+
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         
@@ -232,6 +278,9 @@ class VisitorViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         branch = serializer.validated_data.get('branch', serializer.instance.branch)
+        # Checagem de permissão
+        if branch and not self._user_can_write_branch(self.request.user, branch):
+            raise PermissionDenied('Sem permissão para editar visitante desta filial.')
         if branch and serializer.instance.church_id and branch.church_id != serializer.instance.church_id:
             raise ValidationError({'branch': 'Filial selecionada não pertence à igreja do visitante.'})
 
@@ -239,6 +288,12 @@ class VisitorViewSet(viewsets.ModelViewSet):
             church=branch.church if branch else serializer.instance.church,
             branch=branch
         )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._user_can_write_branch(request.user, instance.branch):
+            raise PermissionDenied('Sem permissão para excluir visitante desta filial.')
+        return super().destroy(request, *args, **kwargs)
     
     @action(detail=False, methods=['get'])
     def stats(self, request):
