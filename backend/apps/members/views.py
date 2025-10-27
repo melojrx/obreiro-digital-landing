@@ -13,6 +13,7 @@ from django.db.models import Count, Q
 from datetime import datetime, date
 
 from .models import Member, MembershipStatusLog, MinisterialFunctionHistory, MembershipStatus
+from apps.core.mixins import ChurchScopedQuerysetMixin
 from .serializers import (
     MemberSerializer, MemberListSerializer, MemberCreateSerializer, 
     MemberUpdateSerializer, MemberSummarySerializer,
@@ -21,7 +22,7 @@ from .serializers import (
 )
 
 
-class MemberViewSet(viewsets.ModelViewSet):
+class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
     """
     ViewSet para CRUD de membros com otimizações
     """
@@ -34,30 +35,12 @@ class MemberViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        """QuerySet otimizado com select_related e filtros por igreja"""
-        # Filtrar apenas membros da igreja do usuário logado
+        """QuerySet otimizado + escopo por igreja/branch/secretário."""
         queryset = Member.objects.select_related('church', 'branch', 'spouse', 'responsible')
-        
-        # Usar igreja ativa do usuário
-        from apps.accounts.models import ChurchUser
-        active_church = ChurchUser.objects.get_active_church_for_user(self.request.user)
-        
-        if active_church:
-            queryset = queryset.filter(church=active_church)
-        else:
-            # Se não tem igreja ativa, retornar queryset vazio
-            queryset = queryset.none()
-
-        active_branch = ChurchUser.objects.get_active_branch_for_user(self.request.user)
-        request_branch = getattr(self.request, 'branch', None) or active_branch
-        if request_branch:
-            queryset = queryset.filter(branch=request_branch)
-        
-        # Filtrar apenas membros ativos por padrão
+        scoped = self.filter_queryset_by_scope(self.request, queryset, has_branch=True)
         if self.action != 'all':
-            queryset = queryset.filter(is_active=True)
-        
-        return queryset
+            scoped = scoped.filter(is_active=True)
+        return scoped
 
     # ==============================
     # Permissões por ação (P1b)

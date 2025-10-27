@@ -24,6 +24,7 @@ from .serializers import (
 )
 from apps.branches.models import Branch
 from apps.core.permissions import IsMemberUser
+from apps.core.mixins import ChurchScopedQuerysetMixin
 from apps.core.throttling import QRCodeAnonRateThrottle, QRCodeUserRateThrottle
 
 
@@ -128,7 +129,7 @@ def register_visitor(request, qr_code_uuid):
 # ENDPOINTS ADMINISTRATIVOS (Com autenticação)
 # =====================================
 
-class VisitorViewSet(viewsets.ModelViewSet):
+class VisitorViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
     """
     ViewSet para administração de visitantes
     Requer autenticação e permissões de igreja
@@ -147,30 +148,9 @@ class VisitorViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        """
-        Filtra visitantes pela igreja do usuário
-        """
-        request = self.request
-        user = request.user
-
-        if user.is_superuser:
-            return Visitor.objects.all()
-
-        church = getattr(request, 'church', None)
-        if church is None and user.is_authenticated:
-            from apps.accounts.models import ChurchUser
-            church = ChurchUser.objects.get_active_church_for_user(user)
-
-        if not church:
-            return Visitor.objects.none()
-
-        queryset = Visitor.objects.filter(church=church, is_active=True)
-
-        branch = getattr(request, 'branch', None)
-        if branch:
-            queryset = queryset.filter(branch=branch)
-
-        return queryset
+        """Aplica escopo padronizado (igreja/branch/secretário)."""
+        base = Visitor.objects.filter(is_active=True)
+        return self.filter_queryset_by_scope(self.request, base, has_branch=True)
 
     # ==============================
     # Permissões por ação (P1b)

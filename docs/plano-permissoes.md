@@ -51,15 +51,15 @@ Nota sobre Denomination Admin
 - Na plataforma, o usuário que assina via cadastro recebe capacidade de administrador do tenant (Denomination Admin). No modelo atual isso é representado como `CHURCH_ADMIN` com alcance de denominação via `can_manage_church(church)`.
 
 Fase P2 — Escopo de queryset comum
-- Criar `BaseChurchScopedViewSet` (ou mixin) com `get_queryset()` padrão:
+- Criado `ChurchScopedQuerysetMixin` em `apps/core/mixins.py` com filtro padrão:
   - Superuser → all
-  - ChurchAdmin → objetos da sua igreja (todas as branches)
-  - Secretary → objetos com `branch` ∈ `managed_branches`
-  - Denominação (quando aplicável) → todas as igrejas da denominação (para endpoints de denominação)
-- Aplicar a: BranchViewSet, VisitorViewSet, MemberViewSet, Activities quando couber.
+  - ChurchAdmin → objetos da igreja ativa (todas as branches)
+  - Secretary → restringe por `managed_branches` quando houver
+  - Considera `request.church`/`request.branch` (middleware) e fallback para igreja ativa via ChurchUser
+- Aplicado a: VisitorViewSet e MemberViewSet (Branches mantém lógica custom por ora).
 
 Aceite P2
-- Listagens sempre respeitam a hierarquia/branches do usuário logado sem duplicar regras em cada ViewSet.
+- Listagens de Visitors e Members respeitam a hierarquia/branches do usuário logado sem duplicar regras. Branches mantém escopo atual (mais amplo) até etapa de refino.
 
 Fase P3 — Validações de coerência (serializers)
 - MembersSerializer/VisitorsSerializer
