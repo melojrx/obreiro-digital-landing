@@ -8,6 +8,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
@@ -134,6 +135,44 @@ class BranchViewSet(viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
             return Branch.objects.none()
+
+    # ==============================
+    # Permissões por ação (P1)
+    # ==============================
+    def get_permissions(self):
+        """Leitura para membros; escrita verificada manualmente por ação."""
+        if self.action in ['list', 'retrieve', 'qr_codes', 'visitor_stats']:
+            permission_classes = [IsAuthenticated, IsMemberUser]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def _user_can_manage_church(self, user, church):
+        """Usa ChurchUser.can_manage_church para validar escopo (igreja/denom)."""
+        try:
+            for cu in user.church_users.filter(is_active=True):
+                if cu.can_manage_church(church):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _user_can_manage_branch(self, user, branch: Branch):
+        if user.is_superuser:
+            return True
+        # Church admin (da igreja ou da denominação) pode tudo
+        if self._user_can_manage_church(user, branch.church):
+            return True
+        # Managers específicos de filial (permite se tiver flag e branch atribuída)
+        try:
+            cu = user.church_users.filter(church=branch.church, is_active=True).first()
+            if cu and cu.can_manage_branches:
+                if not cu.managed_branches.exists():
+                    return True
+                return cu.managed_branches.filter(pk=branch.pk).exists()
+        except Exception:
+            pass
+        return False
     
     def get_serializer_class(self):
         """Retorna serializer específico para QR Code em algumas actions"""
@@ -142,7 +181,10 @@ class BranchViewSet(viewsets.ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
-        """Ao criar, herdar defaults da Church quando campo não vier informado."""
+        """Ao criar, checar permissão e herdar defaults da Church quando aplicável."""
+        church = serializer.validated_data.get('church')
+        if not church or not self._user_can_manage_church(self.request.user, church):
+            raise PermissionDenied('Você não tem permissão para criar filiais nesta igreja.')
         branch = serializer.save()
         try:
             # Se não foi explicitamente enviado, herdar da igreja
@@ -213,6 +255,8 @@ class BranchViewSet(viewsets.ModelViewSet):
     def regenerate_qr_code(self, request, pk=None):
         """Regenera QR code com novo UUID"""
         branch = self.get_object()
+        if not self._user_can_manage_branch(request.user, branch):
+            return Response({'error': 'Sem permissão para gerenciar QR desta filial.'}, status=status.HTTP_403_FORBIDDEN)
         
         try:
             # Usar o método já existente no modelo
@@ -233,6 +277,8 @@ class BranchViewSet(viewsets.ModelViewSet):
     def toggle_qr_code(self, request, pk=None):
         """Ativa/desativa QR code"""
         branch = self.get_object()
+        if not self._user_can_manage_branch(request.user, branch):
+            return Response({'error': 'Sem permissão para alterar o QR desta filial.'}, status=status.HTTP_403_FORBIDDEN)
         branch.qr_code_active = not branch.qr_code_active
         branch.save(update_fields=['qr_code_active', 'updated_at'])
         
