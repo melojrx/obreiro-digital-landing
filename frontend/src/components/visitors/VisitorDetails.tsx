@@ -60,6 +60,20 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false);
   const [isUpdatingFollowUp, setIsUpdatingFollowUp] = useState(false);
 
+  // Helpers de formatação/validação de telefone (Brasil)
+  const formatPhone = (value: string): string => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 6) return numbers.replace(/(\d{2})(\d{0,4})/, '($1) $2');
+    if (numbers.length <= 10) return numbers.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    return numbers.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+  };
+  const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+  const phoneRequired = !visitor.phone;
+  const phoneValid = !phoneRequired || (convertPhone && phoneRegex.test(convertPhone));
+  const birthRequired = !visitor.birth_date;
+  const birthValid = !birthRequired || !!convertBirthDate;
+
   const handleConvert = () => {
     const payload: { conversion_notes?: string; birth_date?: string; phone?: string } = {
       conversion_notes: conversionNotes || ''
@@ -521,16 +535,3 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
     </div>
   );
 };
-  // Helpers de formatação/validação de telefone (Brasil)
-  const formatPhone = (value: string): string => {
-    const numbers = value.replace(/\D/g, '').slice(0, 11);
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 6) return numbers.replace(/(\d{2})(\d{0,4})/, '($1) $2');
-    if (numbers.length <= 10) return numbers.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
-    return numbers.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
-  };
-  const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
-  const phoneRequired = !visitor.phone;
-  const phoneValid = !phoneRequired || (convertPhone && phoneRegex.test(convertPhone));
-  const birthRequired = !visitor.birth_date;
-  const birthValid = !birthRequired || !!convertBirthDate;

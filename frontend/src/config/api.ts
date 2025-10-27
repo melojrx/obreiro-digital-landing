@@ -152,6 +152,11 @@ export const API_ENDPOINTS = {
     statusHistory: (id: number) => `/members/${id}/status_history/`,
     export: '/members/export/',
     availableForSpouse: '/members/available_for_spouse/',
+    // Rotas do próprio usuário (sem filtrar por filial)
+    me: {
+      status: '/members/me/status/',
+      transferBranch: '/members/me/transfer-branch/',
+    },
   },
   
   // Status de Membresia (Nova estrutura)

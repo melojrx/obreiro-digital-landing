@@ -95,6 +95,127 @@ class MemberViewSet(viewsets.ModelViewSet):
         elif self.action == 'dashboard':
             return MemberSummarySerializer
         return MemberSerializer
+
+    @action(detail=False, methods=['get'], url_path='me/status')
+    def my_membership_status(self, request):
+        """
+        Retorna status de membresia do usuário atual na igreja ativa, sem filtrar por filial.
+        Útil para validação no frontend (exibir/ocultar conversão e sugerir transferência).
+        """
+        from apps.accounts.models import ChurchUser
+
+        active_church = ChurchUser.objects.get_active_church_for_user(request.user)
+        if not active_church:
+            return Response(
+                {"error": "Usuário não tem igreja ativa configurada"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Buscar membro pela associação direta ao usuário (não restringir por filial aqui)
+        member = (
+            Member.objects.select_related('branch')
+            .filter(church=active_church, user=request.user, is_active=True)
+            .first()
+        )
+
+        active_branch = ChurchUser.objects.get_active_branch_for_user(request.user)
+
+        data = {
+            "church_id": active_church.id,
+            "is_member": bool(member),
+            "member_id": member.id if member else None,
+            "branch": {
+                "id": member.branch.id,
+                "name": member.branch.name,
+            } if member and member.branch else None,
+            "active_branch": {
+                "id": active_branch.id,
+                "name": active_branch.name,
+            } if active_branch else None,
+        }
+
+        # Pode sugerir transferência se houver filial ativa diferente da atual
+        if member and active_branch and (member.branch_id != active_branch.id):
+            data["can_transfer"] = True
+            data["target_branch_id"] = active_branch.id
+        else:
+            data["can_transfer"] = False
+            data["target_branch_id"] = None
+
+        return Response(data)
+
+    @action(detail=False, methods=['post'], url_path='me/transfer-branch')
+    def transfer_my_branch(self, request):
+        """
+        Transfere a lotação (branch) do membro do usuário atual para a filial informada.
+        Regras:
+        - Usuário deve ser membro da igreja ativa
+        - A filial alvo deve pertencer à mesma igreja
+        - Atualiza também ChurchUser.active_branch para consistência de navegação
+        """
+        from apps.accounts.models import ChurchUser
+        from apps.branches.models import Branch
+
+        try:
+            target_branch_id = int(request.data.get('branch_id'))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "branch_id inválido ou não informado"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        active_church = ChurchUser.objects.get_active_church_for_user(request.user)
+        if not active_church:
+            return Response(
+                {"error": "Usuário não tem igreja ativa configurada"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Buscar membro do usuário
+        member = (
+            Member.objects.select_related('branch')
+            .filter(church=active_church, user=request.user, is_active=True)
+            .first()
+        )
+        if not member:
+            return Response(
+                {"error": "Usuário não possui registro de membro nesta igreja"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validar filial alvo
+        try:
+            target_branch = Branch.objects.get(id=target_branch_id, church=active_church, is_active=True)
+        except Branch.DoesNotExist:
+            return Response(
+                {"error": "Filial inválida para a igreja ativa"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if member.branch_id == target_branch.id:
+            return Response(
+                {"message": "Membro já está lotado nesta filial", "member": MemberSerializer(member).data}
+            )
+
+        # Aplicar transferência
+        member.branch = target_branch
+        member.save(update_fields=['branch', 'updated_at'])
+
+        # Manter ChurchUser.active_branch sincronizado, se existir o vínculo
+        try:
+            church_user = ChurchUser.objects.filter(user=request.user, church=active_church, is_active=True).first()
+            if church_user and getattr(church_user, 'active_branch_id', None) != target_branch.id:
+                church_user.active_branch = target_branch
+                church_user.save(update_fields=['active_branch', 'updated_at'])
+        except Exception:
+            pass
+
+        return Response(
+            {
+                "message": "Transferência de filial realizada com sucesso",
+                "member": MemberSerializer(member).data,
+            }
+        )
     
     @action(detail=False, methods=['get'])
     def dashboard(self, request):

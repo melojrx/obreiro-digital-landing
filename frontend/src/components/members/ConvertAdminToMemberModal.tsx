@@ -52,11 +52,14 @@ type ConvertAdminErrorResponse = {
 interface ConvertAdminToMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // Chamado após conversão bem-sucedida, com o membro criado/vinculado
+  onConverted?: (member: import('@/services/membersService').Member) => void;
 }
 
 export function ConvertAdminToMemberModal({
   isOpen,
   onClose,
+  onConverted,
 }: ConvertAdminToMemberModalProps) {
   const { user, refreshUserData, userChurch } = useAuth();
   const branchName = useMemo(() => {
@@ -221,6 +224,15 @@ export function ConvertAdminToMemberModal({
         console.error('Erro ao atualizar dados do usuário após conversão:', refreshError);
       }
       
+      // Notificar o pai (ex.: Dashboard) sobre a conversão
+      if (onConverted && response?.member) {
+        try {
+          onConverted(response.member);
+        } catch (cbErr) {
+          console.error('Erro no callback onConverted:', cbErr);
+        }
+      }
+
       reset(defaultValues);
       onClose();
     },

@@ -448,6 +448,28 @@ export const membersService = {
     );
     return response.data;
   },
+
+  // Verificar status de membresia do usuário atual (sem filtrar por filial)
+  async getMyMembershipStatus(): Promise<{
+    church_id: number;
+    is_member: boolean;
+    member_id?: number | null;
+    branch?: { id: number; name: string } | null;
+    active_branch?: { id: number; name: string } | null;
+    can_transfer: boolean;
+    target_branch_id?: number | null;
+  }> {
+    const response = await api.get(API_ENDPOINTS.members.me.status);
+    return response.data;
+  },
+
+  // Transferir lotação do membro do usuário atual para outra filial
+  async transferMyMembership(branchId: number): Promise<{ message: string; member: Member }> {
+    const response = await api.post(API_ENDPOINTS.members.me.transferBranch, {
+      branch_id: branchId,
+    });
+    return response.data;
+  },
 };
 
 // Serviço para MembershipStatus

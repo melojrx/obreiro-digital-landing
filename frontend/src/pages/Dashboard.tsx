@@ -6,6 +6,7 @@ import { useMainDashboard } from '@/hooks/useDashboard';
 import { useActivities } from '@/hooks/useActivities';
 import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { api } from '@/config/api';
+import { membersService } from '@/services/membersService';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { RecentActivities } from '@/components/dashboard/RecentActivities';
@@ -32,6 +33,8 @@ const Dashboard = () => {
     const { data: activities = [], isLoading: activitiesLoading } = useActivities({});
     const [showConvertModal, setShowConvertModal] = useState(false);
     const [shouldShowConvertButton, setShouldShowConvertButton] = useState(false);
+    const [showTransferCard, setShowTransferCard] = useState(false);
+    const [transferring, setTransferring] = useState(false);
     const activeChurchInfo = useCurrentActiveChurch();
     
     // Verificar se o usuário é Church Admin
@@ -52,36 +55,36 @@ const Dashboard = () => {
                 setShouldShowConvertButton(false);
                 return;
             }
+
+            // Fallback rápido: se já marcamos localmente que este usuário virou membro
+            // nesta igreja, escondemos o card imediatamente (evita flicker e casos de
+            // busca paginada/por filial não retornando o membro recém-criado).
+            const localFlagKey = `ov_has_member_user_${user.id}_church_${userChurch?.id || 'unknown'}`;
+            const localFlag = localStorage.getItem(localFlagKey);
+            if (localFlag === '1') {
+                console.log('✅ Flag local indica que usuário já é membro. Ocultando card.');
+                setShouldShowConvertButton(false);
+                // Não retornamos aqui para permitir revalidação assíncrona via API;
+                // se o backend indicar que não é membro, limpamos a flag mais abaixo.
+            }
             
             try {
-                console.log('🔍 Verificando se Church Admin já é membro:', user.email);
-                
-                // Buscar por e-mail E por user ID
-                const response = await api.get<MemberSearchResponse>(
-                    `/members/?search=${encodeURIComponent(user.email)}`
-                );
-                console.log('✅ Resposta da busca de membros:', response.data);
-                
-                // Verificar se existe algum membro vinculado a este usuário OU com o mesmo e-mail
-                const members = response.data.results ?? [];
-                const hasMemberRecord = members.some((member) => {
-                    const isSameUser = member.user === user.id;
-                    const isSameEmail = member.email?.toLowerCase() === user.email?.toLowerCase();
-                    console.log('🔍 Verificando membro:', {
-                        memberId: member.id,
-                        memberUser: member.user,
-                        memberEmail: member.email,
-                        currentUserId: user.id,
-                        currentUserEmail: user.email,
-                        isSameUser,
-                        isSameEmail
-                    });
-                    return isSameUser || isSameEmail;
-                });
-                
-                console.log('🎯 Tem registro de membro?', hasMemberRecord);
-                console.log('✅ shouldShowConvertButton será:', !hasMemberRecord);
+                console.log('🔍 Consultando status de membresia (por usuário): /members/me/status');
+                const status = await membersService.getMyMembershipStatus();
+                console.log('✅ Status de membresia:', status);
+
+                const hasMemberRecord = !!status.is_member;
                 setShouldShowConvertButton(!hasMemberRecord);
+
+                // Mostrar card de transferência quando for membro e a filial ativa diferir
+                const activeBranchId = activeChurchInfo?.active_branch?.id;
+                const memberBranchId = status.branch?.id ?? null;
+                const shouldSuggestTransfer = hasMemberRecord && !!activeBranchId && memberBranchId !== activeBranchId;
+                setShowTransferCard(!!shouldSuggestTransfer);
+
+                if (hasMemberRecord) {
+                    localStorage.setItem(localFlagKey, '1');
+                }
             } catch (error) {
                 console.error('❌ Erro ao verificar status de membro:', error);
                 setShouldShowConvertButton(false);
@@ -212,7 +215,53 @@ const Dashboard = () => {
                         // Recarregar verificação após fechar modal
                         setShouldShowConvertButton(false);
                     }}
+                    onConverted={(member) => {
+                        // Persistir flag local para este usuário/igreja e esconder o card
+                        if (user?.id && userChurch?.id) {
+                            const localFlagKey = `ov_has_member_user_${user.id}_church_${userChurch.id}`;
+                            localStorage.setItem(localFlagKey, '1');
+                        }
+                        setShouldShowConvertButton(false);
+                        setShowTransferCard(false);
+                    }}
                 />
+
+                {/* Card de Transferência de Filial */}
+                {showTransferCard && activeChurchInfo?.active_branch && (
+                    <Card className="border-amber-200 bg-amber-50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-amber-900">
+                                <UserCheck className="h-5 w-5" />
+                                Transferir minha lotação para esta filial
+                            </CardTitle>
+                            <CardDescription>
+                                Sua lotação atual é diferente da filial ativa. Você pode transferir sua lotação para a filial "{activeChurchInfo.active_branch.name}".
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button 
+                                onClick={async () => {
+                                    if (!activeChurchInfo?.active_branch?.id) return;
+                                    try {
+                                        setTransferring(true);
+                                        const result = await membersService.transferMyMembership(activeChurchInfo.active_branch.id);
+                                        toast({ title: 'Sucesso', description: result.message });
+                                        setShowTransferCard(false);
+                                    } catch (e) {
+                                        console.error('Erro ao transferir lotação:', e);
+                                        toast({ title: 'Erro', description: 'Não foi possível transferir sua lotação.', variant: 'destructive' });
+                                    } finally {
+                                        setTransferring(false);
+                                    }
+                                }}
+                                disabled={transferring}
+                                className="w-full sm:w-auto"
+                            >
+                                {transferring ? 'Transferindo...' : 'Transferir para esta filial'}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </AppLayout>
     );
