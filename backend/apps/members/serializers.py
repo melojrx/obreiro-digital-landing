@@ -31,6 +31,11 @@ class MemberSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.name', read_only=True)
     membership_status_display = serializers.CharField(source='get_membership_status_display', read_only=True)
     ministerial_function_display = serializers.CharField(source='get_ministerial_function_display', read_only=True)
+    # Acesso ao sistema
+    has_system_access = serializers.SerializerMethodField()
+    system_user_email = serializers.SerializerMethodField()
+    system_user_role = serializers.SerializerMethodField()
+    system_user_role_label = serializers.SerializerMethodField()
     
     class Meta:
         model = Member
@@ -60,12 +65,15 @@ class MemberSerializer(serializers.ModelSerializer):
             
             # Dados adicionais
             'profession', 'education_level', 'photo', 'notes',
-            
+
             # Preferências
             'accept_sms', 'accept_email', 'accept_whatsapp',
-            
+
             # Controle
-            'is_active', 'created_at', 'updated_at'
+            'is_active', 'created_at', 'updated_at',
+
+            # Acesso ao sistema
+            'has_system_access', 'system_user_email', 'system_user_role', 'system_user_role_label',
         ]
         read_only_fields = [
             'id', 'church_name', 'branch_name', 'age', 'membership_years', 'full_address',
@@ -92,6 +100,38 @@ class MemberSerializer(serializers.ModelSerializer):
         if obj.spouse:
             return obj.spouse.full_name
         return None
+
+    def get_has_system_access(self, obj):
+        try:
+            return bool(obj.user_id)
+        except Exception:
+            return False
+
+    def get_system_user_email(self, obj):
+        try:
+            return obj.user.email if obj.user_id and getattr(obj, 'user', None) else None
+        except Exception:
+            return None
+
+    def get_system_user_role(self, obj):
+        try:
+            if not obj.user_id or not obj.church_id:
+                return None
+            from apps.accounts.models import ChurchUser
+            cu = ChurchUser.objects.filter(user_id=obj.user_id, church_id=obj.church_id, is_active=True).first()
+            return cu.role if cu else None
+        except Exception:
+            return None
+
+    def get_system_user_role_label(self, obj):
+        try:
+            if not obj.user_id or not obj.church_id:
+                return None
+            from apps.accounts.models import ChurchUser
+            cu = ChurchUser.objects.filter(user_id=obj.user_id, church_id=obj.church_id, is_active=True).first()
+            return cu.get_role_display() if cu else None
+        except Exception:
+            return None
 
 
 class MemberListSerializer(serializers.ModelSerializer):
@@ -130,10 +170,7 @@ class MemberCreateSerializer(serializers.ModelSerializer):
     system_role = serializers.ChoiceField(
         choices=[
             (RoleChoices.CHURCH_ADMIN, 'Administrador da Igreja'),
-            (RoleChoices.PASTOR, 'Pastor'),
             (RoleChoices.SECRETARY, 'Secretário(a)'),
-            (RoleChoices.LEADER, 'Líder'),
-            (RoleChoices.MEMBER, 'Membro'),
         ],
         required=False,
         write_only=True

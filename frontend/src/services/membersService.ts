@@ -69,6 +69,11 @@ export interface Member {
   branch?: number | null;
   branch_name?: string;
   user?: number;  // ID do usuário vinculado (opcional)
+  // Acesso ao sistema (campos derivados do backend)
+  has_system_access?: boolean;
+  system_user_email?: string | null;
+  system_user_role?: string | null;
+  system_user_role_label?: string | null;
   full_name: string;
   cpf?: string;
   rg?: string;
@@ -192,6 +197,8 @@ export interface CreateMembershipStatusData {
 
 export interface CreateMemberData {
   church: number;
+  // Associar filial na criação (se ausente, backend tenta usar filial ativa do usuário)
+  branch?: number;
   full_name: string;
   cpf?: string;
   rg?: string;

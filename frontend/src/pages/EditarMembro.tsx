@@ -39,20 +39,51 @@ const EditarMembro: React.FC = () => {
 
     try {
       setSaving(true);
-      const { create_system_user, system_role, user_email, user_password, ...memberUpdateData } = (data as any);
+      const { create_system_user, system_role, user_email, user_password, church, ...memberUpdateData } = (data as any);
       await membersService.updateMember(Number(id), memberUpdateData);
 
       // Se for para criar usuário do sistema e o membro ainda não tem usuário vinculado
       if (member && !member.user && create_system_user) {
         if (system_role && user_email && user_password) {
-          await membersService.createSystemUser(Number(id), { system_role, user_email, user_password });
+          const normalizedRole = system_role === 'denomination_admin' ? 'church_admin' : system_role;
+          const res = await membersService.createSystemUser(Number(id), { system_role: normalizedRole, user_email, user_password });
+          // Feedback explícito quando e-mail já existia (backend retorna 'atualizado' na mensagem)
+          const roleLabel = (role: string) => (
+            role === 'denomination_admin' ? 'Administrador da Denominação (Nível 3)' :
+            role === 'church_admin' ? 'Administrador da Igreja (Nível 2)' :
+            role === 'secretary' ? 'Secretário(a) (Nível 1)' : role
+          );
+          const chosenLabel = roleLabel(system_role);
+          if ((res?.message || '').toLowerCase().includes('atualiz')) {
+            toast.success(`E-mail já existia: senha atualizada e usuário vinculado como ${chosenLabel}.`);
+          } else {
+            toast.success(`Usuário do sistema criado e vinculado como ${chosenLabel}.`);
+          }
         }
       }
       toast.success('Membro atualizado com sucesso!');
       navigate(`/membros/${id}`);
     } catch (error) {
       console.error('Erro ao atualizar membro:', error);
-      toast.error('Erro ao atualizar membro. Tente novamente.');
+      // Tentar extrair mensagem do backend
+      let message = 'Erro ao atualizar membro. Verifique os campos obrigatórios e tente novamente.';
+      if (typeof (error as any)?.message === 'string') {
+        message = (error as any).message;
+      }
+      const resp = (error as any)?.response;
+      if (resp?.data) {
+        const data = resp.data;
+        if (typeof data === 'string') message = data;
+        else if (data.detail) message = data.detail;
+        else {
+          // Agregar primeiros erros de campo
+          const firstKey = Object.keys(data)[0];
+          if (firstKey && Array.isArray(data[firstKey]) && data[firstKey].length > 0) {
+            message = `${firstKey}: ${data[firstKey][0]}`;
+          }
+        }
+      }
+      toast.error(message);
     } finally {
       setSaving(false);
     }

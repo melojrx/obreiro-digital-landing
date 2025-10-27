@@ -155,26 +155,29 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   const activeChurch = useCurrentActiveChurch();
   
   // Papéis do sistema (catálogo)
+  // Papéis de acesso ao sistema (conforme documento de permissões)
   const roleCatalog = [
-    { value: 'church_admin', label: 'Administrador da Igreja', description: 'Acesso completo à administração da igreja' },
-    { value: 'pastor', label: 'Pastor', description: 'Gestão pastoral e administrativa' },
-    { value: 'secretary', label: 'Secretário(a)', description: 'Gestão de cadastros e dados' },
-    { value: 'leader', label: 'Líder', description: 'Liderança de ministérios e atividades' },
-    { value: 'member', label: 'Membro', description: 'Acesso básico ao sistema' },
+    { value: 'denomination_admin', label: 'Administrador da Denominação (Nível 3)', description: 'Administra múltiplas igrejas da denominação' },
+    { value: 'church_admin', label: 'Administrador da Igreja (Nível 2)', description: 'Administra a igreja (Matriz e Filiais)' },
+    { value: 'secretary', label: 'Secretário(a) (Nível 1)', description: 'Gestão de cadastros de Membros e Visitantes' },
   ] as const;
 
   // Regras de distribuição de papéis por quem está atribuindo
   const permissions = usePermissions();
   const allowedRoleCodes: string[] = React.useMemo(() => {
-    // Top-level (equivalente ao antigo denomination_admin) e church_admin
-    if (permissions.canManageDenomination || permissions.isChurchAdmin || permissions.canManageChurches || permissions.canManageChurch) {
-      return ['church_admin', 'pastor', 'secretary', 'leader', 'member'];
+    // Denomination admin (gestão de denominações inteira)
+    if (permissions.canManageDenominations) {
+      return ['denomination_admin', 'church_admin', 'secretary'];
     }
-    // Secretário só pode distribuir SECRETARY
+    // Church admin/gestores de igreja
+    if (permissions.isChurchAdmin || permissions.canManageChurches || permissions.canManageChurch) {
+      return ['church_admin', 'secretary'];
+    }
+    // Secretaria
     if (permissions.isSecretary || (permissions.canManageMembers && !permissions.canManageChurch && !permissions.isChurchAdmin)) {
       return ['secretary'];
     }
-    // Demais perfis não podem atribuir papéis
+    // Sem permissão
     return [];
   }, [permissions]);
 
@@ -321,8 +324,38 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         throw new Error('Igreja ativa não encontrada. Selecione uma igreja antes de cadastrar membros.');
       }
       
+      // Determinar filial para associar o novo membro
+      let branchId: number | undefined = activeChurch.active_branch?.id;
+      if (!branchId && data.church_id) {
+        try {
+          const { branchService } = await import('@/services/branchService');
+          const paginated = await branchService.getBranchesByChurch(data.church_id, 1, 50);
+          const branches = paginated.results || [];
+          const hq = branches.find((b: any) => b.is_headquarters);
+          branchId = (hq?.id || branches[0]?.id) as number | undefined;
+          console.log('🏷️ Branch selecionada para novo membro:', branchId);
+        } catch (e) {
+          console.warn('⚠️ Não foi possível carregar filiais para definir branch do membro. Prosseguindo sem branch.', e);
+        }
+      }
+
+      // Normalizações para atender validadores do backend
+      const normalizeZip = (value?: string) => {
+        if (!value) return undefined;
+        const digits = value.replace(/\D/g, '').slice(0, 8);
+        if (digits.length !== 8) return value;
+        return digits.replace(/(\d{5})(\d{3})/, '$1-$2');
+      };
+
+      const normalizedPhone = formatPhone(data.phone || '');
+      const normalizedPhoneSecondary = data.phone_secondary ? formatPhone(data.phone_secondary) : undefined;
+      const normalizedZip = normalizeZip(data.zipcode || undefined);
+      const normalizedState = (data.state || '').toUpperCase() || undefined;
+
+      const mappedRole = data.system_role === 'denomination_admin' ? 'church_admin' : data.system_role;
       const formData: CreateMemberData = {
         church: data.church_id, // Usar igreja selecionada no formulário
+        branch: branchId,
         full_name: data.full_name,
         birth_date: data.birth_date,
         gender: data.gender,
@@ -339,15 +372,15 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         children_count: data.children_count || undefined,
         
         email: data.email || undefined,
-        phone: data.phone || undefined,
-        phone_secondary: data.phone_secondary || undefined,
+        phone: normalizedPhone,
+        phone_secondary: normalizedPhoneSecondary,
         address: data.address || undefined,
         number: data.number || undefined,
         complement: data.complement || undefined,
         neighborhood: data.neighborhood || undefined,
         city: data.city || undefined,
-        state: data.state || undefined,
-        zipcode: data.zipcode || undefined,
+        state: normalizedState,
+        zipcode: normalizedZip,
         // baptism_date removido do payload
         previous_church: data.previous_church || undefined,
         transfer_letter: data.transfer_letter || undefined,
@@ -360,9 +393,9 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         accept_sms: data.accept_sms,
         accept_email: data.accept_email,
         accept_whatsapp: data.accept_whatsapp,
-        // Campos de papel do sistema
+        // Campos de papel do sistema (mapear denomination_admin -> church_admin para compat)
         create_system_user: data.create_system_user,
-        system_role: data.system_role,
+        system_role: mappedRole,
         user_email: data.user_email,
         user_password: data.user_password,
         
@@ -1215,21 +1248,35 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Se já possui usuário vinculado, mostrar aviso e desabilitar criação */}
+                  
                   {member && member.user ? (
                     <div className="p-3 rounded border bg-gray-50 text-sm text-gray-700">
                       Este membro já possui acesso ao sistema vinculado.
                     </div>
                   ) : canAssignRoles ? (
-                    <FormField
-                     control={form.control}
-                     name="create_system_user"
-                     render={({ field }) => (
-                       <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormField
+                    control={form.control}
+                    name="create_system_user"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                         <FormControl>
                           <Checkbox
                             checked={field.value}
-                            onCheckedChange={field.onChange}
+                            onCheckedChange={(checked) => {
+                              field.onChange(checked);
+                              if (checked) {
+                                // Auto-selecionar papel quando só houver uma opção
+                                const currentRole = form.getValues('system_role');
+                                if (!currentRole && availableRoles.length === 1) {
+                                  form.setValue('system_role', availableRoles[0].value, { shouldValidate: true });
+                                }
+                                // Pré-preencher e-mail com o do membro (se houver)
+                                const currentEmail = form.getValues('user_email');
+                                if (!currentEmail && (member?.email || '').trim()) {
+                                  form.setValue('user_email', member!.email!, { shouldValidate: true });
+                                }
+                              }
+                            }}
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">
@@ -1238,6 +1285,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                             Marque para criar um usuário que poderá fazer login no sistema
                           </FormDescription>
                         </div>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -1351,6 +1399,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                           <div className="mt-2 text-xs text-blue-600">
                             <strong>O que este papel pode fazer:</strong>
                             <ul className="list-disc list-inside mt-1">
+                              {form.watch('system_role') === 'denomination_admin' && (
+                                <>
+                                  <li>Administrar todas as igrejas da denominação</li>
+                                  <li>Gerenciar administradores de igreja</li>
+                                  <li>Visualizar relatórios consolidados da denominação</li>
+                                </>
+                              )}
                               {form.watch('system_role') === 'church_admin' && (
                                 <>
                                   <li>Gerenciar todos os membros e visitantes</li>
@@ -1359,30 +1414,11 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                                   <li>Gerenciar filiais da igreja</li>
                                 </>
                               )}
-                              {form.watch('system_role') === 'pastor' && (
-                                <>
-                                  <li>Gerenciar membros e visitantes</li>
-                                  <li>Criar e gerenciar atividades</li>
-                                  <li>Acessar relatórios pastorais</li>
-                                </>
-                              )}
                               {form.watch('system_role') === 'secretary' && (
                                 <>
                                   <li>Gerenciar cadastros de membros</li>
                                   <li>Gerenciar visitantes</li>
                                   <li>Visualizar relatórios básicos</li>
-                                </>
-                              )}
-                              {form.watch('system_role') === 'leader' && (
-                                <>
-                                  <li>Gerenciar visitantes</li>
-                                  <li>Criar e gerenciar atividades</li>
-                                </>
-                              )}
-                              {form.watch('system_role') === 'member' && (
-                                <>
-                                  <li>Visualizar informações básicas</li>
-                                  <li>Atualizar próprio perfil</li>
                                 </>
                               )}
                             </ul>
@@ -1496,15 +1532,30 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                         <FormControl>
                           <Checkbox
                             checked={field.value}
-                            onCheckedChange={field.onChange}
+                            onCheckedChange={(checked) => {
+                              field.onChange(checked);
+                              if (checked) {
+                                // Pré-selecionar papel quando houver apenas uma opção disponível
+                                const currentRole = form.getValues('system_role');
+                                if (!currentRole && availableRoles.length === 1) {
+                                  form.setValue('system_role', availableRoles[0].value);
+                                }
+                                // Pré-preencher e-mail com o do membro (se existir)
+                                const currentEmail = form.getValues('user_email');
+                                if (!currentEmail && (member?.email || '').trim()) {
+                                  form.setValue('user_email', member!.email!, { shouldValidate: true });
+                                }
+                              }
+                            }}
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">
                           <FormLabel>Usuário terá acesso ao sistema?</FormLabel>
                           <FormDescription>
-                            Marque para criar um usuário que poderá fazer login no sistema
+                            Marque para criar um usuário que poderá fazer login no sistema. Após marcar, selecione o papel e informe e-mail e senha de acesso.
                           </FormDescription>
                         </div>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -1614,6 +1665,12 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                             <strong>O que este papel pode fazer:</strong>
                             <ul className="list-disc pl-5 space-y-1">
                               <li>Permissões variam por papel e igreja</li>
+                              {form.watch('system_role') === 'denomination_admin' && (
+                                <>
+                                  <li>Administrar denominação e igrejas vinculadas</li>
+                                  <li>Relatórios consolidados da denominação</li>
+                                </>
+                              )}
                               {form.watch('system_role') === 'church_admin' && (
                                 <>
                                   <li>Gerenciar dados da igreja e membros</li>
@@ -1621,27 +1678,10 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                                   <li>Acessar relatórios consolidados</li>
                                 </>
                               )}
-                              {form.watch('system_role') === 'pastor' && (
-                                <>
-                                  <li>Gestão pastoral e administrativa</li>
-                                  <li>Relatórios ministeriais</li>
-                                </>
-                              )}
                               {form.watch('system_role') === 'secretary' && (
                                 <>
                                   <li>Gestão de cadastros</li>
                                   <li>Relatórios básicos</li>
-                                </>
-                              )}
-                              {form.watch('system_role') === 'leader' && (
-                                <>
-                                  <li>Liderança de ministérios e atividades</li>
-                                </>
-                              )}
-                              {form.watch('system_role') === 'member' && (
-                                <>
-                                  <li>Visualizar informações básicas</li>
-                                  <li>Atualizar próprio perfil</li>
                                 </>
                               )}
                             </ul>

@@ -150,26 +150,24 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Determinar papéis permitidos para o solicitante
-        allowed_roles = []
+        allowed_roles: list[str] = []
         user = request.user
         if user.is_superuser:
+            # Superuser pode atribuir níveis 3, 2 e 1 (alias aceito)
             allowed_roles = [
+                'denomination_admin',  # alias aceito (mapeado para CHURCH_ADMIN)
                 RoleChoices.CHURCH_ADMIN,
-                RoleChoices.PASTOR,
                 RoleChoices.SECRETARY,
-                RoleChoices.LEADER,
-                RoleChoices.MEMBER,
             ]
         else:
             church_users = list(user.church_users.filter(is_active=True))
             can_manage = any(cu.can_manage_church(member.church) for cu in church_users)
             if can_manage:
+                # Church admins/gestores: níveis 3 (alias), 2 e 1
                 allowed_roles = [
+                    'denomination_admin',  # alias aceito (mapeado)
                     RoleChoices.CHURCH_ADMIN,
-                    RoleChoices.PASTOR,
                     RoleChoices.SECRETARY,
-                    RoleChoices.LEADER,
-                    RoleChoices.MEMBER,
                 ]
             else:
                 cu = user.church_users.filter(church=member.church, is_active=True).first()
@@ -179,42 +177,87 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
         if system_role not in allowed_roles:
             raise PermissionDenied('Sem permissão para atribuir este papel.')
 
+        # Normalizar role (alias)
+        normalized_role = RoleChoices.CHURCH_ADMIN if system_role == 'denomination_admin' else system_role
+
         # Validar senha
         try:
             validate_password(user_password)
         except DjangoValidationError as e:
             return Response({'error': 'Senha inválida', 'details': list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validar unicidade de email (usuário ativo)
         User = get_user_model()
-        if User.objects.filter(email=user_email, is_active=True).exists():
-            return Response({'error': 'Este e-mail já está em uso por outro usuário ativo.'}, status=status.HTTP_400_BAD_REQUEST)
+        existing_user = User.objects.filter(email=user_email, is_active=True).first()
 
-        # Criar usuário
-        # Garantir telefone em formato válido; fallback conservador se ausente
-        phone = member.phone or '(00) 0000-0000'
-        created_user = User.objects.create_user(
-            email=user_email,
-            password=user_password,
-            full_name=member.full_name,
-            phone=phone,
-        )
+        if existing_user:
+            # Atualizar senha do usuário existente (admin/secretário criou acesso para alguém já registrado)
+            try:
+                existing_user.set_password(user_password)
+                # Marcar perfil como completo para evitar onboarding
+                if not getattr(existing_user, 'is_profile_complete', False):
+                    existing_user.is_profile_complete = True
+                existing_user.save()
+            except Exception:
+                return Response({'error': 'Não foi possível atualizar a senha do usuário existente.'}, status=status.HTTP_400_BAD_REQUEST)
+            created_user = existing_user
+            created = False
+        else:
+            # Criar usuário novo
+            phone = member.phone or '(00) 0000-0000'
+            created_user = User.objects.create_user(
+                email=user_email,
+                password=user_password,
+                full_name=member.full_name,
+                phone=phone,
+            )
+            created = True
+
+        # Marcar perfil como completo para evitar redirecionar para fluxo de cadastro
+        if not getattr(created_user, 'is_profile_complete', False):
+            created_user.is_profile_complete = True
+            try:
+                created_user.save(update_fields=['is_profile_complete', 'updated_at'])
+            except Exception:
+                created_user.save()
 
         # Vincular à igreja e papel
-        ChurchUser.objects.create(
+        from apps.accounts.models import ChurchUser as CU
+        church_user, cu_created = CU.objects.get_or_create(
             user=created_user,
             church=member.church,
-            role=system_role,
-            is_user_active_church=True,
-            active_branch=member.branch if getattr(member, 'branch', None) else None,
+            defaults={
+                'role': normalized_role,
+                'is_user_active_church': True,
+                'active_branch': member.branch if getattr(member, 'branch', None) else None,
+            }
         )
+        # Se já existia, garantir papel e flags coerentes
+        if not cu_created:
+            changed = False
+            if church_user.role != normalized_role:
+                church_user.role = normalized_role
+                changed = True
+            if not church_user.is_user_active_church:
+                church_user.is_user_active_church = True
+                changed = True
+            if getattr(member, 'branch', None) and church_user.active_branch_id != member.branch_id:
+                church_user.active_branch = member.branch
+                changed = True
+            if changed:
+                # Reaplicar permissões se o papel mudou
+                try:
+                    if church_user.role != normalized_role:
+                        church_user.set_permissions_by_role()
+                except Exception:
+                    pass
+                church_user.save()
 
         # Atualizar membro
         member.user = created_user
         member.save(update_fields=['user', 'updated_at'])
 
         return Response({
-            'message': 'Usuário do sistema criado e vinculado ao membro com sucesso.',
+            'message': 'Usuário do sistema {} e vinculado ao membro com sucesso.'.format('criado' if created else 'atualizado'),
             'member': MemberSerializer(member, context={'request': request}).data,
         }, status=status.HTTP_201_CREATED)
 

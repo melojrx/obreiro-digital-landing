@@ -121,8 +121,18 @@ const Perfil: React.FC = () => {
                     <p className="text-sm text-blue-600 mt-2">Enviando foto...</p>
                   )}
                   
-                  <h3 className="font-semibold text-lg mt-3">{user?.full_name}</h3>
-                  <p className="text-sm text-gray-600">{user?.email}</p>
+                  <h3
+                    className="font-semibold text-base mt-3 leading-snug break-all max-w-[220px] mx-auto text-gray-900"
+                    title={user?.full_name || ''}
+                  >
+                    {user?.full_name}
+                  </h3>
+                  <p
+                    className="text-xs text-gray-600 break-all max-w-[220px] mx-auto"
+                    title={user?.email || ''}
+                  >
+                    {user?.email}
+                  </p>
                   {userChurch && (
                     <Badge variant="secondary" className="mt-2">
                       {translateRole(userChurch.user_role)}

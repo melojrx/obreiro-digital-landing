@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, Phone, Mail, Info, MoveRight as MoveRightIcon } from 'lucide-react';
+import { Eye, Edit, Trash2, Phone, Mail, Info, MoveRight as MoveRightIcon, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -141,7 +141,15 @@ export const MembersTable: React.FC<MembersTableProps> = ({
               </TableCell>
               <TableCell>
                 <div>
-                  <div className="font-medium text-gray-900">{member.full_name}</div>
+                  <div className="font-medium text-gray-900 flex items-center gap-2">
+                    {member.full_name}
+                    {(member.has_system_access || member.user) && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1" title="Usuário com acesso ao sistema">
+                        <Shield className="h-3 w-3 text-green-600" />
+                        Acesso
+                      </Badge>
+                    )}
+                  </div>
                   {member.birth_date && (
                     <div className="text-sm text-gray-500">
                       {new Date().getFullYear() - new Date(member.birth_date).getFullYear()} anos
@@ -274,15 +282,23 @@ export const MembersTable: React.FC<MembersTableProps> = ({
           <div key={member.id} className="bg-white border rounded-lg p-4 space-y-3">
             {/* Header do Card */}
             <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={member.photo} alt={member.full_name} />
-                  <AvatarFallback className="text-sm">
-                    {getInitials(member.full_name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h4 className="font-medium text-gray-900">{member.full_name}</h4>
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={member.photo} alt={member.full_name} />
+                    <AvatarFallback className="text-sm">
+                      {getInitials(member.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                  <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                    {member.full_name}
+                    {(member.has_system_access || member.user) && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1" title="Usuário com acesso ao sistema">
+                        <Shield className="h-3 w-3 text-green-600" />
+                        Acesso
+                      </Badge>
+                    )}
+                  </h4>
                   {member.birth_date && (
                     <p className="text-sm text-gray-500">
                       {new Date().getFullYear() - new Date(member.birth_date).getFullYear()} anos

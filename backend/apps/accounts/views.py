@@ -31,6 +31,20 @@ class CustomAuthToken(ObtainAuthToken):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         token, created = Token.objects.get_or_create(user=user)
+
+        # Se o usuário já possui vínculo com alguma igreja, considerar perfil completo
+        try:
+            from .models import ChurchUser
+            if not getattr(user, 'is_profile_complete', False):
+                has_church = ChurchUser.objects.filter(user=user, is_active=True).exists()
+                if has_church:
+                    user.is_profile_complete = True
+                    try:
+                        user.save(update_fields=['is_profile_complete', 'updated_at'])
+                    except Exception:
+                        user.save()
+        except Exception:
+            pass
         
         print('✅ DEBUG - Login successful for user:', user.email)
         
@@ -286,6 +300,124 @@ def my_church(request):
             'name': church_user.active_branch.name
         } if church_user.active_branch else None
     })
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_personal_data(request):
+    """Atualiza dados pessoais do usuário autenticado (nome, email, telefone, perfil)."""
+    user: CustomUser = request.user
+
+    data = request.data or {}
+
+    # Atualizar dados básicos do usuário
+    full_name = data.get('full_name')
+    email = data.get('email')
+    phone = data.get('phone')
+
+    if email and email != user.email:
+        # Garantir unicidade entre usuários ativos
+        if CustomUser.objects.filter(email=email, is_active=True).exclude(pk=user.pk).exists():
+            return Response({'error': 'Este e-mail já está em uso por outro usuário.'}, status=status.HTTP_400_BAD_REQUEST)
+        user.email = email
+
+    if full_name:
+        user.full_name = full_name
+
+    if phone:
+        user.phone = phone
+
+    user.save()
+
+    # Atualizar perfil complementar
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    bio = data.get('bio')
+    if bio is not None:
+        profile.bio = bio
+
+    birth_date = data.get('birth_date')
+    if birth_date:
+        try:
+            profile.birth_date = datetime.strptime(birth_date, '%Y-%m-%d').date()
+        except Exception:
+            # Ignorar formato inválido silenciosamente; validação básica no front
+            pass
+
+    gender = data.get('gender')
+    if gender:
+        gender = gender.upper()
+        if gender in dict(GenderChoices.choices):
+            profile.gender = gender
+
+    profile.save()
+
+    # Montar payload compatível com frontend User
+    user_payload = {
+        'id': user.id,
+        'email': user.email,
+        'full_name': user.full_name,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'phone': user.phone,
+        'subscription_plan': user.subscription_plan,
+        'is_profile_complete': True,
+        'profile': {
+            'bio': profile.bio,
+            'birth_date': profile.birth_date.isoformat() if profile.birth_date else None,
+            'gender': profile.gender,
+            'avatar': profile.avatar.url if profile.avatar else None,
+            'cpf': profile.cpf,
+            'address': profile.address,
+            'zipcode': profile.zipcode,
+            'number': profile.number,
+            'email_notifications': profile.email_notifications,
+            'sms_notifications': profile.sms_notifications,
+        },
+    }
+
+    return Response({'user': user_payload, 'message': 'Dados pessoais atualizados com sucesso.'})
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_church_data(request):
+    """Atualiza dados da igreja ativa do usuário autenticado."""
+    user = request.user
+    church = ChurchUser.objects.get_active_church_for_user(user)
+    if not church:
+        return Response({'error': 'Usuário não possui igreja ativa.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    data = request.data or {}
+    # Atualizar campos básicos da igreja
+    for field in ['name', 'cnpj', 'email', 'phone', 'address', 'city', 'state', 'zipcode']:
+        if field in data:
+            setattr(church, field, data.get(field))
+    church.save()
+
+    # Papel do usuário na igreja
+    cu = ChurchUser.objects.filter(user=user, church=church, is_active=True).first()
+    church_payload = {
+        'id': church.id,
+        'name': church.name,
+        'short_name': getattr(church, 'short_name', '') or '',
+        'cnpj': church.cnpj or '',
+        'email': church.email or '',
+        'phone': church.phone or '',
+        'address': church.address or '',
+        'city': church.city,
+        'state': church.state,
+        'zipcode': church.zipcode or '',
+        'subscription_plan': church.subscription_plan,
+        'role': cu.get_role_display() if cu else '',
+        'role_label': cu.get_role_display() if cu else '',
+        'user_role': cu.role if cu else '',
+        'active_branch': {
+            'id': cu.active_branch.id,
+            'name': cu.active_branch.name
+        } if cu and cu.active_branch else None
+    }
+
+    return Response({'church': church_payload, 'message': 'Dados da igreja atualizados com sucesso.'})
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
