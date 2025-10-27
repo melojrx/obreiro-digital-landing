@@ -108,6 +108,11 @@ class VisitorSerializer(serializers.ModelSerializer):
         if not self.instance and not attrs.get('full_name'):
             raise serializers.ValidationError("Campo 'full_name' é obrigatório")
 
+        # Normalização de registration_source (opcional): lower/underscore
+        rs = attrs.get('registration_source') or getattr(self.instance, 'registration_source', None)
+        if rs:
+            attrs['registration_source'] = str(rs).strip().lower().replace(' ', '_')
+
         attrs = super().validate(attrs)
         branch = attrs.get('branch') or getattr(self.instance, 'branch', None)
         if branch:

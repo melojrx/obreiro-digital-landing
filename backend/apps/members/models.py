@@ -290,6 +290,21 @@ class Member(BaseModel):
         default=date.today,
         help_text="Data de ingresso como membro"
     )
+
+    # Campos novos (compat) – período explícito da membresia
+    membership_start_date = models.DateField(
+        "Início da Membresia",
+        blank=True,
+        null=True,
+        help_text="Data de início da membresia (compatível com membership_date)"
+    )
+
+    membership_end_date = models.DateField(
+        "Fim da Membresia",
+        blank=True,
+        null=True,
+        help_text="Data de término da membresia (se desligado)"
+    )
     
     # Dados de origem
     previous_church = models.CharField(
@@ -428,6 +443,7 @@ class Member(BaseModel):
             models.Index(fields=['cpf']),
             models.Index(fields=['birth_date']),
             models.Index(fields=['membership_date']),
+            models.Index(fields=['membership_end_date']),
         ]
     
     def __str__(self):
@@ -471,6 +487,14 @@ class Member(BaseModel):
                 raise ValidationError("Data de membresia não pode ser anterior ao nascimento")
             if self.membership_date > today:
                 raise ValidationError("Data de membresia não pode ser no futuro")
+
+        # Validar período de membresia explícito
+        if self.membership_start_date and self.birth_date and self.membership_start_date < self.birth_date:
+            raise ValidationError("Início da membresia não pode ser anterior ao nascimento")
+        if self.membership_start_date and self.membership_start_date > today:
+            raise ValidationError("Início da membresia não pode ser no futuro")
+        if self.membership_end_date and self.membership_start_date and self.membership_end_date <= self.membership_start_date:
+            raise ValidationError("Fim da membresia deve ser posterior ao início")
     
     def _validate_spouse_data(self):
         """Valida consistência dos dados do cônjuge"""
@@ -648,6 +672,16 @@ class MembershipStatus(BaseModel):
         related_name='membership_statuses',
         verbose_name="Membro"
     )
+
+    # Nova referência opcional à filial onde a ordenação/status ocorreu
+    branch = models.ForeignKey(
+        'branches.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='membership_statuses',
+        verbose_name="Filial"
+    )
     
     status = models.CharField(
         "Status",
@@ -683,6 +717,15 @@ class MembershipStatus(BaseModel):
         indexes = [
             models.Index(fields=['member', '-effective_date']),
             models.Index(fields=['status', '-effective_date']),
+            models.Index(fields=['branch']),
+        ]
+        constraints = [
+            # Garante apenas um status 'atual' por membro quando end_date é nulo
+            models.UniqueConstraint(
+                fields=['member'],
+                condition=models.Q(end_date__isnull=True),
+                name='unique_current_membership_status_per_member'
+            )
         ]
     
     def __str__(self):

@@ -4,7 +4,7 @@ Objetivo
 - Alinhar os modelos aos campos do diagrama `docs/modelodedadosobreiro.png`, reduzir redundâncias e manter compatibilidade sem quebrar a aplicação.
 
 Escopo Inicial
-- Modelos: `Denomination`, `Church`, `Branch` (etapas futuras: `Members`, `Visitors`).
+- Modelos: `Denomination`, `Church`, `Branch` (concluídos) e agora `Members`, `Visitors`, `MembershipStatus`.
 
 Decisões Arquiteturais
 - Plano/limites e métricas consolidadas podem existir em Denomination e/ou Church. Nesta fase:
@@ -58,6 +58,61 @@ Trilha C — Church/Branch
 - C5. Agregações
   - Manter em Church caches agregados: `total_members`, `total_visitors`, `total_visitors_registered`. Atualizar em tasks/pontos críticos.
 
+Trilha M — Members
+- M1. Período de membresia (aditivo, compat)
+  - Adicionar em `Member` os campos `membership_start_date` (DateField, null=True/blank=True) e `membership_end_date` (DateField, null=True/blank=True).
+  - Data migration: popular `membership_start_date` com o valor de `membership_date` existente.
+  - Serializers: expor `membership_start_date`/`membership_end_date`. Continuar aceitando `membership_date` (compat) — se apenas `membership_date` vier no payload, persistir em `membership_start_date` também.
+  - Índices: adicionar índice em `membership_end_date`.
+  - Validações: quando ambos preenchidos, `membership_end_date` > `membership_start_date`.
+
+- M2. APIs/Front (compat)
+  - Atualizar serializers de criação/atualização/lista para incluir os novos campos.
+  - Front pode ler os campos novos sem remover `membership_date` ainda.
+  - Futuro (S4): deprecar `membership_date` após validação.
+
+Trilha S — MembershipStatus
+- S1. Branch + alias de datas (aditivo)
+  - Adicionar `branch` (FK opcional) em `MembershipStatus` e data migration para preencher com `member.branch` quando existir.
+  - Manter colunas atuais `effective_date`/`end_date`, mas expor aliases em serializer: `ordination_start_date` → `effective_date`, `ordination_end_date` → `end_date`.
+  - Constraint: garantir apenas um status atual por membro (`UniqueConstraint(fields=['member'], condition=Q(end_date__isnull=True))`).
+  - Índices: adicionar índice em `branch` e manter existentes.
+
+  - Choices (Ordenações – cargos eclesiásticos)
+    - O modelo MembershipStatus representará as ordenações/cargos do membro ao longo do tempo (log histórico).
+    - STATUS_CHOICES a adotar (rótulos conforme diagrama):
+      - `member` – Membro
+      - `deacon` – Diácono
+      - `deaconess` – Diaconisa
+      - `elder` – Presbítero
+      - `evangelist` – Evangelista
+      - `pastor` – Pastor
+      - `female_pastor` – Pastora
+      - `missionary` – Missionário
+      - `female_missionary` – Missionária
+      - `leader` – Líder
+      - `cooperator` – Cooperador(ra)
+      - `auxiliary` – Auxiliar
+
+    Observações de compatibilidade:
+    - Manteremos o campo atual `status` (MembershipStatus) usando os valores acima.
+    - Para coexistir com `MinisterialFunctionHistory`, iremos centralizar a cronologia das ordenações em `MembershipStatus` e manter `MinisterialFunctionHistory` como compat até migração futura (convergência opcional).
+
+- S2. Regras de gravação / compat
+  - No create/update, se `branch` não for informado, preencher com `member.branch`.
+  - Validar `ordination_end_date` > `ordination_start_date` (já coberto no save).
+  - Front: atualizar serviço para aceitar `branch` e `ordination_*` mantendo compat.
+
+Trilha V — Visitors
+- V1. Consistência/Índices
+  - Modelo já compatível com o diagrama.
+  - Avaliar inclusão de índice (`branch`, `created_at`) para consultas de recência por filial.
+  - Validar normalização de `registration_source` em serializers (opcional).
+
+- V2. Integração
+  - Confirmar que conversão para membro preserva `branch` e respeita a regra de “um membro por branch”.
+  - Church.update_statistics já agrega `total_visitors_registered` das branches.
+
 Checklists (acompanhamento)
 - [x] D1: Campos adicionados e migração aplicada
 - [ ] D2: `update_statistics()` + backfill + serializers atualizados
@@ -67,6 +122,12 @@ Checklists (acompanhamento)
 - [ ] C3: Remoção de `qr_code_*` de Church + limpeza de referências
 - [x] C4: Default de registro de visitantes da Church aplicado em novas Branches
 - [x] C5: Rotina de agregação consistente (membros/visitantes) por Church/Denomination
+- [x] M1: Members – adicionar membership_start_date/end_date + backfill + serializers
+- [ ] M2: Members – atualizar APIs/Front (compat)
+- [x] S1: MembershipStatus – adicionar branch + aliases datas + constraint + backfill
+- [x] S2: MembershipStatus – regras de gravação/compat + front
+- [x] V1: Visitors – índices/consistência
+- [x] V2: Visitors – validação conversão/branch
 
 Testes e Validação
 - API
@@ -89,3 +150,9 @@ Diário de Bordo (preencher durante execução)
 - 2025‑10‑27 – C3 remoção de campos Church.qr_code_* e limpeza aplicada.
 - 2025‑10‑27 – C4 herdando allows_visitor_registration em novas branches.
 - 2025‑10‑27 – C5 agregação de total_visitors_registered em Church.update_statistics.
+- 2025‑10‑27 – Planejamento M (Members), S (MembershipStatus) e V (Visitors) adicionado.
+- 2025‑10‑27 – M1 concluído: campos de período de membresia adicionados, backfill, serializers.
+- 2025‑10‑27 – S1 concluído: branch em MembershipStatus, aliases de datas, constraint e backfill.
+- 2025‑10‑27 – S2 concluído: defaults/validações em serializer e compat no front.
+- 2025‑10‑27 – V1 concluído: índice (branch, created_at) + normalização leve de registration_source.
+- 2025‑10‑27 – V2 concluído: confirmado fluxo de conversão mantém branch e regra de lotação.

@@ -4,6 +4,7 @@ import { api, API_ENDPOINTS } from '@/config/api';
 export interface MembershipStatus {
   id: number;
   member: number;
+  branch?: number | null;
   member_name: string;
   status: string;
   status_display: string;
@@ -176,6 +177,10 @@ export interface CreateMembershipStatusData {
   status: string;
   effective_date?: string;
   end_date?: string;
+  // Novos campos compatíveis com o backend
+  ordination_start_date?: string;
+  ordination_end_date?: string;
+  branch?: number;
   reason?: string;
   // Campos de compatibilidade
   termination_date?: string;
@@ -500,13 +505,18 @@ export const membershipStatusService = {
   // Criar novo status
   async createStatus(data: CreateMembershipStatusData): Promise<MembershipStatus> {
     console.log('🔍 membershipStatusService.createStatus - Dados enviados:', data);
-    const response = await api.post(API_ENDPOINTS.membershipStatus.create, data);
+    const payload = { ...data } as any;
+    // Compat: se vier termination_date, mapear para end_date se end_date ausente
+    if (payload.termination_date && !payload.end_date) payload.end_date = payload.termination_date;
+    const response = await api.post(API_ENDPOINTS.membershipStatus.create, payload);
     return response.data;
   },
 
   // Atualizar status existente
   async updateStatus(id: number, data: Partial<CreateMembershipStatusData>): Promise<MembershipStatus> {
-    const response = await api.patch(API_ENDPOINTS.membershipStatus.update(id), data);
+    const payload = { ...data } as any;
+    if (payload.termination_date && !payload.end_date) payload.end_date = payload.termination_date;
+    const response = await api.patch(API_ENDPOINTS.membershipStatus.update(id), payload);
     return response.data;
   },
 

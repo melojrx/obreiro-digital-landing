@@ -268,6 +268,7 @@ class Visitor(BaseModel):
             models.Index(fields=['church', 'branch']),
             models.Index(fields=['church', 'converted_to_member']),
             models.Index(fields=['qr_code_used']),
+            models.Index(fields=['branch', 'created_at']),
         ]
     
     def __str__(self):

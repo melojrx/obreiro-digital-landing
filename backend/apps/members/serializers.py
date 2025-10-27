@@ -49,7 +49,7 @@ class MemberSerializer(serializers.ModelSerializer):
             
             # Dados eclesiásticos 
             'membership_status', 'membership_status_display',
-            'membership_date', 'membership_years', 'previous_church', 
+            'membership_date', 'membership_start_date', 'membership_end_date', 'membership_years', 'previous_church', 
             'transfer_letter',
             
             # Dados ministeriais
@@ -111,7 +111,7 @@ class MemberListSerializer(serializers.ModelSerializer):
             'id', 'user', 'full_name', 'email', 'phone', 'birth_date', 'age',
             'church_name', 'branch_name', 'membership_status', 'membership_status_display',
             'ministerial_function', 'ministerial_function_display',
-            'membership_date',
+            'membership_date', 'membership_start_date', 'membership_end_date',
             'is_active'
         ]
     
@@ -166,7 +166,7 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'zipcode',
             
             # Dados eclesiásticos
-            'membership_status', 
+            'membership_status', 'membership_start_date', 'membership_end_date', 
             'previous_church', 'transfer_letter',
             
             # Dados ministeriais
@@ -294,6 +294,13 @@ class MemberCreateSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         """Validações gerais"""
+        # Compat: se vier apenas membership_date, mapear para membership_start_date
+        md = self.initial_data.get('membership_date') if isinstance(self.initial_data, dict) else None
+        if md and not attrs.get('membership_start_date'):
+            try:
+                attrs['membership_start_date'] = md
+            except Exception:
+                pass
         # Validar idade mínima
         if attrs.get('birth_date'):
             today = date.today()
@@ -408,7 +415,7 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             'full_name', 'cpf', 'rg', 'birth_date', 'gender', 'marital_status',
             'email', 'phone', 'phone_secondary', 'address', 'number', 'complement', 'neighborhood', 
             'city', 'state', 'zipcode', 
-            'membership_status', 'previous_church', 'transfer_letter', 
+            'membership_status', 'membership_start_date', 'membership_end_date', 'previous_church', 'transfer_letter', 
             'ministerial_function', 'spouse', 'children_count', 'responsible', 'profession', 'education_level', 
             'photo', 'notes', 'accept_sms', 'accept_email', 'accept_whatsapp',
             'branch'
@@ -605,18 +612,28 @@ class MembershipStatusSerializer(serializers.ModelSerializer):
     
     member_name = serializers.CharField(source='member.full_name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    # Novos aliases para datas de ordenação
+    ordination_start_date = serializers.DateField(source='effective_date', required=False, allow_null=True)
+    ordination_end_date = serializers.DateField(source='end_date', required=False, allow_null=True)
     
     class Meta:
         model = MembershipStatus
         fields = [
-            'id', 'member', 'member_name', 'status', 'status_display',
-            'effective_date', 'end_date', 'observation',
-            'is_active', 'created_at', 'updated_at'
+            'id', 'member', 'member_name', 'branch', 'status', 'status_display',
+            'effective_date', 'end_date', 'ordination_start_date', 'ordination_end_date',
+            'observation', 'is_active', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'member_name', 'status_display', 'created_at', 'updated_at']
     
     def validate(self, attrs):
         """Validações específicas"""
+        # Compat: aceitar ordination_* e mapear para effective_date/end_date
+        initial = getattr(self, 'initial_data', {}) or {}
+        if 'ordination_start_date' in initial and 'effective_date' not in attrs:
+            attrs['effective_date'] = initial.get('ordination_start_date')
+        if 'ordination_end_date' in initial and 'end_date' not in attrs:
+            attrs['end_date'] = initial.get('ordination_end_date')
+
         effective_date = attrs.get('effective_date')
         end_date = attrs.get('end_date')
         
@@ -625,6 +642,25 @@ class MembershipStatusSerializer(serializers.ModelSerializer):
                 "Data de término deve ser posterior à data de ordenação"
             )
         
+        # Definir branch padrão quando não informado: usar branch do membro
+        if attrs.get('branch') is None:
+            member = attrs.get('member') or getattr(self.instance, 'member', None)
+            if member and getattr(member, 'branch', None):
+                attrs['branch'] = member.branch
+
+        # Validar unicidade de status atual (sem end_date)
+        if not attrs.get('end_date'):
+            from .models import MembershipStatus
+            member = attrs.get('member') or getattr(self.instance, 'member', None)
+            if member:
+                qs = MembershipStatus.objects.filter(member=member, end_date__isnull=True)
+                if self.instance:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise serializers.ValidationError(
+                        "Já existe um status atual para este membro. Finalize o status atual antes de criar outro."
+                    )
+
         return attrs
 
 

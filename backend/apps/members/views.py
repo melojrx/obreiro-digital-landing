@@ -11,12 +11,12 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Count, Q
 from datetime import datetime, date
 
-from .models import Member, MembershipStatusLog, MinisterialFunctionHistory
+from .models import Member, MembershipStatusLog, MinisterialFunctionHistory, MembershipStatus
 from .serializers import (
     MemberSerializer, MemberListSerializer, MemberCreateSerializer, 
     MemberUpdateSerializer, MemberSummarySerializer,
     MembershipStatusLogSerializer, MemberStatusChangeSerializer,
-    MinisterialFunctionHistorySerializer
+    MinisterialFunctionHistorySerializer, MembershipStatusSerializer
 )
 
 
@@ -938,3 +938,42 @@ class MinisterialFunctionHistoryViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         obj.save(update_fields=['end_date', 'updated_at'])
         return Response(self.get_serializer(obj).data)
+
+
+class MembershipStatusViewSet(viewsets.ModelViewSet):
+    """CRUD de status de membresia (ordenações) com escopo por igrejas do usuário."""
+    serializer_class = MembershipStatusSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['member', 'status']
+    ordering_fields = ['effective_date', 'created_at']
+    ordering = ['-effective_date']
+
+    def get_queryset(self):
+        qs = MembershipStatus.objects.select_related('member', 'branch')
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        # Escopo pelas igrejas onde o usuário possui vínculo ativo
+        from apps.accounts.models import ChurchUser
+        church_ids = ChurchUser.objects.filter(user=user, is_active=True).values_list('church_id', flat=True)
+        if not church_ids:
+            return qs.none()
+        qs = qs.filter(member__church_id__in=list(church_ids))
+
+        # Filtro por is_current (end_date nula)
+        is_current = self.request.query_params.get('is_current')
+        if is_current is not None:
+            val = str(is_current).lower() in ('1', 'true', 't', 'yes', 'y')
+            if val:
+                qs = qs.filter(end_date__isnull=True)
+            else:
+                qs = qs.filter(end_date__isnull=False)
+        return qs
+
+    def perform_create(self, serializer):
+        # Serializer já faz fallback de branch para member.branch e valida status atual único
+        serializer.save()
+
+    def perform_update(self, serializer):
+        serializer.save()

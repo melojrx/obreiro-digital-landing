@@ -12,7 +12,7 @@ from drf_spectacular.views import (
 from apps.denominations.views import DenominationViewSet
 from apps.churches.views import ChurchViewSet
 from apps.branches.views import BranchViewSet
-from apps.members.views import MemberViewSet, MinisterialFunctionHistoryViewSet
+from apps.members.views import MemberViewSet, MinisterialFunctionHistoryViewSet, MembershipStatusViewSet
 from apps.visitors.views import VisitorViewSet
 from apps.activities.views import ActivityViewSet, MinistryViewSet
 
@@ -27,6 +27,7 @@ router.register(r'churches', ChurchViewSet, basename='church')
 router.register(r'branches', BranchViewSet, basename='branch')
 router.register(r'members', MemberViewSet, basename='member')
 router.register(r'ministerial-function-history', MinisterialFunctionHistoryViewSet, basename='ministerial-function-history')
+router.register(r'membership-status', MembershipStatusViewSet, basename='membership-status')
 router.register(r'visitors', VisitorViewSet, basename='visitor')
 router.register(r'activities', ActivityViewSet, basename='activity')
 router.register(r'ministries', MinistryViewSet, basename='ministry')
