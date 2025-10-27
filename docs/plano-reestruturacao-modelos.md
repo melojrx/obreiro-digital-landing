@@ -59,7 +59,7 @@ Trilha C — Church/Branch
   - Manter em Church caches agregados: `total_members`, `total_visitors`, `total_visitors_registered`. Atualizar em tasks/pontos críticos.
 
 Checklists (acompanhamento)
-- [ ] D1: Campos adicionados e migração aplicada
+- [x] D1: Campos adicionados e migração aplicada
 - [ ] D2: `update_statistics()` + backfill + serializers atualizados
 - [ ] D3: Validação de uso de `max_churches` (>0) em criação de Church
 - [ ] C1: Serializer Church delegando QR/flags para Branch principal (read‑only)
@@ -82,9 +82,8 @@ Riscos e Mitigações
 - Clients legados consumindo `qr_code_*` via Church: manter resposta no serializer via delegação até a remoção definitiva.
 
 Diário de Bordo (preencher durante execução)
-- YYYY‑MM‑DD – D1 aplicado em dev. Migração OK. Sem quebras.
+- 2025‑10‑27 – D1 aplicado em dev. Migração criada (0003_*). Sem quebras.
 - YYYY‑MM‑DD – D2 backfill executado. Totais conferidos.
 - YYYY‑MM‑DD – C1 serializers delegando QR. Telas testadas.
 - YYYY‑MM‑DD – C2 data migration QR → main branch.
 - YYYY‑MM‑DD – C3 remoção de campos Church.qr_code_* e limpeza.
-
