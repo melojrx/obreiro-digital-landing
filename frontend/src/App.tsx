@@ -56,6 +56,10 @@ const ChurchDetailsPage = lazy(() =>
   import("./pages/ChurchDetailsPage")
 );
 
+const BranchDetailsPage = lazy(() => 
+  import("./pages/BranchDetailsPage")
+);
+
 const queryClient = new QueryClient();
 
 const AppContent = () => {
@@ -322,6 +326,14 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="auth_complete">
             <ChurchDetailsPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/denominacao/branches/:id" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <BranchDetailsPage />
           </ProtectedRoute>
         } 
       />

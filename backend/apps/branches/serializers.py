@@ -14,6 +14,9 @@ class BranchSerializer(serializers.ModelSerializer):
     full_address = serializers.ReadOnlyField()
     visitor_registration_url = serializers.ReadOnlyField()
     
+    # Alias para compatibilidade no front: expor is_headquarters como is_main
+    is_headquarters = serializers.BooleanField(source='is_main', read_only=True)
+
     class Meta:
         model = Branch
         fields = [
@@ -26,6 +29,8 @@ class BranchSerializer(serializers.ModelSerializer):
             'requires_visitor_approval', 'total_visitors_registered',
             # Estatísticas
             'total_visitors', 'total_activities',
+            # Identificadores de matriz
+            'is_main', 'is_headquarters',
             # Timestamps
             'created_at', 'updated_at', 'is_active'
         ]
