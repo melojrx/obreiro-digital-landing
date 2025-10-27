@@ -486,6 +486,12 @@ export const membersService = {
     });
     return response.data;
   },
+
+  // Criação de usuário do sistema a partir da edição do membro
+  async createSystemUser(memberId: number, data: { system_role: string; user_email: string; user_password: string }): Promise<{ message: string; member: Member }> {
+    const response = await api.post(API_ENDPOINTS.members.createSystemUser(memberId), data);
+    return response.data;
+  },
 };
 
 // Serviço para MembershipStatus

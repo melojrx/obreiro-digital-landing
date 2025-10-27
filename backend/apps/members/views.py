@@ -11,6 +11,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Count, Q
 from datetime import datetime, date
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .models import Member, MembershipStatusLog, MinisterialFunctionHistory, MembershipStatus
 from apps.core.mixins import ChurchScopedQuerysetMixin
@@ -116,6 +119,104 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
         if instance.branch and not self._user_can_write_branch(request.user, instance.branch):
             raise PermissionDenied('Sem permissão para excluir membro desta filial.')
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], url_path='create-system-user')
+    def create_system_user(self, request, pk=None):
+        """
+        Cria um usuário do sistema vinculado ao membro (fluxo a partir da edição).
+        Regras:
+        - Membro ainda não pode ter usuário associado
+        - Papel permitido varia conforme quem atribui:
+          * Superuser / quem gerencia a igreja: church_admin, pastor, secretary, leader, member
+          * Secretary na igreja do membro: apenas secretary
+        - Valida e-mail único (usuário ativo) e senha via validators do Django
+        """
+        from apps.accounts.models import ChurchUser
+        from apps.core.models import RoleChoices
+
+        member = self.get_object()
+        if member.user_id:
+            return Response({
+                'error': 'Membro já possui usuário do sistema vinculado.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        system_role = request.data.get('system_role')
+        user_email = request.data.get('user_email')
+        user_password = request.data.get('user_password')
+
+        if not system_role or not user_email or not user_password:
+            return Response({
+                'error': 'Campos obrigatórios ausentes: system_role, user_email, user_password.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Determinar papéis permitidos para o solicitante
+        allowed_roles = []
+        user = request.user
+        if user.is_superuser:
+            allowed_roles = [
+                RoleChoices.CHURCH_ADMIN,
+                RoleChoices.PASTOR,
+                RoleChoices.SECRETARY,
+                RoleChoices.LEADER,
+                RoleChoices.MEMBER,
+            ]
+        else:
+            church_users = list(user.church_users.filter(is_active=True))
+            can_manage = any(cu.can_manage_church(member.church) for cu in church_users)
+            if can_manage:
+                allowed_roles = [
+                    RoleChoices.CHURCH_ADMIN,
+                    RoleChoices.PASTOR,
+                    RoleChoices.SECRETARY,
+                    RoleChoices.LEADER,
+                    RoleChoices.MEMBER,
+                ]
+            else:
+                cu = user.church_users.filter(church=member.church, is_active=True).first()
+                if cu and cu.role_effective == RoleChoices.SECRETARY:
+                    allowed_roles = [RoleChoices.SECRETARY]
+
+        if system_role not in allowed_roles:
+            raise PermissionDenied('Sem permissão para atribuir este papel.')
+
+        # Validar senha
+        try:
+            validate_password(user_password)
+        except DjangoValidationError as e:
+            return Response({'error': 'Senha inválida', 'details': list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validar unicidade de email (usuário ativo)
+        User = get_user_model()
+        if User.objects.filter(email=user_email, is_active=True).exists():
+            return Response({'error': 'Este e-mail já está em uso por outro usuário ativo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Criar usuário
+        # Garantir telefone em formato válido; fallback conservador se ausente
+        phone = member.phone or '(00) 0000-0000'
+        created_user = User.objects.create_user(
+            email=user_email,
+            password=user_password,
+            full_name=member.full_name,
+            phone=phone,
+        )
+
+        # Vincular à igreja e papel
+        ChurchUser.objects.create(
+            user=created_user,
+            church=member.church,
+            role=system_role,
+            is_user_active_church=True,
+            active_branch=member.branch if getattr(member, 'branch', None) else None,
+        )
+
+        # Atualizar membro
+        member.user = created_user
+        member.save(update_fields=['user', 'updated_at'])
+
+        return Response({
+            'message': 'Usuário do sistema criado e vinculado ao membro com sucesso.',
+            'member': MemberSerializer(member, context={'request': request}).data,
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='transfer-branch')
     def transfer_branch_admin(self, request, pk=None):

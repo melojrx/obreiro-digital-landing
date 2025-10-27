@@ -39,7 +39,15 @@ const EditarMembro: React.FC = () => {
 
     try {
       setSaving(true);
-      await membersService.updateMember(Number(id), data);
+      const { create_system_user, system_role, user_email, user_password, ...memberUpdateData } = (data as any);
+      await membersService.updateMember(Number(id), memberUpdateData);
+
+      // Se for para criar usuário do sistema e o membro ainda não tem usuário vinculado
+      if (member && !member.user && create_system_user) {
+        if (system_role && user_email && user_password) {
+          await membersService.createSystemUser(Number(id), { system_role, user_email, user_password });
+        }
+      }
       toast.success('Membro atualizado com sucesso!');
       navigate(`/membros/${id}`);
     } catch (error) {

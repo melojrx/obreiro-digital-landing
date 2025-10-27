@@ -47,6 +47,7 @@ import {
 } from '@/services/membersService';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // Schema de validação
 const phoneRegex = /^\(\d{2}\) \d{4,5}-\d{4}$/;
@@ -153,15 +154,35 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   const { user } = useAuth();
   const activeChurch = useCurrentActiveChurch();
   
-  // Papéis disponíveis para atribuição
-  const availableRoles = [
+  // Papéis do sistema (catálogo)
+  const roleCatalog = [
     { value: 'church_admin', label: 'Administrador da Igreja', description: 'Acesso completo à administração da igreja' },
     { value: 'pastor', label: 'Pastor', description: 'Gestão pastoral e administrativa' },
     { value: 'secretary', label: 'Secretário(a)', description: 'Gestão de cadastros e dados' },
     { value: 'leader', label: 'Líder', description: 'Liderança de ministérios e atividades' },
     { value: 'member', label: 'Membro', description: 'Acesso básico ao sistema' },
-  ];
-  const canAssignRoles = true; // Habilitar criação de usuários
+  ] as const;
+
+  // Regras de distribuição de papéis por quem está atribuindo
+  const permissions = usePermissions();
+  const allowedRoleCodes: string[] = React.useMemo(() => {
+    // Top-level (equivalente ao antigo denomination_admin) e church_admin
+    if (permissions.canManageDenomination || permissions.isChurchAdmin || permissions.canManageChurches || permissions.canManageChurch) {
+      return ['church_admin', 'pastor', 'secretary', 'leader', 'member'];
+    }
+    // Secretário só pode distribuir SECRETARY
+    if (permissions.isSecretary || (permissions.canManageMembers && !permissions.canManageChurch && !permissions.isChurchAdmin)) {
+      return ['secretary'];
+    }
+    // Demais perfis não podem atribuir papéis
+    return [];
+  }, [permissions]);
+
+  const availableRoles = React.useMemo(() => {
+    return roleCatalog.filter(r => allowedRoleCodes.includes(r.value));
+  }, [allowedRoleCodes]);
+
+  const canAssignRoles = availableRoles.length > 0;
   const rolesLoading = false;
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
@@ -1194,11 +1215,17 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="create_system_user"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  {/* Se já possui usuário vinculado, mostrar aviso e desabilitar criação */}
+                  {member && member.user ? (
+                    <div className="p-3 rounded border bg-gray-50 text-sm text-gray-700">
+                      Este membro já possui acesso ao sistema vinculado.
+                    </div>
+                  ) : canAssignRoles ? (
+                    <FormField
+                     control={form.control}
+                     name="create_system_user"
+                     render={({ field }) => (
+                       <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                         <FormControl>
                           <Checkbox
                             checked={field.value}
@@ -1214,8 +1241,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       </FormItem>
                     )}
                   />
+                  ) : (
+                    <div className="p-3 rounded border bg-gray-50 text-sm text-gray-600">
+                      Você não tem permissão para atribuir papéis de acesso ao sistema.
+                    </div>
+                  )}
 
-                  {form.watch('create_system_user') && (
+                  {canAssignRoles && form.watch('create_system_user') && (
                     <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
                       <h4 className="font-medium text-blue-900 flex items-center gap-2">
                         <Shield className="h-4 w-4" />

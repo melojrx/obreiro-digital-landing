@@ -150,6 +150,7 @@ export const API_ENDPOINTS = {
     statistics: '/members/statistics/',
     profile: (id: number) => `/members/${id}/profile/`,
     updateStatus: (id: number) => `/members/${id}/update_status/`,
+    createSystemUser: (id: number) => `/members/${id}/create-system-user/`,
     // Histórico de status de membresia (auditoria simples)
     statusHistory: (id: number) => `/members/${id}/status_history/`,
     export: '/members/export/',
