@@ -6,6 +6,8 @@ Ex: Assembleia de Deus, Igreja Batista, Universal, etc.
 from django.db import models
 from django.conf import settings
 from apps.core.models import BaseModel, ActiveManager
+from django.utils import timezone
+from apps.core.models import SubscriptionPlanChoices, SubscriptionStatusChoices
 from apps.core.models import validate_cnpj, phone_validator, cep_validator
 from apps.accounts.models import LEGACY_DENOMINATION_ROLE
 
@@ -126,6 +128,83 @@ class Denomination(BaseModel):
         default=0,
         help_text="Calculado automaticamente"
     )
+
+    # =====================================
+    # ASSINATURA / LIMITES / VISITANTES (NOVOS)
+    # =====================================
+    subscription_plan = models.CharField(
+        "Plano de Assinatura",
+        max_length=20,
+        choices=SubscriptionPlanChoices.choices,
+        default=SubscriptionPlanChoices.BASIC,
+        help_text="Plano SaaS contratado para a denominação"
+    )
+
+    subscription_status = models.CharField(
+        "Status da Assinatura",
+        max_length=20,
+        choices=SubscriptionStatusChoices.choices,
+        default=SubscriptionStatusChoices.TRIAL,
+        help_text="Status atual da assinatura"
+    )
+
+    subscription_start_date = models.DateTimeField(
+        "Início da Assinatura",
+        default=timezone.now,
+        help_text="Data de início da assinatura"
+    )
+
+    subscription_end_date = models.DateTimeField(
+        "Fim da Assinatura",
+        null=True,
+        blank=True,
+        help_text="Data de término da assinatura"
+    )
+
+    trial_end_date = models.DateTimeField(
+        "Fim do Período de Teste",
+        null=True,
+        blank=True,
+        help_text="Data de fim do trial, quando em período de teste"
+    )
+
+    # Limites (0 = ilimitado)
+    max_members = models.PositiveIntegerField(
+        "Limite de Membros",
+        default=0,
+        help_text="Máximo de membros agregados. 0 = ilimitado"
+    )
+
+    max_churches = models.PositiveIntegerField(
+        "Limite de Igrejas",
+        default=1,
+        help_text="Máximo de igrejas permitidas. 0 = ilimitado"
+    )
+
+    max_branches = models.PositiveIntegerField(
+        "Limite de Filiais",
+        default=0,
+        help_text="Máximo de filiais por denominação (agregado). 0 = ilimitado"
+    )
+
+    # Visitantes (agregados)
+    total_visitors = models.PositiveIntegerField(
+        "Total de Visitantes",
+        default=0,
+        help_text="Total agregado de visitantes em todas as igrejas"
+    )
+
+    allows_visitor_registration = models.BooleanField(
+        "Permite Registro de Visitantes",
+        default=True,
+        help_text="Default da denominação para permitir registro de visitantes"
+    )
+
+    total_visitors_registered = models.PositiveIntegerField(
+        "Total de Visitantes Registrados",
+        default=0,
+        help_text="Total agregado de registros via QR code"
+    )
     
     # Managers
     objects = models.Manager()
@@ -139,6 +218,7 @@ class Denomination(BaseModel):
             models.Index(fields=['name']),
             models.Index(fields=['administrator']),
             models.Index(fields=['headquarters_state']),
+            models.Index(fields=['subscription_status']),
         ]
     
     def __str__(self):
