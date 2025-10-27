@@ -21,14 +21,23 @@ class DenominationSerializer(serializers.ModelSerializer):
             'id', 'name', 'short_name', 'description', 'administrator',
             'administrator_name', 'email', 'phone', 'website',
             'headquarters_address', 'headquarters_city', 'headquarters_state',
-            'headquarters_zipcode', 'cnpj', 'logo', 'total_churches',
-            'total_members', 'display_name', 'churches_count',
-            'total_members_count', 'created_at', 'updated_at', 'is_active'
+            'headquarters_zipcode', 'cnpj', 'logo',
+            # Assinatura/limites
+            'subscription_plan', 'subscription_status', 'subscription_start_date',
+            'subscription_end_date', 'trial_end_date', 'max_members', 'max_churches',
+            'max_branches',
+            # Agregados
+            'total_churches', 'total_members', 'total_visitors',
+            'total_visitors_registered', 'allows_visitor_registration',
+            # Read-only derivados
+            'display_name', 'churches_count', 'total_members_count',
+            'created_at', 'updated_at', 'is_active'
         ]
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'administrator_name',
             'display_name', 'churches_count', 'total_members_count',
-            'total_churches', 'total_members'
+            'total_churches', 'total_members', 'total_visitors',
+            'total_visitors_registered'
         ]
 
 

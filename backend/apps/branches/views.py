@@ -141,6 +141,17 @@ class BranchViewSet(viewsets.ModelViewSet):
             return BranchQRCodeSerializer
         return super().get_serializer_class()
 
+    def perform_create(self, serializer):
+        """Ao criar, herdar defaults da Church quando campo não vier informado."""
+        branch = serializer.save()
+        try:
+            # Se não foi explicitamente enviado, herdar da igreja
+            if 'allows_visitor_registration' not in serializer.validated_data and branch.church:
+                branch.allows_visitor_registration = getattr(branch.church, 'allows_visitor_registration', True)
+                branch.save(update_fields=['allows_visitor_registration', 'updated_at'])
+        except Exception:
+            pass
+
     @action(detail=False, methods=['get'], url_path='check-create-availability')
     def check_create_availability(self, request):
         """Verifica se a igreja pode criar novas filiais com base no plano vigente"""

@@ -250,10 +250,34 @@ class Denomination(BaseModel):
         return Member.objects.filter(church_id__in=church_ids, is_active=True).count()
     
     def update_statistics(self):
-        """Atualiza as estatísticas calculadas"""
+        """Atualiza as estatísticas calculadas para a denominação.
+
+        - total_churches: igrejas ativas
+        - total_members: membros ativos (via Member)
+        - total_visitors: soma de `Church.total_visitors`
+        - total_visitors_registered: soma de `Church.total_visitors_registered`
+        """
+        from apps.churches.models import Church  # import local para evitar circular import
+        from django.db.models import Sum
+
         self.total_churches = self.churches_count
         self.total_members = self.total_members_count
-        self.save(update_fields=['total_churches', 'total_members', 'updated_at'])
+
+        church_qs = Church.objects.filter(denomination=self, is_active=True)
+        agg = church_qs.aggregate(
+            total_visitors_sum=Sum('total_visitors'),
+            total_visitors_registered_sum=Sum('total_visitors_registered'),
+        )
+        self.total_visitors = int(agg.get('total_visitors_sum') or 0)
+        self.total_visitors_registered = int(agg.get('total_visitors_registered_sum') or 0)
+
+        self.save(update_fields=[
+            'total_churches',
+            'total_members',
+            'total_visitors',
+            'total_visitors_registered',
+            'updated_at'
+        ])
     
     def can_user_manage(self, user):
         """Verifica se um usuário pode gerenciar esta denominação"""

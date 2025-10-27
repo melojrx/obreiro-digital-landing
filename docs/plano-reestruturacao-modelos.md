@@ -65,8 +65,8 @@ Checklists (acompanhamento)
 - [ ] C1: Serializer Church delegando QR/flags para Branch principal (read‑only)
 - [ ] C2: Data migration de QR para main branch + verificação de “uma main por Church”
 - [ ] C3: Remoção de `qr_code_*` de Church + limpeza de referências
-- [ ] C4: Default de registro de visitantes da Church aplicado em novas Branches
-- [ ] C5: Rotina de agregação consistente (membros/visitantes) por Church/Denomination
+- [x] C4: Default de registro de visitantes da Church aplicado em novas Branches
+- [x] C5: Rotina de agregação consistente (membros/visitantes) por Church/Denomination
 
 Testes e Validação
 - API
@@ -84,6 +84,8 @@ Riscos e Mitigações
 Diário de Bordo (preencher durante execução)
 - 2025‑10‑27 – D1 aplicado em dev. Migração criada (0003_*). Sem quebras.
 - YYYY‑MM‑DD – D2 backfill executado. Totais conferidos.
-- YYYY‑MM‑DD – C1 serializers delegando QR. Telas testadas.
-- YYYY‑MM‑DD – C2 data migration QR → main branch.
-- YYYY‑MM‑DD – C3 remoção de campos Church.qr_code_* e limpeza.
+- 2025‑10‑27 – C1 serializers delegando QR. Actions compat criadas.
+- 2025‑10‑27 – C2 data migration QR → main branch aplicada.
+- 2025‑10‑27 – C3 remoção de campos Church.qr_code_* e limpeza aplicada.
+- 2025‑10‑27 – C4 herdando allows_visitor_registration em novas branches.
+- 2025‑10‑27 – C5 agregação de total_visitors_registered em Church.update_statistics.

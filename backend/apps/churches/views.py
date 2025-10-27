@@ -235,6 +235,59 @@ class ChurchViewSet(viewsets.ModelViewSet):
         # Atualizar estatísticas da denominação se aplicável
         if instance.denomination:
             instance.denomination.update_statistics()
+
+    # ==============================
+    # Compat: QR Code via Church → Branch principal
+    # ==============================
+    def _get_main_branch(self, church):
+        try:
+            from apps.branches.models import Branch
+            branch = church.branches.filter(is_active=True, is_main=True).first()
+            if not branch:
+                branch = church.branches.filter(is_active=True).first()
+            return branch
+        except Exception:
+            return None
+
+    @action(detail=True, methods=['get'])
+    def qr_code(self, request, pk=None):
+        """Retorna dados de QR da filial principal (compat)."""
+        church = self.get_object()
+        branch = self._get_main_branch(church)
+        if not branch:
+            return Response({'error': 'Igreja não possui filial principal para QR.'}, status=status.HTTP_404_NOT_FOUND)
+        from apps.branches.serializers import BranchQRCodeSerializer
+        serializer = BranchQRCodeSerializer(branch, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def regenerate_qr_code(self, request, pk=None):
+        """Regenera QR da filial principal (compat)."""
+        church = self.get_object()
+        branch = self._get_main_branch(church)
+        if not branch:
+            return Response({'error': 'Igreja não possui filial principal para QR.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            branch.regenerate_qr_code()
+            from apps.branches.serializers import BranchQRCodeSerializer
+            serializer = BranchQRCodeSerializer(branch, context={'request': request})
+            return Response({'message': 'QR code regenerado com sucesso', 'data': serializer.data})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def toggle_qr_code(self, request, pk=None):
+        """Ativa/desativa QR da filial principal (compat)."""
+        church = self.get_object()
+        branch = self._get_main_branch(church)
+        if not branch:
+            return Response({'error': 'Igreja não possui filial principal para QR.'}, status=status.HTTP_404_NOT_FOUND)
+        branch.qr_code_active = not branch.qr_code_active
+        branch.save(update_fields=['qr_code_active', 'updated_at'])
+        status_text = 'ativado' if branch.qr_code_active else 'desativado'
+        from apps.branches.serializers import BranchQRCodeSerializer
+        serializer = BranchQRCodeSerializer(branch, context={'request': request})
+        return Response({'message': f'QR code {status_text} com sucesso', 'data': serializer.data})
     
     # ============================================
     # CUSTOM ACTIONS - ESTATÍSTICAS E RELATÓRIOS

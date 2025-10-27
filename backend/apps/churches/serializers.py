@@ -22,6 +22,10 @@ class ChurchSerializer(serializers.ModelSerializer):
     subscription_expired = serializers.ReadOnlyField()
     can_add_members = serializers.ReadOnlyField()
     can_add_branches = serializers.ReadOnlyField()
+    # Compat: expor dados de QR da filial principal via métodos (read-only)
+    qr_code_uuid = serializers.SerializerMethodField()
+    qr_code_image = serializers.SerializerMethodField()
+    qr_code_active = serializers.SerializerMethodField()
     
     class Meta:
         model = Church
@@ -32,6 +36,10 @@ class ChurchSerializer(serializers.ModelSerializer):
             'logo', 'cover_image', 'subscription_plan', 'subscription_status',
             'subscription_start_date', 'subscription_end_date', 'trial_end_date',
             'max_members', 'max_branches', 'total_members', 'total_visitors',
+            # Compat: QR via filial principal
+            'qr_code_uuid', 'qr_code_image', 'qr_code_active',
+            # Flags/contadores relacionados a visitantes
+            'allows_visitor_registration', 'total_visitors_registered',
             'display_name', 'full_address', 'is_subscription_active',
             'is_trial_active', 'days_until_expiration', 'subscription_expired',
             'can_add_members', 'can_add_branches', 'created_at', 'updated_at',
@@ -42,8 +50,36 @@ class ChurchSerializer(serializers.ModelSerializer):
             'main_pastor_name', 'display_name', 'full_address',
             'is_subscription_active', 'is_trial_active', 'days_until_expiration',
             'subscription_expired', 'can_add_members', 'can_add_branches',
-            'total_members', 'total_visitors'
+            'total_members', 'total_visitors',
+            'qr_code_uuid', 'qr_code_image', 'qr_code_active',
+            'total_visitors_registered'
         ]
+
+    def _get_main_branch(self, obj):
+        try:
+            from apps.branches.models import Branch
+            branch = obj.branches.filter(is_active=True, is_main=True).first()
+            if not branch:
+                branch = obj.branches.filter(is_active=True).first()
+            return branch
+        except Exception:
+            return None
+
+    def get_qr_code_uuid(self, obj):
+        branch = self._get_main_branch(obj)
+        return str(branch.qr_code_uuid) if branch and branch.qr_code_uuid else None
+
+    def get_qr_code_image(self, obj):
+        branch = self._get_main_branch(obj)
+        if branch and branch.qr_code_image:
+            request = self.context.get('request')
+            url = branch.qr_code_image.url
+            return request.build_absolute_uri(url) if request else url
+        return None
+
+    def get_qr_code_active(self, obj):
+        branch = self._get_main_branch(obj)
+        return bool(branch.qr_code_active) if branch else False
 
 
 class ChurchCreateSerializer(serializers.ModelSerializer):
@@ -119,19 +155,21 @@ class ChurchCreateSerializer(serializers.ModelSerializer):
         # Verificar limites de igrejas por denominação
         if denomination:
             from apps.core.models import SubscriptionPlanChoices
-            
-            # Buscar plano da denominação ou usar padrão
-            denomination_plan = getattr(denomination, 'subscription_plan', SubscriptionPlanChoices.BASIC)
-            
-            # Limites por plano (para denominações)
-            limits = {
-                SubscriptionPlanChoices.BASIC: 1,
-                SubscriptionPlanChoices.PROFESSIONAL: 5,
-                SubscriptionPlanChoices.ENTERPRISE: 20,
-                SubscriptionPlanChoices.DENOMINATION: 999999,  # Ilimitado
-            }
-            
-            max_churches = limits.get(denomination_plan, 1)
+
+            # Prioriza limite explícito configurado na denominação quando > 0
+            explicit_limit = getattr(denomination, 'max_churches', 0) or 0
+            if explicit_limit > 0:
+                max_churches = explicit_limit
+            else:
+                # Fallback: limites por plano (compatibilidade)
+                denomination_plan = getattr(denomination, 'subscription_plan', SubscriptionPlanChoices.BASIC)
+                limits = {
+                    SubscriptionPlanChoices.BASIC: 1,
+                    SubscriptionPlanChoices.PROFESSIONAL: 5,
+                    SubscriptionPlanChoices.ENTERPRISE: 20,
+                    SubscriptionPlanChoices.DENOMINATION: 999999,  # Ilimitado
+                }
+                max_churches = limits.get(denomination_plan, 1)
             current_churches = Church.objects.filter(
                 denomination=denomination,
                 is_active=True
@@ -139,7 +177,7 @@ class ChurchCreateSerializer(serializers.ModelSerializer):
             
             if current_churches >= max_churches:
                 raise serializers.ValidationError(
-                    f"Esta denominação atingiu o limite de {max_churches} igrejas para o plano {denomination_plan}"
+                    f"Esta denominação atingiu o limite de {max_churches} igrejas"
                 )
         
         # Validar estado (formato)
@@ -525,6 +563,10 @@ class ChurchDetailSerializer(serializers.ModelSerializer):
     subscription_plan_display = serializers.CharField(source='get_subscription_plan_display', read_only=True)
     members_count = serializers.IntegerField(read_only=True)
     branches_count = serializers.IntegerField(read_only=True)
+    # Compat: dados de QR da filial principal
+    qr_code_uuid = serializers.SerializerMethodField()
+    qr_code_image = serializers.SerializerMethodField()
+    qr_code_active = serializers.SerializerMethodField()
     
     class Meta:
         model = Church
@@ -539,6 +581,9 @@ class ChurchDetailSerializer(serializers.ModelSerializer):
             'total_members', 'members_count', 'total_visitors', 'branches_count', 'display_name', 'full_address', 
             'is_subscription_active', 'is_trial_active', 'days_until_expiration', 
             'subscription_expired', 'can_add_members', 'can_add_branches', 
+            # Compat: QR + flags/contadores relacionados a visitantes
+            'qr_code_uuid', 'qr_code_image', 'qr_code_active',
+            'allows_visitor_registration', 'total_visitors_registered',
             'created_at', 'updated_at', 'is_active'
         ]
 
@@ -561,6 +606,32 @@ class ChurchDetailSerializer(serializers.ModelSerializer):
             data['total_visitors'] = data.get('total_visitors', 0)
 
         return data
+
+    # Métodos compat QR (reutilizam helper do serializer de lista)
+    def _get_main_branch(self, obj):
+        try:
+            branch = obj.branches.filter(is_active=True, is_main=True).first()
+            if not branch:
+                branch = obj.branches.filter(is_active=True).first()
+            return branch
+        except Exception:
+            return None
+
+    def get_qr_code_uuid(self, obj):
+        branch = self._get_main_branch(obj)
+        return str(branch.qr_code_uuid) if branch and branch.qr_code_uuid else None
+
+    def get_qr_code_image(self, obj):
+        branch = self._get_main_branch(obj)
+        if branch and branch.qr_code_image:
+            request = self.context.get('request')
+            url = branch.qr_code_image.url
+            return request.build_absolute_uri(url) if request else url
+        return None
+
+    def get_qr_code_active(self, obj):
+        branch = self._get_main_branch(obj)
+        return bool(branch.qr_code_active) if branch else False
 
 
 class FirstChurchSerializer(serializers.Serializer):
