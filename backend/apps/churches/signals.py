@@ -38,7 +38,5 @@ def create_qr_code_and_main_branch_for_new_church(sender, instance, created, **k
             )
             
             print(f'✅ Branch matriz criada: {branch.name}')
-            print(f'   - QR Code UUID (Church): {instance.qr_code_uuid}')
             print(f'   - QR Code UUID (Branch): {branch.qr_code_uuid}')
-            print(f'   - QR Code Image (Church): {bool(instance.qr_code_image)}')
             print(f'   - QR Code Image (Branch): {bool(branch.qr_code_image)}')
