@@ -454,17 +454,36 @@ class Member(BaseModel):
         # Formatar campos
         if self.state:
             self.state = self.state.upper()
-        
+
         # Validar datas lógicas
         self._validate_dates()
-        
+
         # Validar dados do cônjuge
         self._validate_spouse_data()
 
         if self.branch and self.branch.church_id != self.church_id:
             raise ValidationError("Filial selecionada não pertence à mesma igreja.")
-        
+
+        # Detectar mudanças ANTES de salvar
+        old_spouse = None
+        old_membership_status = None
+        if self.pk:  # Se é update (não create)
+            try:
+                old_instance = Member.objects.get(pk=self.pk)
+                old_spouse = old_instance.spouse
+                old_membership_status = old_instance.membership_status
+            except Member.DoesNotExist:
+                old_spouse = None
+                old_membership_status = None
+
+        # Salvar o membro
         super().save(*args, **kwargs)
+
+        # Sincronizar relacionamento bidirecional de cônjuge DEPOIS de salvar
+        self._sync_spouse_relationship(old_spouse)
+
+        # Atualizar cônjuge se membership_status mudou para falecido
+        self._update_spouse_on_death(old_membership_status)
     
     def _validate_dates(self):
         """Valida consistência das datas"""
@@ -502,10 +521,75 @@ class Member(BaseModel):
         if self.marital_status != 'married':
             self.spouse = None
             return
-        
+
         # Se o cônjuge for o próprio membro, limpar
         if self.spouse == self:
             self.spouse = None
+
+    def _sync_spouse_relationship(self, old_spouse):
+        """
+        Sincroniza relacionamento bidirecional de cônjuge.
+
+        Cenários tratados:
+        1. Novo casamento: A casa com B → atualiza B para casar com A
+        2. Divórcio/viuvez: A descasa → atualiza ex-cônjuge
+        3. Mudança de cônjuge: A era casado com B, agora casa com C → atualiza B e C
+
+        IMPORTANTE: Usa QuerySet.update() para evitar recursão infinita.
+        """
+        from django.utils import timezone
+
+        # Cenário 1: Membro NÃO é mais casado (divorciou, viuvou, etc)
+        if self.marital_status != 'married' and old_spouse:
+            # Remover vínculo do ex-cônjuge usando update() direto
+            if old_spouse.spouse_id == self.pk:
+                Member.objects.filter(pk=old_spouse.pk).update(
+                    spouse=None,
+                    updated_at=timezone.now()
+                )
+            return
+
+        # Cenário 2: Membro é casado e tem cônjuge membro cadastrado
+        if self.marital_status == 'married' and self.spouse:
+            # Caso 2a: Cônjuge mudou (era casado com B, agora casa com C)
+            if old_spouse and old_spouse.pk != self.spouse.pk:
+                # Remover vínculo do ex-cônjuge usando update() direto
+                if old_spouse.spouse_id == self.pk:
+                    Member.objects.filter(pk=old_spouse.pk).update(
+                        spouse=None,
+                        updated_at=timezone.now()
+                    )
+
+            # Caso 2b: Atualizar novo cônjuge (ou cônjuge que já existia)
+            # Apenas se o cônjuge ainda não estiver vinculado a este membro
+            if self.spouse.spouse_id != self.pk:
+                Member.objects.filter(pk=self.spouse.pk).update(
+                    marital_status='married',
+                    spouse=self.pk,
+                    updated_at=timezone.now()
+                )
+
+    def _update_spouse_on_death(self, old_membership_status):
+        """
+        Atualiza cônjuge quando membro falece.
+
+        Quando um membro casado é marcado como falecido, o cônjuge deve ser
+        automaticamente atualizado para viúvo e o vínculo removido.
+
+        IMPORTANTE: Usa QuerySet.update() para evitar recursão infinita.
+        """
+        from django.utils import timezone
+
+        # Verificar se o status mudou para 'deceased' (falecido)
+        if self.membership_status == 'deceased' and old_membership_status != 'deceased':
+            # Se tinha cônjuge no momento da morte
+            if self.spouse_id:
+                # Atualizar cônjuge para viúvo e remover vínculo
+                Member.objects.filter(pk=self.spouse_id).update(
+                    marital_status='widowed',
+                    spouse=None,
+                    updated_at=timezone.now()
+                )
     
     # =====================================
     # PROPRIEDADES CALCULADAS

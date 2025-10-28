@@ -114,11 +114,9 @@ export interface Member {
   accept_email: boolean;
   accept_whatsapp: boolean;
   
-  // Campos do cônjuge
-  spouse_name?: string;
-  spouse_is_member: boolean;
-  spouse_member?: number;
-  spouse_member_name?: string;
+  // Campo do cônjuge (ID do membro cônjuge, se for membro)
+  spouse?: number;
+  spouse_name?: string; // Nome exibido do cônjuge (read-only, calculado pelo backend)
   
   // Dados familiares
   children_count?: number;
@@ -231,10 +229,8 @@ export interface CreateMemberData {
   accept_email?: boolean;
   accept_whatsapp?: boolean;
   
-  // Campos do cônjuge
-  spouse_name?: string;
-  spouse_is_member?: boolean;
-  spouse_member?: number;
+  // Campo do cônjuge (ID do membro cônjuge)
+  spouse?: number;
   
   // Dados familiares
   children_count?: number;
