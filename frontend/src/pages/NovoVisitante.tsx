@@ -17,10 +17,26 @@ const NovoVisitante: React.FC = () => {
 
   const handleSubmit = async (data: VisitorFormData) => {
     try {
-      const branchId = activeChurch?.active_branch?.id;
-      if (!branchId) {
-        toast.error('Defina uma filial ativa antes de cadastrar visitantes.');
+      if (!activeChurch) {
+        toast.error('Igreja ativa não encontrada. Selecione uma igreja antes de cadastrar visitantes.');
         return;
+      }
+
+      // Determinar filial para associar o novo visitante
+      let branchId: number | undefined = activeChurch.active_branch?.id;
+
+      // Se não houver filial ativa, tentar buscar a Matriz ou primeira filial disponível
+      if (!branchId && activeChurch.id) {
+        try {
+          const { branchService } = await import('@/services/branchService');
+          const paginated = await branchService.getBranchesByChurch(activeChurch.id, 1, 50);
+          const branches = paginated.results || [];
+          const hq = branches.find((b: any) => b.is_headquarters);
+          branchId = (hq?.id || branches[0]?.id) as number | undefined;
+          console.log('🏷️ Branch selecionada para novo visitante:', branchId);
+        } catch (e) {
+          console.warn('⚠️ Não foi possível carregar filiais para definir branch do visitante. Prosseguindo sem branch.', e);
+        }
       }
 
       setSaving(true);
