@@ -357,13 +357,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         cpf: data.cpf || undefined,
         rg: data.rg || undefined,
         marital_status: data.marital_status || undefined,
-        
+
         // Campo do cônjuge (ID do membro cônjuge)
         spouse: data.spouse || undefined,
-        
+
         // Dados familiares
         children_count: data.children_count || undefined,
-        
+
         email: data.email || undefined,
         phone: normalizedPhone,
         phone_secondary: normalizedPhoneSecondary,
@@ -386,13 +386,15 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         accept_sms: data.accept_sms,
         accept_email: data.accept_email,
         accept_whatsapp: data.accept_whatsapp,
-        // Campos de papel do sistema (mapear denomination_admin -> church_admin para compat)
-        create_system_user: data.create_system_user,
-        system_role: mappedRole,
-        user_email: data.user_email,
-        user_password: data.user_password,
-        
-        
+
+        // Campos de papel do sistema - somente se create_system_user for true
+        ...(data.create_system_user && {
+          create_system_user: true,
+          system_role: mappedRole,
+          user_email: data.user_email,
+          user_password: data.user_password,
+        }),
+
         // Foto
         photo: selectedPhoto || undefined,
       };
