@@ -1,6 +1,7 @@
 from datetime import date, datetime
+import logging
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
 from django.db import transaction
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -14,6 +15,9 @@ from apps.core.models import GenderChoices, RoleChoices, validate_cpf
 from .auth_serializers import CustomAuthTokenSerializer
 from apps.core.throttling import AuthAnonRateThrottle, AuthUserRateThrottle
 from .models import ChurchUser, CustomUser, UserProfile
+
+# Logger para auditoria de segurança
+security_logger = logging.getLogger('security')
 
 class CustomAuthToken(ObtainAuthToken):
     serializer_class = CustomAuthTokenSerializer
@@ -737,3 +741,132 @@ def finalize_registration(request):
             {'error': f'Erro ao finalizar cadastro: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_user_role(request, user_id):
+    """
+    Atualiza o role de um usuário em uma igreja específica.
+    
+    VALIDAÇÕES DE SEGURANÇA:
+    - Usuário NÃO pode modificar suas próprias permissões
+    - Apenas Church Admin ou superior pode modificar roles
+    - Logs de auditoria para todas as mudanças de permissão
+    """
+    current_user = request.user
+    new_role = request.data.get('role')
+    church_id = request.data.get('church_id')
+    
+    # Validação 1: Campos obrigatórios
+    if not new_role or not church_id:
+        return Response(
+            {'error': 'Campos obrigatórios: role e church_id'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validação 2: Role válido
+    valid_roles = [choice[0] for choice in RoleChoices.choices]
+    if new_role not in valid_roles:
+        return Response(
+            {'error': f'Role inválido. Opções: {valid_roles}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validação 3: CRÍTICA - Usuário NÃO pode modificar suas próprias permissões
+    if str(user_id) == str(current_user.id):
+        security_logger.warning(
+            f"SECURITY ALERT: User {current_user.id} ({current_user.email}) "
+            f"tentou modificar suas próprias permissões para {new_role}"
+        )
+        raise PermissionDenied(
+            "Você não pode modificar suas próprias permissões"
+        )
+    
+    try:
+        target_user = CustomUser.objects.get(id=user_id, is_active=True)
+        from apps.churches.models import Church
+        church = Church.objects.get(id=church_id)
+        
+        # Buscar ChurchUser atual
+        church_user = ChurchUser.objects.filter(
+            user=target_user,
+            church=church,
+            is_active=True
+        ).first()
+        
+        if not church_user:
+            return Response(
+                {'error': 'Usuário não possui vínculo com esta igreja'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Validação 4: Verificar se o solicitante tem permissão para modificar roles
+        # Apenas Church Admin ou superior podem modificar roles
+        requesting_church_user = ChurchUser.objects.filter(
+            user=current_user,
+            church=church,
+            is_active=True
+        ).first()
+        
+        if not requesting_church_user:
+            raise PermissionDenied("Você não tem vínculo com esta igreja")
+        
+        # Validação hierárquica: apenas Church Admin ou superior podem modificar roles
+        allowed_to_modify = requesting_church_user.role in [
+            RoleChoices.SUPER_ADMIN,
+            RoleChoices.CHURCH_ADMIN
+        ]
+        
+        if not allowed_to_modify and not current_user.is_superuser:
+            security_logger.warning(
+                f"SECURITY ALERT: User {current_user.id} ({current_user.email}) "
+                f"com role {requesting_church_user.role} tentou modificar permissões "
+                f"do usuário {target_user.id}"
+            )
+            raise PermissionDenied(
+                "Apenas administradores da igreja podem modificar permissões"
+            )
+        
+        # Armazenar role antigo para auditoria
+        old_role = church_user.role
+        
+        # Atualizar role
+        church_user.role = new_role
+        church_user.set_permissions_by_role()  # Reaplica permissões baseadas no novo role
+        church_user.save()
+        
+        # Log de auditoria
+        security_logger.info(
+            f"ROLE_CHANGE: User {target_user.id} ({target_user.email}) "
+            f"role changed from {old_role} to {new_role} "
+            f"in church {church.id} ({church.name}) "
+            f"by user {current_user.id} ({current_user.email})"
+        )
+        
+        return Response({
+            'message': f'Permissão atualizada com sucesso de {old_role} para {new_role}',
+            'user_id': target_user.id,
+            'user_email': target_user.email,
+            'old_role': old_role,
+            'new_role': new_role,
+            'church_id': church.id,
+            'church_name': church.name,
+            'changed_by': current_user.email
+        })
+        
+    except CustomUser.DoesNotExist:
+        return Response(
+            {'error': 'Usuário não encontrado'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        security_logger.error(
+            f"ERROR updating role: User {current_user.id} attempted to change "
+            f"user {user_id} role to {new_role}. Error: {str(e)}"
+        )
+        return Response(
+            {'error': f'Erro ao atualizar permissão: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+

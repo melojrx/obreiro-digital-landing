@@ -3,6 +3,7 @@ Views para o app Members
 Implementa APIs para gestão de membros
 """
 
+import logging
 from rest_framework import viewsets, status, permissions
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
@@ -23,6 +24,9 @@ from .serializers import (
     MembershipStatusLogSerializer, MemberStatusChangeSerializer,
     MinisterialFunctionHistorySerializer, MembershipStatusSerializer
 )
+
+# Logger para auditoria de segurança
+security_logger = logging.getLogger('security')
 
 
 class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -233,10 +237,17 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
         )
         # Se já existia, garantir papel e flags coerentes
         if not cu_created:
+            old_role = church_user.role
             changed = False
             if church_user.role != normalized_role:
                 church_user.role = normalized_role
                 changed = True
+                # Log de auditoria para mudança de role
+                security_logger.info(
+                    f"ROLE_CHANGE via create_system_user: Member {member.id} ({member.full_name}) "
+                    f"role changed from {old_role} to {normalized_role} "
+                    f"by user {request.user.id} ({request.user.email})"
+                )
             if not church_user.is_user_active_church:
                 church_user.is_user_active_church = True
                 changed = True
@@ -251,6 +262,12 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
                 except Exception:
                     pass
                 church_user.save()
+        else:
+            # Log para novo role atribuído
+            security_logger.info(
+                f"ROLE_ASSIGNMENT via create_system_user: Member {member.id} ({member.full_name}) "
+                f"assigned role {normalized_role} by user {request.user.id} ({request.user.email})"
+            )
 
         # Atualizar membro
         member.user = created_user

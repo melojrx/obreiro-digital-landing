@@ -458,7 +458,13 @@ class ChurchViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def assign_admin(self, request, pk=None):
-        """Atribuir administrador à igreja"""
+        """
+        Atribuir administrador à igreja
+        
+        VALIDAÇÕES DE SEGURANÇA:
+        - Usuário NÃO pode se auto-atribuir roles
+        - Apenas Church Admin ou superior pode atribuir roles
+        """
         church = self.get_object()
         user_id = request.data.get('user_id')
         role = request.data.get('role', 'church_admin')
@@ -467,6 +473,17 @@ class ChurchViewSet(viewsets.ModelViewSet):
             return Response(
                 {'error': 'user_id é obrigatório'}, 
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # VALIDAÇÃO CRÍTICA: Usuário não pode se auto-atribuir roles
+        if str(user_id) == str(request.user.id):
+            logger.warning(
+                f"SECURITY ALERT: User {request.user.id} ({request.user.email}) "
+                f"tentou se auto-atribuir role {role} na igreja {church.id}"
+            )
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied(
+                "Você não pode atribuir permissões a si mesmo"
             )
         
         try:
@@ -494,12 +511,19 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 }
             )
             
+            old_role = None
             if not created:
+                old_role = church_user.role
                 church_user.role = role
                 church_user.is_active = True
                 church_user.save()
             
-            logger.info(f"Usuário {user.email} atribuído como {role} à igreja {church.name} por {request.user.email}")
+            # Log de auditoria
+            action = 'criado' if created else f'atualizado de {old_role} para'
+            logger.info(
+                f"ROLE_ASSIGNMENT: Usuário {user.email} {action} {role} "
+                f"na igreja {church.name} por {request.user.email}"
+            )
             
             return Response({
                 'message': f'Usuário {user.email} atribuído como {role}',

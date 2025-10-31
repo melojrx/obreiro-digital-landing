@@ -10,6 +10,7 @@ from .views import (
     update_personal_data,
     update_church_data,
     finalize_registration,
+    update_user_role,
 )
 
 urlpatterns = [
@@ -23,9 +24,11 @@ urlpatterns = [
     path('users/upload-avatar/', upload_avatar, name='upload-avatar'),
     path('users/update_personal_data/', update_personal_data, name='update-personal-data'),
     path('users/update_church_data/', update_church_data, name='update-church-data'),
+    path('users/<int:user_id>/update-role/', update_user_role, name='update-user-role'),
 
     # Legacy/aux
     path('my-churches/', my_churches, name='my-churches'),
     path('active-church/', active_church, name='active-church'),
     path('set-active-church/', set_active_church, name='set-active-church'),
 ]
+
