@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +25,8 @@ interface MemberSearchResponse {
     results?: Array<Pick<Member, 'id' | 'user' | 'email'>>;
 }
 
+const CONVERT_FLAG_TTL_MS = 2 * 60 * 1000; // 2 minutos para tolerar latência entre conversão e verificação
+
 const Dashboard = () => {
     const { user, userChurch } = useAuth();
     const location = useLocation();
@@ -43,58 +45,101 @@ const Dashboard = () => {
     const isChurchAdmin = userChurch?.user_role === 'church_admin' || userChurch?.role === 'CHURCH_ADMIN';
     
     // Verificar se já tem registro de membro
-    useEffect(() => {
-        const checkMemberStatus = async () => {
-            console.log('🔍 Verificando se deve mostrar card de conversão:', {
-                isChurchAdmin,
-                userEmail: user?.email,
-                userId: user?.id,
-                userChurch
-            });
-            
-            if (!isChurchAdmin || !user?.email || !user?.id) {
-                console.log('❌ Não deve mostrar card: isChurchAdmin =', isChurchAdmin, 'user.email =', user?.email, 'user.id =', user?.id);
+    const checkMemberStatus = useCallback(async () => {
+        console.log('🔍 Verificando se deve mostrar card de conversão:', {
+            isChurchAdmin,
+            userEmail: user?.email,
+            userId: user?.id,
+            userChurch,
+            activeChurchInfo,
+        });
+
+        if (!isChurchAdmin || !user?.email || !user?.id) {
+            console.log('❌ Não deve mostrar card: isChurchAdmin =', isChurchAdmin, 'user.email =', user?.email, 'user.id =', user?.id);
+            setShouldShowConvertButton(false);
+            setShowTransferCard(false);
+            return;
+        }
+
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const localFlagKey = `ov_has_member_user_${user.id}_church_${userChurch?.id || 'unknown'}`;
+        const rawFlag = window.localStorage.getItem(localFlagKey);
+        let parsedFlag: { status?: string; timestamp?: number } | null = null;
+
+        if (rawFlag) {
+            try {
+                parsedFlag = JSON.parse(rawFlag);
+            } catch (parseError) {
+                if (rawFlag === '1') {
+                    parsedFlag = { status: 'converted' };
+                }
+            }
+        }
+
+        const now = Date.now();
+        const hasRecentConversionFlag =
+            !!parsedFlag &&
+            parsedFlag.status === 'converted' &&
+            (!parsedFlag.timestamp || now - parsedFlag.timestamp < CONVERT_FLAG_TTL_MS);
+
+        if (hasRecentConversionFlag) {
+            console.log('✅ Flag local recente indica conversão. Mantendo card oculto enquanto revalida.');
+            setShouldShowConvertButton(false);
+        }
+
+        try {
+            console.log('🔍 Consultando status de membresia (por usuário): /members/me/status');
+            const status = await membersService.getMyMembershipStatus();
+            console.log('✅ Status de membresia:', status);
+
+            const hasMemberRecord = !!status.is_member;
+
+            // Mostrar card de transferência quando for membro e a filial ativa diferir
+            const activeBranchId = activeChurchInfo?.active_branch?.id;
+            const memberBranchId = status.branch?.id ?? null;
+            const shouldSuggestTransfer = hasMemberRecord && !!activeBranchId && memberBranchId !== activeBranchId;
+            setShowTransferCard(!!shouldSuggestTransfer);
+
+            if (hasMemberRecord) {
                 setShouldShowConvertButton(false);
+                window.localStorage.setItem(
+                    localFlagKey,
+                    JSON.stringify({ status: 'converted', timestamp: now })
+                );
                 return;
             }
 
-            // Fallback rápido: se já marcamos localmente que este usuário virou membro
-            // nesta igreja, escondemos o card imediatamente (evita flicker e casos de
-            // busca paginada/por filial não retornando o membro recém-criado).
-            const localFlagKey = `ov_has_member_user_${user.id}_church_${userChurch?.id || 'unknown'}`;
-            const localFlag = localStorage.getItem(localFlagKey);
-            if (localFlag === '1') {
-                console.log('✅ Flag local indica que usuário já é membro. Ocultando card.');
-                setShouldShowConvertButton(false);
-                // Não retornamos aqui para permitir revalidação assíncrona via API;
-                // se o backend indicar que não é membro, limpamos a flag mais abaixo.
-            }
-            
-            try {
-                console.log('🔍 Consultando status de membresia (por usuário): /members/me/status');
-                const status = await membersService.getMyMembershipStatus();
-                console.log('✅ Status de membresia:', status);
+            // Caso não seja membro e exista flag local expirada, limpar e reexibir card
+            if (parsedFlag) {
+                const isFlagExpired =
+                    parsedFlag.timestamp !== undefined ? now - parsedFlag.timestamp >= CONVERT_FLAG_TTL_MS : true;
 
-                const hasMemberRecord = !!status.is_member;
-                setShouldShowConvertButton(!hasMemberRecord);
-
-                // Mostrar card de transferência quando for membro e a filial ativa diferir
-                const activeBranchId = activeChurchInfo?.active_branch?.id;
-                const memberBranchId = status.branch?.id ?? null;
-                const shouldSuggestTransfer = hasMemberRecord && !!activeBranchId && memberBranchId !== activeBranchId;
-                setShowTransferCard(!!shouldSuggestTransfer);
-
-                if (hasMemberRecord) {
-                    localStorage.setItem(localFlagKey, '1');
+                if (isFlagExpired) {
+                    console.log('⚠️ Flag local expirada e backend indica ausência de membro. Limpando flag.');
+                    window.localStorage.removeItem(localFlagKey);
+                    setShouldShowConvertButton(true);
+                } else {
+                    console.log('⌛ Conversão recém-solicitada ainda não refletida no backend. Mantendo card oculto temporariamente.');
+                    setShouldShowConvertButton(false);
                 }
-            } catch (error) {
-                console.error('❌ Erro ao verificar status de membro:', error);
+            } else {
+                setShouldShowConvertButton(true);
+            }
+        } catch (error) {
+            console.error('❌ Erro ao verificar status de membro:', error);
+            if (!hasRecentConversionFlag) {
                 setShouldShowConvertButton(false);
             }
-        };
-        
+            setShowTransferCard(false);
+        }
+    }, [activeChurchInfo, isChurchAdmin, user, userChurch]);
+
+    useEffect(() => {
         checkMemberStatus();
-    }, [isChurchAdmin, user, userChurch]);
+    }, [checkMemberStatus]);
 
     useEffect(() => {
         if (error) {
@@ -214,17 +259,20 @@ const Dashboard = () => {
                     isOpen={showConvertModal}
                     onClose={() => {
                         setShowConvertModal(false);
-                        // Recarregar verificação após fechar modal
-                        setShouldShowConvertButton(false);
+                        checkMemberStatus();
                     }}
-                    onConverted={(member) => {
+                    onConverted={(_member) => {
                         // Persistir flag local para este usuário/igreja e esconder o card
                         if (user?.id && userChurch?.id) {
                             const localFlagKey = `ov_has_member_user_${user.id}_church_${userChurch.id}`;
-                            localStorage.setItem(localFlagKey, '1');
+                            localStorage.setItem(
+                                localFlagKey,
+                                JSON.stringify({ status: 'converted', timestamp: Date.now() })
+                            );
                         }
                         setShouldShowConvertButton(false);
                         setShowTransferCard(false);
+                        checkMemberStatus();
                     }}
                 />
 
