@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters import rest_framework as filters
@@ -25,10 +26,21 @@ from apps.core.permissions import (
     CanCreateChurches, CanManageChurchAdmins
 )
 from apps.core.models import MembershipStatusChoices
-from apps.accounts.models import LEGACY_DENOMINATION_ROLE
+from apps.accounts.models import LEGACY_DENOMINATION_ROLE, RoleChoices
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+ROLE_HIERARCHY = {
+    RoleChoices.SUPER_ADMIN: 0,
+    RoleChoices.CHURCH_ADMIN: 1,
+    RoleChoices.PASTOR: 2,
+    RoleChoices.SECRETARY: 3,
+    RoleChoices.LEADER: 4,
+    RoleChoices.MEMBER: 5,
+    RoleChoices.READ_ONLY: 6,
+}
+ROLE_HIERARCHY_DEFAULT = 99
 
 
 class ChurchFilter(filters.FilterSet):
@@ -189,6 +201,39 @@ class ChurchViewSet(viewsets.ModelViewSet):
             permission_classes = [permissions.IsAuthenticated]
         
         return [permission() for permission in permission_classes]
+
+    def _role_level(self, role_code: str) -> int:
+        """Retorna o nível hierárquico associado ao papel informado."""
+        return ROLE_HIERARCHY.get(role_code, ROLE_HIERARCHY_DEFAULT)
+
+    def _resolve_actor_role_context(self, user, church):
+        """
+        Determina o papel efetivo e nível hierárquico do solicitante
+        considerando o contexto da igreja alvo.
+        """
+        if user.is_superuser:
+            return RoleChoices.SUPER_ADMIN, self._role_level(RoleChoices.SUPER_ADMIN)
+
+        actor_church_user = None
+        if church:
+            actor_church_user = user.church_users.filter(
+                church=church,
+                is_active=True
+            ).first()
+
+        if actor_church_user:
+            return actor_church_user.role_effective, actor_church_user.role_hierarchy_level
+
+        # Fallback para administradores de plataforma (SUPER_ADMIN em qualquer igreja)
+        platform_role = user.church_users.filter(
+            role=RoleChoices.SUPER_ADMIN,
+            is_active=True
+        ).first()
+
+        if platform_role:
+            return platform_role.role_effective, platform_role.role_hierarchy_level
+
+        return None, None
     
     def get_serializer_class(self):
         """Serializer específico por ação"""
@@ -471,8 +516,8 @@ class ChurchViewSet(viewsets.ModelViewSet):
         
         try:
             from django.contrib.auth import get_user_model
-            from apps.accounts.models import ChurchUser, RoleChoices
-            
+            from apps.accounts.models import ChurchUser
+
             User = get_user_model()
             user = User.objects.get(id=user_id)
             
@@ -483,29 +528,122 @@ class ChurchViewSet(viewsets.ModelViewSet):
                     {'error': f'Role inválido. Opções: {valid_roles}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+            normalized_role = ChurchUser.normalize_role_value(role)
+            actor_role, actor_level = self._resolve_actor_role_context(request.user, church)
+
+            if actor_role is None or actor_level is None:
+                logger.warning(
+                    "Attempt to manage roles without sufficient context blocked",
+                    extra={
+                        'actor_id': request.user.id,
+                        'actor_email': request.user.email,
+                        'target_id': user.id,
+                        'target_email': user.email,
+                        'requested_role': normalized_role,
+                        'church_id': church.id,
+                        'reason': 'missing_actor_role',
+                    }
+                )
+                raise PermissionDenied('Sem permissão para gerenciar papéis nesta igreja.')
+
+            target_level = self._role_level(normalized_role)
+
+            if normalized_role == RoleChoices.SUPER_ADMIN and actor_level > self._role_level(RoleChoices.SUPER_ADMIN):
+                logger.warning(
+                    "Attempt to grant SUPER_ADMIN without privilege blocked",
+                    extra={
+                        'actor_id': request.user.id,
+                        'actor_email': request.user.email,
+                        'target_id': user.id,
+                        'target_email': user.email,
+                        'church_id': church.id,
+                        'actor_role': actor_role,
+                    }
+                )
+                raise PermissionDenied('Somente Super Admin pode conceder este papel.')
+
+            if actor_level > target_level:
+                logger.warning(
+                    "Permission escalation attempt blocked",
+                    extra={
+                        'actor_id': request.user.id,
+                        'actor_email': request.user.email,
+                        'actor_role': actor_role,
+                        'target_id': user.id,
+                        'target_email': user.email,
+                        'requested_role': normalized_role,
+                        'church_id': church.id,
+                        'reason': 'hierarchy_violation',
+                    }
+                )
+                raise PermissionDenied('Você não tem hierarquia suficiente para conceder este papel.')
+
+            if user.id == request.user.id and actor_level > self._role_level(RoleChoices.CHURCH_ADMIN):
+                logger.warning(
+                    "Self-permission change attempt blocked",
+                    extra={
+                        'actor_id': request.user.id,
+                        'actor_email': request.user.email,
+                        'requested_role': normalized_role,
+                        'church_id': church.id,
+                        'actor_role': actor_role,
+                    }
+                )
+                raise PermissionDenied('Você não pode modificar suas próprias permissões.')
             
             # Criar ou atualizar ChurchUser
             church_user, created = ChurchUser.objects.get_or_create(
                 user=user,
                 church=church,
                 defaults={
-                    'role': role,
+                    'role': normalized_role,
                     'is_active': True
                 }
             )
             
-            if not created:
-                church_user.role = role
+            previous_role = church_user.role
+
+            # Reaplicar papel e permissões quando necessário
+            if created or church_user.role != normalized_role or not church_user.is_active:
+                church_user.role = normalized_role
                 church_user.is_active = True
+                try:
+                    church_user.set_permissions_by_role()
+                except Exception:
+                    # Em caso de erro na configuração automática, manter fluxo mas registrar
+                    logger.exception(
+                        "Falha ao aplicar permissões automáticas ao atualizar papel",
+                        extra={
+                            'target_id': user.id,
+                            'target_email': user.email,
+                            'requested_role': normalized_role,
+                            'church_id': church.id,
+                        }
+                    )
                 church_user.save()
             
-            logger.info(f"Usuário {user.email} atribuído como {role} à igreja {church.name} por {request.user.email}")
+            logger.info(
+                "Permissão de usuário atualizada",
+                extra={
+                    'actor_id': request.user.id,
+                    'actor_email': request.user.email,
+                    'actor_role': actor_role,
+                    'target_id': user.id,
+                    'target_email': user.email,
+                    'previous_role': previous_role,
+                    'new_role': normalized_role,
+                    'church_id': church.id,
+                    'was_created': created,
+                }
+            )
             
             return Response({
-                'message': f'Usuário {user.email} atribuído como {role}',
+                'message': f'Usuário {user.email} atribuído como {normalized_role}',
                 'user_id': user.id,
                 'user_email': user.email,
-                'role': role,
+                'role': normalized_role,
+                'role_display': dict(RoleChoices.choices).get(normalized_role, normalized_role),
                 'created': created
             })
             
@@ -514,6 +652,9 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 {'error': 'Usuário não encontrado'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
+        except PermissionDenied as exc:
+            # Repropagar exceções de permissão para DRF tratar corretamente
+            raise exc
         except Exception as e:
             logger.error(f"Erro ao atribuir admin à igreja {church.name}: {str(e)}")
             return Response(

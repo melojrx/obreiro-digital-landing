@@ -190,7 +190,17 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState('personal');
-  
+  const isEditingSelf = React.useMemo(() => {
+    if (!user) return false;
+    if (member?.user) {
+      return member.user === user.id;
+    }
+    if (member?.system_user_email && user.email) {
+      return member.system_user_email.toLowerCase() === user.email.toLowerCase();
+    }
+    return false;
+  }, [member?.system_user_email, member?.user, user?.email, user?.id]);
+
   // Estado para igrejas disponíveis
   const [availableChurches, setAvailableChurches] = useState<Array<{
     id: number;
@@ -258,6 +268,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       create_system_user: false,
       system_role: '',
       user_email: '',
+      user_password: '',
 
       
       // Igreja
@@ -265,6 +276,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       
     },
   });
+
+  useEffect(() => {
+    if (isEditingSelf) {
+      form.setValue('create_system_user', false, { shouldDirty: false, shouldValidate: false });
+      form.setValue('system_role', '', { shouldDirty: false, shouldValidate: false });
+    }
+  }, [form, isEditingSelf]);
 
 
 
@@ -1513,185 +1531,204 @@ export const MemberForm: React.FC<MemberFormProps> = ({
               </Card>
 
               {/* Acesso ao Sistema (movido para Informações Adicionais) */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Acesso ao Sistema
-                  </CardTitle>
-                  <CardDescription>
-                    Configure se este membro terá acesso ao sistema de gestão
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="create_system_user"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={(checked) => {
-                              field.onChange(checked);
-                              if (checked) {
-                                // Pré-selecionar papel quando houver apenas uma opção disponível
-                                const currentRole = form.getValues('system_role');
-                                if (!currentRole && availableRoles.length === 1) {
-                                  form.setValue('system_role', availableRoles[0].value);
+              {!isEditingSelf ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Acesso ao Sistema
+                    </CardTitle>
+                    <CardDescription>
+                      Configure se este membro terá acesso ao sistema de gestão
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="create_system_user"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (checked) {
+                                  // Pré-selecionar papel quando houver apenas uma opção disponível
+                                  const currentRole = form.getValues('system_role');
+                                  if (!currentRole && availableRoles.length === 1) {
+                                    form.setValue('system_role', availableRoles[0].value);
+                                  }
+                                  // Pré-preencher e-mail com o do membro (se existir)
+                                  const currentEmail = form.getValues('user_email');
+                                  if (!currentEmail && (member?.email || '').trim()) {
+                                    form.setValue('user_email', member!.email!, { shouldValidate: true });
+                                  }
                                 }
-                                // Pré-preencher e-mail com o do membro (se existir)
-                                const currentEmail = form.getValues('user_email');
-                                if (!currentEmail && (member?.email || '').trim()) {
-                                  form.setValue('user_email', member!.email!, { shouldValidate: true });
-                                }
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Usuário terá acesso ao sistema?</FormLabel>
-                          <FormDescription>
-                            Marque para criar um usuário que poderá fazer login no sistema. Após marcar, selecione o papel e informe e-mail e senha de acesso.
-                          </FormDescription>
+                              }}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>Usuário terá acesso ao sistema?</FormLabel>
+                            <FormDescription>
+                              Marque para criar um usuário que poderá fazer login no sistema. Após marcar, selecione o papel e informe e-mail e senha de acesso.
+                            </FormDescription>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {form.watch('create_system_user') && (
+                      <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
+                        <h4 className="font-medium text-blue-900 flex items-center gap-2">
+                          <Shield className="h-4 w-4" />
+                          Configurações de Acesso ao Sistema
+                        </h4>
+                        
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                          <p className="text-sm text-yellow-800">
+                            <strong>Importante:</strong> Ao marcar esta opção, será criado um usuário que poderá fazer login no sistema.
+                            Escolha o papel adequado baseado nas responsabilidades da pessoa na igreja.
+                          </p>
                         </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
 
-                  {form.watch('create_system_user') && (
-                    <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
-                      <h4 className="font-medium text-blue-900 flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Configurações de Acesso ao Sistema
-                      </h4>
-                      
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <p className="text-sm text-yellow-800">
-                          <strong>Importante:</strong> Ao marcar esta opção, será criado um usuário que poderá fazer login no sistema.
-                          Escolha o papel adequado baseado nas responsabilidades da pessoa na igreja.
-                        </p>
-                      </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="system_role"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Papel no Sistema *</FormLabel>
+                                <Select 
+                                  onValueChange={field.onChange} 
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Selecione o papel" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {availableRoles.map((role) => (
+                                      <SelectItem key={role.value} value={role.value}>
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">{role.label}</span>
+                                          <span className="text-xs text-gray-500">{role.description}</span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormDescription>
+                                  Define as permissões do usuário no sistema
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="system_role"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Papel no Sistema *</FormLabel>
-                              <Select 
-                                onValueChange={field.onChange} 
-                                defaultValue={field.value}
-                              >
+                          <FormField
+                            control={form.control}
+                            name="user_email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>E-mail para Login *</FormLabel>
                                 <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Selecione o papel" />
-                                  </SelectTrigger>
+                                  <Input 
+                                    type="email" 
+                                    placeholder="email@exemplo.com" 
+                                    {...field} 
+                                  />
                                 </FormControl>
-                                <SelectContent>
-                                  {availableRoles.map((role) => (
-                                    <SelectItem key={role.value} value={role.value}>
-                                      <div className="flex flex-col">
-                                        <span className="font-medium">{role.label}</span>
-                                        <span className="text-xs text-gray-500">{role.description}</span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormDescription>
-                                Define as permissões do usuário no sistema
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                                <FormDescription>
+                                  E-mail que será usado para fazer login no sistema
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
 
                         <FormField
                           control={form.control}
-                          name="user_email"
+                          name="user_password"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>E-mail para Login *</FormLabel>
+                              <FormLabel>Senha Inicial *</FormLabel>
                               <FormControl>
                                 <Input 
-                                  type="email" 
-                                  placeholder="email@exemplo.com" 
+                                  type="password" 
+                                  placeholder="Digite uma senha inicial (mínimo 8 caracteres)" 
                                   {...field} 
                                 />
                               </FormControl>
                               <FormDescription>
-                                E-mail que será usado para fazer login no sistema
+                                Senha inicial para acesso. O usuário poderá alterá-la posteriormente.
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
 
-                      <FormField
-                        control={form.control}
-                        name="user_password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Senha Inicial *</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="password" 
-                                placeholder="Digite uma senha inicial (mínimo 8 caracteres)" 
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Senha inicial para acesso. O usuário poderá alterá-la posteriormente.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {form.watch('system_role') && (
-                        <div className="p-3 bg-blue-100 border border-blue-300 rounded-lg">
-                          <h5 className="font-medium text-blue-900 mb-2">
-                            Papel Selecionado: {availableRoles.find(r => r.value === form.watch('system_role'))?.label}
-                          </h5>
-                          <p className="text-sm text-blue-700">
-                            {availableRoles.find(r => r.value === form.watch('system_role'))?.description}
-                          </p>
-                          
-                          <div className="mt-2 text-xs text-blue-600">
-                            <strong>O que este papel pode fazer:</strong>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li>Permissões variam por papel e igreja</li>
-                              {form.watch('system_role') === 'denomination_admin' && (
-                                <>
-                                  <li>Administrar denominação e igrejas vinculadas</li>
-                                  <li>Relatórios consolidados da denominação</li>
-                                </>
-                              )}
-                              {form.watch('system_role') === 'church_admin' && (
-                                <>
-                                  <li>Gerenciar dados da igreja e membros</li>
-                                  <li>Gerenciar filiais e atividades</li>
-                                  <li>Acessar relatórios consolidados</li>
-                                </>
-                              )}
-                              {form.watch('system_role') === 'secretary' && (
-                                <>
-                                  <li>Gestão de cadastros</li>
-                                  <li>Relatórios básicos</li>
-                                </>
-                              )}
-                            </ul>
+                        {form.watch('system_role') && (
+                          <div className="p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                            <h5 className="font-medium text-blue-900 mb-2">
+                              Papel Selecionado: {availableRoles.find(r => r.value === form.watch('system_role'))?.label}
+                            </h5>
+                            <p className="text-sm text-blue-700">
+                              {availableRoles.find(r => r.value === form.watch('system_role'))?.description}
+                            </p>
+                            
+                            <div className="mt-2 text-xs text-blue-600">
+                              <strong>O que este papel pode fazer:</strong>
+                              <ul className="list-disc pl-5 space-y-1">
+                                <li>Permissões variam por papel e igreja</li>
+                                {form.watch('system_role') === 'denomination_admin' && (
+                                  <>
+                                    <li>Administrar denominação e igrejas vinculadas</li>
+                                    <li>Relatórios consolidados da denominação</li>
+                                  </>
+                                )}
+                                {form.watch('system_role') === 'church_admin' && (
+                                  <>
+                                    <li>Gerenciar dados da igreja e membros</li>
+                                    <li>Gerenciar filiais e atividades</li>
+                                    <li>Acessar relatórios consolidados</li>
+                                  </>
+                                )}
+                                {form.watch('system_role') === 'secretary' && (
+                                  <>
+                                    <li>Gestão de cadastros</li>
+                                    <li>Relatórios básicos</li>
+                                  </>
+                                )}
+                              </ul>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Acesso ao Sistema
+                    </CardTitle>
+                    <CardDescription>
+                      Alterações de permissão não estão disponíveis ao editar o próprio usuário
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                      Para atualizar seu papel no sistema, solicite a um administrador da igreja. Isso evita autopromoções não autorizadas.
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
         </form>

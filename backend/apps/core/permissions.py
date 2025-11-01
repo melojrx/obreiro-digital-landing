@@ -255,9 +255,12 @@ class CanManageChurchAdmins(BasePermission):
         
         from apps.accounts.models import RoleChoices
         
-        # Apenas CHURCH_ADMIN pode gerenciar outros admins
+        if request.user.is_superuser:
+            return True
+        
+        # Church Admins e Super Admins podem gerenciar administradores
         return request.user.church_users.filter(
-            role=RoleChoices.CHURCH_ADMIN,
+            role__in=[RoleChoices.CHURCH_ADMIN, RoleChoices.SUPER_ADMIN],
             is_active=True
         ).exists()
 

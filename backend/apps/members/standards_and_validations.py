@@ -402,9 +402,18 @@ def validate_member_data(member_data, current_member=None):
         
         # Validações de integridade
         if 'cpf' in member_data:
+            church_context = member_data.get('church')
+            # Se veio apenas o ID da igreja, buscar objeto para garantir escopo correto
+            if church_context and not hasattr(church_context, 'denomination_id'):
+                from apps.churches.models import Church
+                try:
+                    church_context = Church.objects.get(id=church_context)
+                except Church.DoesNotExist:
+                    church_context = None
             DataIntegrityCheckers.check_duplicate_cpf(
                 member_data['cpf'],
-                current_member.id if current_member else None
+                church=church_context,
+                exclude_member_id=current_member.id if current_member else None
             )
         
         if 'email' in member_data and 'church' in member_data:

@@ -1076,6 +1076,14 @@ def has_object_permission(self, request, view, obj):
 
 ---
 
+## Controles Recentes de Segurança
+
+- ✅ **Bloqueio de autopromoção**: requisições ao endpoint `POST /api/churches/{id}/assign_admin/` agora validam a hierarquia do solicitante. Apenas Church Admin ou Super Admin podem alterar seu próprio papel e somente papéis de nível igual ou inferior podem ser concedidos a terceiros. Tentativas bloqueadas são registradas em log com contexto (ator, alvo e igreja).
+- ✅ **Interface protegida para autoedição**: ao editar o próprio cadastro de membro, o card “Acesso ao Sistema” é exibido apenas como leitura, eliminando o seletor de papéis e prevenindo ajustes acidentais.
+- ✅ **Auditoria reforçada**: toda tentativa negada de alteração de permissão gera entrada de log (`warning`), indicando motivo e dados relevantes para acompanhamento.
+
+Estas medidas evitam escalonamento indevido de privilégios e fortalecem o fluxo de aprovação de papéis.
+
 ## Conclusão
 
 Esta documentação apresenta o sistema simplificado de permissões do **Obreiro Virtual**, com apenas 4 níveis hierárquicos claramente definidos:
