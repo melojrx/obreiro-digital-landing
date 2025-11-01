@@ -331,31 +331,21 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                   </div>
                   
                   {/* Informações do Cônjuge */}
-                  {member.marital_status === 'married' && member.spouse_name && (
+                  {member.marital_status === 'married' && (
                     <div>
                       <label className="text-sm font-medium text-gray-500">Cônjuge</label>
-                      <div className="text-gray-900">
-                        <p>{member.spouse_name}</p>
-                        {member.spouse_is_member && (
-                          <div className="mt-1 flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">
-                              <Heart className="h-3 w-3 mr-1" />
-                              Membro da Igreja
-                            </Badge>
-                            {member.spouse_member_name && (
-                              <span className="text-sm text-gray-600">
-                                • {member.spouse_member_name}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {!member.spouse_is_member && (
-                          <div className="mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              <User className="h-3 w-3 mr-1" />
-                              Não é membro
-                            </Badge>
-                          </div>
+                      <div className="text-gray-900 space-y-1">
+                        <p>{member.spouse_name || 'Cônjuge não informado'}</p>
+                        {member.spouse ? (
+                          <Badge variant="secondary" className="text-xs">
+                            <Heart className="h-3 w-3 mr-1" />
+                            Membro da Igreja
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            <User className="h-3 w-3 mr-1" />
+                            Não é membro
+                          </Badge>
                         )}
                       </div>
                     </div>

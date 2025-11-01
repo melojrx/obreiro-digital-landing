@@ -493,3 +493,114 @@ class MemberBranchRelationshipTest(TestCase):
             phone="(11) 91111-2222"
         )
         self.assertEqual(member.branch, self.branch)
+
+
+class SpouseSynchronizationTest(TestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            email="sync-admin@test.com",
+            password="adminpassword",
+            full_name="Sync Admin",
+            phone="(11) 93333-9999",
+        )
+
+        self.denomination = Denomination.objects.create(
+            name="Sync Denomination",
+            short_name="SD",
+            administrator=self.admin_user,
+            email="sync@denom.com",
+            phone="(11) 93333-1111",
+            headquarters_address="Rua Denom, 1",
+            headquarters_city="São Paulo",
+            headquarters_state="SP",
+            headquarters_zipcode="01010-000",
+        )
+
+        self.church = Church.objects.create(
+            denomination=self.denomination,
+            name="Igreja Sincronizada",
+            short_name="IS",
+            email="igreja@sync.com",
+            phone="(11) 94444-0000",
+            address="Rua Principal, 10",
+            city="São Paulo",
+            state="SP",
+            zipcode="01011-000",
+            subscription_end_date=date(2099, 1, 1),
+        )
+
+        self.branch = self.church.branches.first()
+        if not self.branch:
+            self.branch = Branch.objects.create(
+                church=self.church,
+                name="Igreja Sincronizada - Matriz",
+                short_name="Matriz",
+                email="matriz@sync.com",
+                phone="(11) 95555-0000",
+                address="Rua Principal, 10",
+                neighborhood="Centro",
+                city="São Paulo",
+                state="SP",
+                zipcode="01011-000",
+                qr_code_active=True,
+                is_main=True,
+            )
+
+        self.member_a = Member.objects.create(
+            church=self.church,
+            branch=self.branch,
+            full_name="João Almeida",
+            birth_date=date(1990, 1, 1),
+            gender="M",
+            marital_status="single",
+            email="joao.almeida@test.com",
+            phone="(11) 96666-0000",
+            membership_date=date(2010, 1, 1),
+        )
+
+        self.member_b = Member.objects.create(
+            church=self.church,
+            branch=self.branch,
+            full_name="Maria Oliveira",
+            birth_date=date(1992, 6, 10),
+            gender="F",
+            marital_status="single",
+            email="maria.oliveira@test.com",
+            phone="(11) 97777-0000",
+            membership_date=date(2012, 5, 15),
+        )
+
+    def _marry_members(self):
+        self.member_a.marital_status = "married"
+        self.member_a.spouse = self.member_b
+        self.member_a.save()
+        self.member_a.refresh_from_db()
+        self.member_b.refresh_from_db()
+
+    def test_marriage_updates_both_members(self):
+        self._marry_members()
+
+        self.assertEqual(self.member_b.marital_status, "married")
+        self.assertEqual(self.member_b.spouse_id, self.member_a.id)
+        self.assertEqual(self.member_a.spouse_id, self.member_b.id)
+
+    def test_removing_spouse_clears_partner(self):
+        self._marry_members()
+
+        self.member_a.marital_status = "single"
+        self.member_a.spouse = None
+        self.member_a.save()
+        self.member_b.refresh_from_db()
+
+        self.assertEqual(self.member_b.marital_status, "single")
+        self.assertIsNone(self.member_b.spouse_id)
+
+    def test_deceased_updates_partner_to_widowed(self):
+        self._marry_members()
+
+        self.member_a.membership_status = "deceased"
+        self.member_a.save()
+        self.member_b.refresh_from_db()
+
+        self.assertEqual(self.member_b.marital_status, "widowed")
+        self.assertIsNone(self.member_b.spouse_id)

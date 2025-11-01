@@ -450,7 +450,7 @@ class Member(BaseModel):
         return f"{self.full_name} - {self.church.short_name}"
     
     def save(self, *args, **kwargs):
-        """Override save para validações e formatações"""
+        """Override save para validações, formatações e sincronização de relacionamentos"""
         # Formatar campos
         if self.state:
             self.state = self.state.upper()
@@ -463,8 +463,22 @@ class Member(BaseModel):
 
         if self.branch and self.branch.church_id != self.church_id:
             raise ValidationError("Filial selecionada não pertence à mesma igreja.")
+
+        old_spouse = None
+        old_membership_status = None
+        if self.pk:
+            try:
+                old_instance = Member.objects.select_related('spouse').get(pk=self.pk)
+                old_spouse = old_instance.spouse
+                old_membership_status = old_instance.membership_status
+            except Member.DoesNotExist:
+                old_spouse = None
+                old_membership_status = None
         
         super().save(*args, **kwargs)
+
+        self._sync_spouse_relationship(old_spouse)
+        self._update_spouse_on_death(old_membership_status)
     
     def _validate_dates(self):
         """Valida consistência das datas"""
@@ -506,6 +520,46 @@ class Member(BaseModel):
         # Se o cônjuge for o próprio membro, limpar
         if self.spouse == self:
             self.spouse = None
+
+    def _sync_spouse_relationship(self, old_spouse):
+        """Sincroniza relacionamento bidirecional de cônjuge após salvar"""
+        # Cenário 1: membro deixou de ser casado ou definiu cônjuge não-membro
+        if self.marital_status != 'married' or not self.spouse_id:
+            if old_spouse and old_spouse.spouse_id == self.pk:
+                Member.objects.filter(pk=old_spouse.pk).update(
+                    spouse=None,
+                    marital_status='single',
+                    updated_at=timezone.now()
+                )
+            return
+
+        # Cenário 2: membro casado com outro membro
+        new_spouse = self.spouse
+
+        # Cônjuge anterior diferente: limpar vínculo recíproco
+        if old_spouse and old_spouse.pk != new_spouse.pk and old_spouse.spouse_id == self.pk:
+            Member.objects.filter(pk=old_spouse.pk).update(
+                spouse=None,
+                marital_status='single',
+                updated_at=timezone.now()
+            )
+
+        # Atualizar cônjuge atual para refletir o relacionamento
+        if new_spouse.spouse_id != self.pk or new_spouse.marital_status != 'married':
+            Member.objects.filter(pk=new_spouse.pk).update(
+                spouse=self.pk,
+                marital_status='married',
+                updated_at=timezone.now()
+            )
+
+    def _update_spouse_on_death(self, old_membership_status):
+        """Atualiza cônjuge quando membro falece"""
+        if self.membership_status == 'deceased' and old_membership_status != 'deceased' and self.spouse_id:
+            Member.objects.filter(pk=self.spouse_id).update(
+                marital_status='widowed',
+                spouse=None,
+                updated_at=timezone.now()
+            )
     
     # =====================================
     # PROPRIEDADES CALCULADAS

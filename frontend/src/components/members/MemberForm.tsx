@@ -64,9 +64,7 @@ const memberSchema = z.object({
     church_id: z.number().min(1, 'Selecione uma igreja'),
   
   // Campos do cônjuge
-  spouse_name: z.string().optional(),
-  spouse_is_member: z.boolean().optional(),
-  spouse_member: z.number().optional(),
+  spouse: z.string().optional(),
   
   // Dados familiares
   children_count: z.number().min(0, 'Quantidade de filhos deve ser 0 ou maior').optional(),
@@ -245,9 +243,10 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       marital_status: member?.marital_status || 'single',
       
       // Campos do cônjuge
-      spouse_name: member?.spouse_name || '',
-      spouse_is_member: member?.spouse_is_member || false,
-      spouse_member: member?.spouse_member || undefined,
+      spouse:
+        member?.marital_status === 'married'
+          ? (member?.spouse ? String(member.spouse) : 'non-member')
+          : '',
       
       // Dados familiares
       children_count: member?.children_count || undefined,
@@ -320,16 +319,38 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   };
 
   // Função para carregar membros disponíveis para cônjuge
-  const loadAvailableSpouses = async (search?: string) => {
-    if (!form.watch('spouse_is_member')) return;
-    
+  const maritalStatus = form.watch('marital_status');
+
+  const loadAvailableSpouses = async () => {
+    if (maritalStatus !== 'married') {
+      setAvailableSpouses([]);
+      return;
+    }
+
     try {
       setSpousesLoading(true);
       const response = await membersService.getAvailableForSpouse({
-        exclude_member_id: member?.id, // Excluir o próprio membro se estiver editando
-        search: search || undefined,
+        exclude_member_id: member?.id,
       });
-      setAvailableSpouses(response.results);
+
+      const results = [...response.results];
+
+      if (
+        member?.spouse &&
+        !results.some((spouse) => spouse.id === member.spouse)
+      ) {
+        results.unshift({
+          id: member.spouse,
+          full_name: member.spouse_name || 'Membro vinculado',
+          cpf: '',
+          birth_date: '',
+          age: 0,
+          gender: '',
+          membership_date: '',
+        });
+      }
+
+      setAvailableSpouses(results);
     } catch (error) {
       console.error('Erro ao carregar membros disponíveis:', error);
       setAvailableSpouses([]);
@@ -338,14 +359,14 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     }
   };
 
-  // Carregar membros disponíveis quando "cônjuge é membro" for marcado
   useEffect(() => {
-    if (form.watch('spouse_is_member')) {
+    if (maritalStatus === 'married') {
       loadAvailableSpouses();
     } else {
       setAvailableSpouses([]);
+      form.setValue('spouse', '', { shouldDirty: false, shouldValidate: true });
     }
-  }, [form.watch('spouse_is_member')]);
+  }, [maritalStatus]);
 
   const handleSubmit = async (data: MemberFormData) => {
     try {
@@ -383,6 +404,11 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       const normalizedPhoneSecondary = data.phone_secondary ? formatPhone(data.phone_secondary) : undefined;
       const normalizedZip = normalizeZip(data.zipcode || undefined);
       const normalizedState = (data.state || '').toUpperCase() || undefined;
+      const spouseValue = data.spouse?.trim();
+      const spouseId =
+        spouseValue && spouseValue !== 'non-member'
+          ? Number(spouseValue)
+          : undefined;
 
       const mappedRole = data.system_role === 'denomination_admin' ? 'church_admin' : data.system_role;
       const formData: CreateMemberData = {
@@ -396,9 +422,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         marital_status: data.marital_status || undefined,
         
         // Campos do cônjuge
-        spouse_name: data.spouse_name || undefined,
-        spouse_is_member: data.spouse_is_member,
-        spouse_member: data.spouse_member || undefined,
+        spouse: Number.isFinite(spouseId) ? spouseId : undefined,
         
         // Dados familiares
         children_count: data.children_count || undefined,
@@ -709,105 +733,56 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                         <Users className="h-5 w-5" />
                         Informações do Cônjuge
                       </h4>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="spouse_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nome do Cônjuge</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Nome completo do cônjuge" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
 
-                        <FormField
-                          control={form.control}
-                          name="spouse_is_member"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormField
+                        control={form.control}
+                        name="spouse"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Vincular Cônjuge</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
                               <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione o cônjuge ou indique que não é membro" />
+                                </SelectTrigger>
                               </FormControl>
-                              <div className="space-y-1 leading-none">
-                                <FormLabel>
-                                  Cônjuge é membro da igreja?
-                                </FormLabel>
-                                <FormDescription>
-                                  Marque se o cônjuge também é membro desta igreja
-                                </FormDescription>
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-
-                        {/* Campo para selecionar o cônjuge se for membro */}
-                        {form.watch('spouse_is_member') && (
-                          <FormField
-                            control={form.control}
-                            name="spouse_member"
-                            render={({ field }) => (
-                              <FormItem className="md:col-span-2">
-                                <FormLabel>Selecionar Cônjuge Membro</FormLabel>
-                                <Select 
-                                  onValueChange={(value) => {
-                                    // Não definir valor se for placeholder ou loading/empty
-                                    if (value === 'placeholder' || value === 'loading' || value === 'empty') {
-                                      field.onChange(undefined);
-                                    } else {
-                                      field.onChange(Number(value));
-                                    }
-                                  }} 
-                                  defaultValue={field.value?.toString()}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Selecione o cônjuge da lista de membros" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {spousesLoading ? (
-                                      <SelectItem value="loading" disabled>
-                                        Carregando membros...
-                                      </SelectItem>
-                                    ) : availableSpouses.length > 0 ? (
-                                      <>
-                                        <SelectItem value="placeholder">Selecione um membro...</SelectItem>
-                                        {availableSpouses.map((spouse) => (
-                                          <SelectItem key={spouse.id} value={spouse.id.toString()}>
-                                            <div className="flex flex-col">
-                                              <span className="font-medium">{spouse.full_name}</span>
-                                              <span className="text-sm text-gray-500">
-                                                {spouse.age} anos • {spouse.gender}
-                                                {spouse.cpf && ` • CPF: ${spouse.cpf}`}
-                                              </span>
-                                            </div>
-                                          </SelectItem>
-                                        ))}
-                                      </>
-                                    ) : (
-                                      <SelectItem value="empty" disabled>
-                                        Nenhum membro disponível
-                                      </SelectItem>
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                                <FormDescription>
-                                  Selecione o cônjuge da lista de membros cadastrados
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                              <SelectContent>
+                                <SelectItem value="non-member">
+                                  Cônjuge não é membro da igreja
+                                </SelectItem>
+                                {spousesLoading ? (
+                                  <SelectItem value="loading" disabled>
+                                    Carregando membros...
+                                  </SelectItem>
+                                ) : availableSpouses.length > 0 ? (
+                                  availableSpouses.map((spouse) => (
+                                    <SelectItem key={spouse.id} value={spouse.id.toString()}>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{spouse.full_name}</span>
+                                        <span className="text-sm text-gray-500">
+                                          {spouse.age} anos • {spouse.gender}
+                                          {spouse.cpf && ` • CPF: ${spouse.cpf}`}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="empty" disabled>
+                                    Nenhum membro disponível para vínculo
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Quando o cônjuge não for membro cadastrado, mantenha a opção "Cônjuge não é membro".
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
                         )}
-                      </div>
+                      />
                     </div>
                   )}
                   
