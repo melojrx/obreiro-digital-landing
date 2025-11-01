@@ -67,6 +67,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const loadChurchData = useCallback(async () => {
+    try {
+      const churchData = await authService.getUserChurch();
+      setUserChurch(churchData);
+      return churchData;
+    } catch (err) {
+      console.error('❌ Erro ao carregar dados da igreja:', err);
+      setUserChurch(null);
+      return null;
+    }
+  }, []);
+
   // Verificar autenticação ao carregar
   useEffect(() => {
     const loadUserData = async () => {
@@ -78,38 +90,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('✅ Token válido encontrado, buscando dados atualizados do backend...');
         
         try {
-          // Sempre buscar dados atualizados do backend em vez de usar localStorage
           const currentUser = await authService.getCurrentUser();
           setUser(currentUser);
+          localStorage.setItem('user', JSON.stringify(currentUser));
           console.log('✅ Dados do usuário carregados do backend:', currentUser);
           
-          // Carregar dados da igreja se o perfil estiver completo
-          console.log('🔍 useAuth - currentUser.is_profile_complete:', currentUser.is_profile_complete);
-          if (currentUser.is_profile_complete) {
-            console.log('✅ Perfil completo, carregando dados da igreja...');
-            try {
-              const churchData = await authService.getUserChurch();
-              console.log('✅ Dados da igreja carregados do authService.getUserChurch():', churchData);
-              setUserChurch(churchData);
-            } catch (error) {
-              console.error('❌ Erro detalhado ao carregar dados da igreja:', error);
-              // Tentar novamente após um breve delay se o erro for de rede
-              if (error instanceof Error && (error.message.includes('Network') || error.message.includes('timeout'))) {
-                console.log('🔄 Tentando carregar igreja novamente após erro de rede...');
-                setTimeout(async () => {
-                  try {
-                    const churchData = await authService.getUserChurch();
-                    console.log('✅ Dados da igreja carregados na segunda tentativa:', churchData);
-                    setUserChurch(churchData);
-                  } catch (retryError) {
-                    console.error('❌ Falha definitiva ao carregar dados da igreja:', retryError);
-                  }
-                }, 1000);
-              }
-            }
-          } else {
-            console.log('❌ Perfil não está completo, pulando carregamento da igreja');
-          }
+          await loadChurchData();
         } catch (error) {
           console.log('❌ Erro ao carregar dados do backend, limpando sessão');
           authService.logout();
@@ -128,7 +114,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     loadUserData();
-  }, []);
+  }, [loadChurchData]);
 
   const isAuthenticated = !!user;
 
@@ -144,22 +130,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const fullUserData = await authService.getCurrentUser();
         setUser(fullUserData);
+        localStorage.setItem('user', JSON.stringify(fullUserData));
         console.log('✅ Dados completos do usuário carregados após login:', fullUserData);
         
-        // Se o perfil estiver completo, carregar dados da igreja também
-        if (fullUserData.is_profile_complete) {
-          console.log('✅ Perfil completo, carregando dados da igreja após login...');
-          try {
-            const churchData = await authService.getUserChurch();
-            console.log('✅ Dados da igreja carregados após login:', churchData);
-            setUserChurch(churchData);
-          } catch (churchError) {
-            console.error('❌ Erro ao carregar dados da igreja após login:', churchError);
-            // Não falhar o login se não conseguir carregar a igreja
-          }
-        } else {
-          console.log('❌ Perfil não está completo, pulando carregamento da igreja');
-        }
+        await loadChurchData();
       } catch (error) {
         // Se falhar ao buscar dados completos, usar dados básicos do login
         console.log('⚠️ Falha ao carregar dados completos, usando dados básicos');
@@ -175,7 +149,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadChurchData]);
 
   const register = useCallback(async (data: RegisterData) => {
     try {
@@ -345,14 +319,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Recarregar dados do usuário
       const currentUser = await authService.getCurrentUser();
       setUser(currentUser);
+      localStorage.setItem('user', JSON.stringify(currentUser));
       console.log('✅ Dados do usuário atualizados');
       
-      // Recarregar dados da igreja
-      if (currentUser.is_profile_complete) {
-        const churchData = await authService.getUserChurch();
-        setUserChurch(churchData);
-        console.log('✅ Dados da igreja atualizados');
-      }
+      await loadChurchData();
     } catch (err) {
       console.error('❌ Erro ao atualizar dados:', err);
       if (err instanceof AuthError) {
@@ -361,7 +331,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setError('Erro ao atualizar dados.');
       }
     }
-  }, []);
+  }, [loadChurchData]);
 
   const updateUser = useCallback(async (data: Partial<User>) => {
     try {
