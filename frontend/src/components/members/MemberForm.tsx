@@ -190,16 +190,28 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState('personal');
+  const normalizedUserEmail = React.useMemo(() => (user?.email || '').trim().toLowerCase(), [user?.email]);
   const isEditingSelf = React.useMemo(() => {
     if (!user) return false;
-    if (member?.user) {
-      return member.user === user.id;
+    if (member?.user && member.user === user.id) {
+      return true;
     }
-    if (member?.system_user_email && user.email) {
-      return member.system_user_email.toLowerCase() === user.email.toLowerCase();
+    const systemEmail = (member?.system_user_email || '').trim().toLowerCase();
+    if (systemEmail && normalizedUserEmail && systemEmail === normalizedUserEmail) {
+      return true;
+    }
+    const memberEmail = (member?.email || '').trim().toLowerCase();
+    if (memberEmail && normalizedUserEmail && memberEmail === normalizedUserEmail) {
+      return true;
     }
     return false;
-  }, [member?.system_user_email, member?.user, user?.email, user?.id]);
+  }, [member?.email, member?.system_user_email, member?.user, normalizedUserEmail, user?.id]);
+  const alreadyHasSystemAccess = React.useMemo(() => {
+    if (member?.user) return true;
+    if (member?.has_system_access) return true;
+    const systemEmail = (member?.system_user_email || '').trim();
+    return systemEmail.length > 0;
+  }, [member?.has_system_access, member?.system_user_email, member?.user]);
 
   // Estado para igrejas disponíveis
   const [availableChurches, setAvailableChurches] = useState<Array<{
@@ -278,11 +290,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   });
 
   useEffect(() => {
-    if (isEditingSelf) {
+    if (isEditingSelf || alreadyHasSystemAccess) {
       form.setValue('create_system_user', false, { shouldDirty: false, shouldValidate: false });
       form.setValue('system_role', '', { shouldDirty: false, shouldValidate: false });
+      form.setValue('user_email', '', { shouldDirty: false, shouldValidate: false });
+      form.setValue('user_password', '', { shouldDirty: false, shouldValidate: false });
     }
-  }, [form, isEditingSelf]);
+  }, [alreadyHasSystemAccess, form, isEditingSelf]);
 
 
 
@@ -1543,7 +1557,21 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <FormField
+                    {alreadyHasSystemAccess && (
+                      <div className="p-3 rounded border bg-gray-50 text-sm text-gray-700">
+                        Este membro já possui acesso ao sistema vinculado.
+                      </div>
+                    )}
+
+                    {!alreadyHasSystemAccess && !canAssignRoles && (
+                      <div className="p-3 rounded border bg-gray-50 text-sm text-gray-600">
+                        Você não tem permissão para atribuir papéis de acesso ao sistema.
+                      </div>
+                    )}
+
+                    {!alreadyHasSystemAccess && canAssignRoles && (
+                      <>
+                        <FormField
                       control={form.control}
                       name="create_system_user"
                       render={({ field }) => (
@@ -1709,6 +1737,8 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                         )}
                       </div>
                     )}
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               ) : (
@@ -1724,7 +1754,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                      Para atualizar seu papel no sistema, solicite a um administrador da igreja. Isso evita autopromoções não autorizadas.
+                      Para atualizar seu papel no sistema, solicite a um administrador da igreja; para alterar sua senha, acesse Perfil → Segurança.
                     </div>
                   </CardContent>
                 </Card>
