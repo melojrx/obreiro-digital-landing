@@ -41,6 +41,8 @@ export interface UploadImageResponse {
 
 class ChurchService {
   private baseURL = '/churches';
+  private _citiesCache = new Map<string, string[]>();
+  private _citiesPromiseCache = new Map<string, Promise<string[]>>();
 
   /**
    * Lista igrejas com filtros e paginação
@@ -347,11 +349,81 @@ class ChurchService {
   }
 
   /**
-   * Obtém cidades por estado
+   * Obtém cidades por estado.
+   * Primeiro tenta o backend; se não houver dados ou ocorrer falha, usa fallback público do IBGE.
    */
   async getCitiesByState(state: string): Promise<string[]> {
-    const response = await api.get(`${this.baseURL}/cities-by-state/?state=${state}`);
-    return response.data;
+    const normalizedState = String(state || '').trim().toUpperCase();
+    if (!normalizedState) {
+      return [];
+    }
+
+    const cacheKey = `cities-${normalizedState}`;
+    if (this._citiesCache.has(cacheKey)) {
+      return this._citiesCache.get(cacheKey)!;
+    }
+
+    if (this._citiesPromiseCache.has(cacheKey)) {
+      return this._citiesPromiseCache.get(cacheKey)!;
+    }
+
+    const loadPromise = (async () => {
+      let result: string[] = [];
+      const collected = new Set<string>();
+      const pushCities = (list: unknown) => {
+        if (!Array.isArray(list)) {
+          return;
+        }
+        list
+          .map((city) => (typeof city === 'string' ? city : ''))
+          .map((city) => city.trim())
+          .filter((city) => city.length > 0)
+          .forEach((city) => {
+            const normalizedCity = city.replace(/\s+/g, ' ');
+            collected.add(normalizedCity);
+          });
+      };
+
+      try {
+        const response = await api.get(`${this.baseURL}/cities-by-state/?state=${normalizedState}`);
+        pushCities(response.data);
+      } catch (backendError) {
+        console.error(`Erro ao carregar cidades via backend para estado ${normalizedState}:`, backendError);
+      }
+
+      if (collected.size === 0) {
+        try {
+          const ibgeResponse = await fetch(
+            `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${normalizedState}/municipios`
+          );
+
+          if (ibgeResponse.ok) {
+            const ibgeData: Array<{ nome?: string }> = await ibgeResponse.json();
+            pushCities(ibgeData.map((item) => item?.nome).filter(Boolean));
+          } else {
+            console.error(`Fallback IBGE retornou status ${ibgeResponse.status} para estado ${normalizedState}`);
+          }
+        } catch (fallbackError) {
+          console.error(`Erro ao buscar cidades no IBGE (fallback) para estado ${normalizedState}:`, fallbackError);
+        }
+      }
+
+      result = Array.from(collected);
+      const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+      result.sort((a, b) => collator.compare(a, b));
+
+      if (result.length > 0) {
+        this._citiesCache.set(cacheKey, result);
+      } else {
+        this._citiesCache.delete(cacheKey);
+      }
+      return result;
+    })().finally(() => {
+      this._citiesPromiseCache.delete(cacheKey);
+    });
+
+    this._citiesPromiseCache.set(cacheKey, loadPromise);
+    return loadPromise;
   }
 
   /**
