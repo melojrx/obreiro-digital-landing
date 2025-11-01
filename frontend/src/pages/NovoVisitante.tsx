@@ -17,9 +17,31 @@ const NovoVisitante: React.FC = () => {
 
   const handleSubmit = async (data: VisitorFormData) => {
     try {
-      const branchId = activeChurch?.active_branch?.id;
+      if (!activeChurch) {
+        toast.error('Não foi possível identificar a igreja ativa. Selecione uma igreja antes de cadastrar visitantes.');
+        return;
+      }
+
+      let branchId = activeChurch.active_branch?.id ?? null;
+
       if (!branchId) {
-        toast.error('Defina uma filial ativa antes de cadastrar visitantes.');
+        try {
+          const { branchService } = await import('@/services/branchService');
+          const paginated = await branchService.getBranchesByChurch(activeChurch.id, 1, 50);
+          const branches = paginated.results || [];
+          const headquarters = branches.find(
+            (branch: any) => branch.is_headquarters || branch.is_main
+          );
+          branchId = (headquarters?.id ?? branches[0]?.id) ?? null;
+        } catch (fallbackError) {
+          console.error('Erro ao buscar filiais para fallback:', fallbackError);
+        }
+      }
+
+      if (!branchId) {
+        toast.error(
+          'Não encontramos uma filial ativa. Selecione uma filial na barra superior ou configure a Matriz em Gestão > Filiais.'
+        );
         return;
       }
 
@@ -29,7 +51,11 @@ const NovoVisitante: React.FC = () => {
       navigate(`/visitantes/${visitor.id}`);
     } catch (error) {
       console.error('Erro ao criar visitante:', error);
-      toast.error('Erro ao cadastrar visitante. Tente novamente.');
+      const backendMessage =
+        (error as any)?.response?.data?.error ||
+        (error as any)?.response?.data?.details?.branch?.[0] ||
+        'Erro ao cadastrar visitante. Tente novamente.';
+      toast.error(backendMessage);
     } finally {
       setSaving(false);
     }

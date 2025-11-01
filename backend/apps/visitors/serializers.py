@@ -124,7 +124,22 @@ class VisitorSerializer(serializers.ModelSerializer):
             attrs['birth_date'] = None
 
         if not self.instance and not attrs.get('branch'):
-            raise serializers.ValidationError({'branch': "Filial é obrigatória para criar visitante"})
+            request = self.context.get('request')
+            fallback_branch = None
+            if request and request.user and request.user.is_authenticated:
+                from apps.accounts.models import ChurchUser  # noqa: WPS433
+                fallback_branch = ChurchUser.objects.get_active_branch_for_user(request.user)
+
+            if fallback_branch:
+                attrs['branch'] = fallback_branch
+            else:
+                raise serializers.ValidationError({
+                    'branch': (
+                        "Nenhuma filial ativa encontrada. "
+                        "Selecione uma filial na barra superior ou configure a Matriz em Gestão de Filiais."
+                    )
+                })
+
         if not self.instance and not attrs.get('full_name'):
             raise serializers.ValidationError("Campo 'full_name' é obrigatório")
 

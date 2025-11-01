@@ -247,23 +247,59 @@ class ChurchUserManager(models.Manager):
     def get_active_branch_for_user(self, user):
         """Retorna a filial ativa (se configurada) para um usuário"""
         try:
+            def resolve_branch(church_user):
+                if not church_user:
+                    return None
+
+                branch = getattr(church_user, 'active_branch', None)
+                if branch and branch.is_active:
+                    return branch
+
+                church = getattr(church_user, 'church', None)
+                if not church:
+                    return None
+
+                # Import lazy para evitar dependências circulares
+                from apps.branches.models import Branch  # noqa: WPS433
+
+                # Preferir a matriz, quando cadastrada
+                candidate = Branch.objects.filter(
+                    church=church,
+                    is_active=True,
+                    is_main=True
+                ).first()
+
+                if not candidate:
+                    candidate = Branch.objects.filter(
+                        church=church,
+                        is_active=True
+                    ).order_by('-is_main', 'id').first()
+
+                if candidate and getattr(church_user, 'active_branch_id', None) != candidate.id:
+                    church_user.active_branch = candidate
+                    church_user.save(update_fields=['active_branch'])
+
+                return candidate
+
             active_church_user = self.get_queryset().filter(
                 user=user,
                 is_active=True,
                 is_user_active_church=True
             ).select_related('active_branch').first()
 
-            if active_church_user and active_church_user.active_branch:
-                return active_church_user.active_branch
+            branch = resolve_branch(active_church_user)
+            if branch:
+                return branch
 
-            # Fallback: primeira filial ativa atribuída ao usuário
+            # Fallback: primeira relação ativa do usuário
             fallback = self.get_queryset().filter(
                 user=user,
                 is_active=True
             ).select_related('active_branch').first()
 
-            if fallback and fallback.active_branch:
-                return fallback.active_branch
+            branch = resolve_branch(fallback)
+            if branch:
+                return branch
 
         except Exception:
             pass

@@ -115,6 +115,13 @@ def active_church(request):
         church=active_church,
         is_active=True
     )
+
+    active_branch = church_user.active_branch
+    if not active_branch:
+        active_branch = ChurchUser.objects.get_active_branch_for_user(user)
+        if active_branch and church_user.active_branch_id != active_branch.id:
+            church_user.active_branch = active_branch
+            church_user.save(update_fields=['active_branch'])
     
     return Response({
         'active_church': {
@@ -125,9 +132,9 @@ def active_church(request):
             'state': active_church.state,
             'denomination_name': active_church.denomination.name if active_church.denomination else None,
             'active_branch': {
-                'id': church_user.active_branch.id,
-                'name': church_user.active_branch.name
-            } if church_user.active_branch else None
+                'id': active_branch.id,
+                'name': active_branch.name
+            } if active_branch else None
         }
     })
 
