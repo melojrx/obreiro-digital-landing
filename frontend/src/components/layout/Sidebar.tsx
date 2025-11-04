@@ -57,14 +57,14 @@ const Sidebar: React.FC = () => {
         { title: 'Atividades', icon: Calendar, href: '/atividades' },
       ]
     },
-    {
-      title: 'Comunicação',
-      icon: MessageSquare,
-      href: '#',
-      children: [
-        { title: 'Pedidos de Oração', icon: HandHeart, href: '/pedidos-oracao' },
-      ]
-    },
+    // {
+    //   title: 'Comunicação',
+    //   icon: MessageSquare,
+    //   href: '#',
+    //   children: [
+    //     { title: 'Pedidos de Oração', icon: HandHeart, href: '/pedidos-oracao' },
+    //   ]
+    // },
     {
       title: 'Administração',
       icon: Settings,
