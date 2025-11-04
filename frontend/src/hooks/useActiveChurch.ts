@@ -68,7 +68,7 @@ export const useSetActiveChurch = () => {
       queryClient.invalidateQueries({ queryKey: ['visitors'] });
       queryClient.invalidateQueries({ queryKey: ['visitor'] });
       
-      // Filiais
+      // Congregações
       queryClient.invalidateQueries({ queryKey: ['branches'] });
       queryClient.invalidateQueries({ queryKey: ['branch'] });
       

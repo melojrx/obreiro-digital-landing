@@ -30,7 +30,7 @@ const activityFormSchema = z.object({
   name: z.string().min(1, 'Nome da atividade é obrigatório').max(200, 'Nome muito longo'),
   description: z.string().optional(),
   ministry_id: z.number().min(1, 'Selecione um ministério').default(1),
-  branch_id: z.number().min(1, 'Selecione uma filial').default(1),
+  branch_id: z.number().min(1, 'Selecione uma congregação').default(1),
   activity_type: z.string().min(1, 'Selecione o tipo de atividade'),
   start_date: z.date({ required_error: 'Data de início é obrigatória' }),
   start_time: z.string().min(1, 'Horário de início é obrigatório'),
@@ -274,7 +274,7 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Selecione a filial" />
+                            <SelectValue placeholder="Selecione a congregação" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -456,7 +456,7 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
                       <Input placeholder="Ex: Santuário, Salão de Eventos..." {...field} />
                     </FormControl>
                     <FormDescription>
-                      Deixe vazio para usar o endereço da filial
+                      Deixe vazio para usar o endereço da congregação
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

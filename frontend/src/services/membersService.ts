@@ -195,7 +195,7 @@ export interface CreateMembershipStatusData {
 
 export interface CreateMemberData {
   church: number;
-  // Associar filial na criação (se ausente, backend tenta usar filial ativa do usuário)
+  // Associar congregação na criação (se ausente, backend tenta usar congregação ativa do usuário)
   branch?: number;
   full_name: string;
   cpf?: string;
@@ -460,7 +460,7 @@ export const membersService = {
     return response.data;
   },
 
-  // Verificar status de membresia do usuário atual (sem filtrar por filial)
+  // Verificar status de membresia do usuário atual (sem filtrar por congregação)
   async getMyMembershipStatus(): Promise<{
     church_id: number;
     is_member: boolean;
@@ -474,7 +474,7 @@ export const membersService = {
     return response.data;
   },
 
-  // Transferir lotação do membro do usuário atual para outra filial
+  // Transferir lotação do membro do usuário atual para outra congregação
   async transferMyMembership(branchId: number): Promise<{ message: string; member: Member }> {
     const response = await api.post(API_ENDPOINTS.members.me.transferBranch, {
       branch_id: branchId,
@@ -482,7 +482,7 @@ export const membersService = {
     return response.data;
   },
 
-  // Transferência assistida de um membro (admin/secretário) para outra filial da mesma igreja
+  // Transferência assistida de um membro (admin/secretário) para outra congregação da mesma igreja
   async transferBranch(memberId: number, branchId: number): Promise<{ message: string; member: Member }> {
     const response = await api.post(API_ENDPOINTS.members.transferBranch(memberId), {
       branch_id: branchId,

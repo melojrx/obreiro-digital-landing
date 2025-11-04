@@ -159,8 +159,8 @@ const ExportChurchDataModal: React.FC<ExportChurchDataModalProps> = ({
     },
     {
       key: 'branches',
-      label: 'Filiais',
-      description: 'Informações das filiais e suas estatísticas',
+      label: 'Congregações',
+      description: 'Informações das congregações e suas estatísticas',
       icon: MapPin,
       size: '~25 KB'
     }

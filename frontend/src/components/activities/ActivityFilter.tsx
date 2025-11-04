@@ -158,10 +158,10 @@ export const ActivityFilter: React.FC<ActivityFilterProps> = ({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Todas as filiais" />
+                  <SelectValue placeholder="Todas as congregações" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as filiais</SelectItem>
+                  <SelectItem value="">Todas as congregações</SelectItem>
                   {branches.map((branch) => (
                     <SelectItem key={branch.id} value={branch.id.toString()}>
                       {branch.name}

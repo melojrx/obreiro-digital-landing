@@ -184,8 +184,8 @@ export const VisitorsFilters: React.FC<VisitorsFiltersProps> = ({
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as Filiais</SelectItem>
-                  {/* TODO: Carregar filiais dinamicamente */}
+                  <SelectItem value="all">Todas as Congregações</SelectItem>
+                  {/* TODO: Carregar congregações dinamicamente */}
                 </SelectContent>
               </Select>
             </div>

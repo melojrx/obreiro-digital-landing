@@ -1,6 +1,6 @@
 /**
  * Hook para navegação e contexto hierárquico
- * Gerencia a navegação entre denominação → igreja → filiais
+ * Gerencia a navegação entre denominação → igreja → congregações
  */
 
 import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
@@ -76,7 +76,7 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
       canManageBranchManagers: permissions.canManageUsers,
       canViewChurchReports: permissions.canViewReports,
       
-      // Filiais
+      // Congregações
       canViewBranchDashboard: permissions.canViewDashboard,
       canManageBranch: permissions.canManageBranches,
       canRegenerateQRCode: permissions.canManageBranches,
@@ -271,7 +271,7 @@ export const useHierarchy = (): UseHierarchyReturn => {
     } catch (error) {
       const errorMessage = error instanceof HierarchyError 
         ? error.message 
-        : 'Erro ao navegar para filial';
+        : 'Erro ao navegar para congregação';
       
       setState(prev => ({
         ...prev,
@@ -326,7 +326,7 @@ export const useHierarchy = (): UseHierarchyReturn => {
         availableBranches: branches.results,
       }));
     } catch (error) {
-      console.error('Erro ao carregar filiais:', error);
+      console.error('Erro ao carregar congregações:', error);
     }
   }, []);
 

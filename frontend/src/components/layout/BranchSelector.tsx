@@ -33,7 +33,7 @@ export const BranchSelector: React.FC = () => {
 
   const branches = data?.results ?? [];
 
-  // Se não há igreja ativa ou menos de 2 filiais, esconder seletor
+  // Se não há igreja ativa ou menos de 2 congregações, esconder seletor
   if (!churchId || branches.length <= 1) {
     return null;
   }
@@ -57,7 +57,7 @@ export const BranchSelector: React.FC = () => {
             <GitBranch className="h-4 w-4 flex-shrink-0" />
             <div className="flex flex-col items-start min-w-0">
               <span className="font-medium text-sm truncate">
-                {activeChurch?.active_branch?.name || 'Selecione uma filial'}
+                {activeChurch?.active_branch?.name || 'Selecione uma congregação'}
               </span>
               {activeChurch && (
                 <span className="text-xs text-muted-foreground truncate">
@@ -94,7 +94,7 @@ export const BranchSelector: React.FC = () => {
 
         <DropdownMenuSeparator />
         <div className="p-2 text-xs text-muted-foreground">
-          {branches.length} {branches.length === 1 ? 'filial' : 'filiais'} disponíveis
+          {branches.length} {branches.length === 1 ? 'congregação' : 'congregações'} disponíveis
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

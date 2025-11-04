@@ -141,7 +141,7 @@ export interface DashboardStats {
 // =====================================
 
 /**
- * Valida se um QR Code é válido e retorna informações da filial
+ * Valida se um QR Code é válido e retorna informações da congregação
  */
 export const validateQRCode = async (uuid: string): Promise<QRCodeValidation> => {
   try {
@@ -290,7 +290,7 @@ export const getVisitorStats = async (): Promise<VisitorStats> => {
 };
 
 /**
- * Obtém estatísticas de visitantes por filial
+ * Obtém estatísticas de visitantes por congregação
  */
 export const getVisitorStatsByBranch = async (): Promise<BranchVisitorStats[]> => {
   const response = await api.get(API_ENDPOINTS.visitors.byBranch);

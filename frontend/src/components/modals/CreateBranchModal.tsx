@@ -284,7 +284,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
 
       toast({
         title: 'Filial criada com sucesso!',
-        description: `A filial "${data.name}" foi criada e está pronta para uso.`,
+        description: `A congregação "${data.name}" foi criada e está pronta para uso.`,
       });
 
       form.reset();
@@ -297,7 +297,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
         description = error.response?.data?.message ?? description;
       }
       toast({
-        title: 'Erro ao criar filial',
+        title: 'Erro ao criar congregação',
         description,
         variant: 'destructive',
       });
@@ -330,14 +330,16 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
               Limite Atingido
             </DialogTitle>
             <DialogDescription>
-              Não é possível criar uma nova filial
+              Não é possível criar uma nova congregação
             </DialogDescription>
           </DialogHeader>
           
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              {availability.message || `Você atingiu o limite de ${availability.max_allowed} filiais para o plano ${availability.subscription_plan}.`}
+                          <p className="text-sm text-red-600 mt-2">
+              {availability.message || `Você atingiu o limite de ${availability.max_allowed} congregações para o plano ${availability.subscription_plan}.`}
+            </p>
             </AlertDescription>
           </Alert>
 
@@ -363,7 +365,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
             Nova Filial - {churchName}
           </DialogTitle>
           <DialogDescription>
-            Crie uma nova filial para expandir o alcance da sua igreja
+            Crie uma nova congregação para expandir o alcance da sua igreja
           </DialogDescription>
         </DialogHeader>
 
@@ -371,7 +373,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
           <Alert>
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              Você pode criar mais {availability.remaining_slots} filial(ais). 
+              Você pode criar mais {availability.remaining_slots} congregação(ais). 
               Total permitido: {availability.max_allowed} ({availability.subscription_plan})
             </AlertDescription>
           </Alert>
@@ -446,7 +448,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                     <FormLabel>Descrição</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Descreva a filial, sua missão e características especiais..."
+                        placeholder="Descreva a congregação, sua missão e características especiais..."
                         className="min-h-[80px]"
                         {...field} 
                       />
@@ -476,7 +478,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                       <FormControl>
                         <Input 
                           type="email" 
-                          placeholder="filial@igreja.com.br" 
+                          placeholder="congregação@igreja.com.br" 
                           {...field} 
                         />
                       </FormControl>
@@ -714,7 +716,7 @@ const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Criando...' : 'Criar Filial'}
+                {isLoading ? 'Criando...' : 'Criar Congregação'}
               </Button>
             </div>
           </form>

@@ -224,11 +224,11 @@ export const DenominationDashboard: React.FC<DenominationDashboardProps> = ({
       color: 'green' as const,
     },
     {
-      title: 'Total de Filiais',
+      title: 'Total de Congregações',
       metrics: [
         {
           value: kpis.totalBranches,
-          label: 'Filiais cadastradas',
+          label: 'Congregações cadastradas',
           change: 0, // Calcular quando tiver dados de crescimento
           format: 'number' as const,
         },

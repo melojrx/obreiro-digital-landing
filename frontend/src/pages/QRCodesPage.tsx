@@ -102,9 +102,9 @@ const QRCodesPage: React.FC = () => {
             </h1>
             <p className="text-gray-600 mt-1 text-sm sm:text-base">
               {permissions.canManageChurches
-                ? 'Gerencie os QR Codes de todas as filiais da denominação'
+                ? 'Gerencie os QR Codes de todas as congregações da denominação'
                 : permissions.canCreateBranches
-                ? 'Visualize e gerencie os QR Codes das suas filiais'
+                ? 'Visualize e gerencie os QR Codes das suas congregações'
                 : 'Visualize os QR Codes disponíveis para registro de visitantes'}
             </p>
           </div>
@@ -137,7 +137,7 @@ const QRCodesPage: React.FC = () => {
           <AlertTitle>Sobre os QR Codes</AlertTitle>
           <AlertDescription>
             Os QR Codes permitem que visitantes se registrem facilmente ao escanear o código.
-            Cada filial possui seu próprio QR Code único. Você pode imprimi-los e colocá-los
+            Cada congregação possui seu próprio QR Code único. Você pode imprimi-los e colocá-los
             em locais estratégicos da igreja.
           </AlertDescription>
         </Alert>
@@ -151,8 +151,8 @@ const QRCodesPage: React.FC = () => {
             </h3>
             <p className="text-gray-600 mb-4">
               {permissions.canCreateBranches
-                ? 'Crie uma filial para gerar QR Codes automaticamente.'
-                : 'Entre em contato com o administrador para criar filiais.'}
+                ? 'Crie uma congregação para gerar QR Codes automaticamente.'
+                : 'Entre em contato com o administrador para criar congregações.'}
             </p>
           </div>
         ) : (

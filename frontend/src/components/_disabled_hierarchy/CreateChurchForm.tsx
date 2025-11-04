@@ -624,7 +624,7 @@ export const CreateChurchForm: React.FC<CreateChurchFormProps> = ({
         </div>
 
         <div>
-          <Label htmlFor="max_branches">Limite de Filiais</Label>
+          <Label htmlFor="max_branches">Limite de Congregações</Label>
           <Controller
             name="max_branches"
             control={form.control}

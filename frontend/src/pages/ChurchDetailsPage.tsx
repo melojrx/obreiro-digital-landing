@@ -153,7 +153,7 @@ const ChurchDetailsPage: React.FC = () => {
       const items = Array.isArray((paginated as any).results) ? (paginated as any).results : (paginated as any).branches || [];
       setBranches(items as BranchDetails[]);
     } catch (error) {
-      console.error('Erro ao carregar filiais:', error);
+      console.error('Erro ao carregar congregações:', error);
     }
   }, [id]);
 
@@ -294,8 +294,8 @@ const ChurchDetailsPage: React.FC = () => {
       // Atualiza contadores da igreja
       loadChurchData();
     } catch (error) {
-      console.error('Erro ao excluir filial:', error);
-      toast({ title: 'Erro ao excluir filial', variant: 'destructive' });
+      console.error('Erro ao excluir congregação:', error);
+      toast({ title: 'Erro ao excluir congregação', variant: 'destructive' });
     } finally {
       setIsDeleting(false);
       setBranchToDelete(null);
@@ -496,7 +496,7 @@ const ChurchDetailsPage: React.FC = () => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleCreateBranch}>
                       <PlusCircle className="h-4 w-4 mr-2" />
-                      Nova Filial
+                      Nova Congregação
                     </DropdownMenuItem>
                   </>
                 )}
@@ -546,7 +546,7 @@ const ChurchDetailsPage: React.FC = () => {
               <div className="flex items-center">
                 <Building className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Filiais</p>
+                  <p className="text-sm font-medium text-gray-600">Congregações</p>
                   <p className="text-2xl font-bold text-gray-900">
                     {branchesCount}
                   </p>
@@ -604,7 +604,7 @@ const ChurchDetailsPage: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="branches" className="flex items-center gap-2">
               <Building className="h-4 w-4" />
-              Filiais
+              Congregações
             </TabsTrigger>
             <TabsTrigger value="admins" className="flex items-center gap-2">
               <UserPlus className="h-4 w-4" />
@@ -760,7 +760,7 @@ const ChurchDetailsPage: React.FC = () => {
 
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span>Filiais</span>
+                          <span>Congregações</span>
                           <span>{branchesCount}/{church.max_branches}</span>
                         </div>
                         <Progress 
@@ -797,7 +797,7 @@ const ChurchDetailsPage: React.FC = () => {
                           onClick={handleCreateBranch}
                         >
                           <PlusCircle className="h-4 w-4 mr-2" />
-                          Nova Filial
+                          Nova Congregação
                         </Button>
                       )}
 
@@ -873,14 +873,14 @@ const ChurchDetailsPage: React.FC = () => {
             )}
           </TabsContent>
 
-          {/* Tab: Filiais */}
+          {/* Tab: Congregações */}
           <TabsContent value="branches" className="space-y-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium">Filiais da Igreja</h3>
+              <h3 className="text-lg font-medium">Congregações da Igreja</h3>
               {permissions.canCreateBranches && (
                 <Button onClick={handleCreateBranch}>
                   <PlusCircle className="h-4 w-4 mr-2" />
-                  Nova Filial
+                  Nova Congregação
                 </Button>
               )}
             </div>
@@ -890,7 +890,7 @@ const ChurchDetailsPage: React.FC = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Filial</TableHead>
+                      <TableHead>Congregação</TableHead>
                       <TableHead>Localização</TableHead>
                       <TableHead>QRCode</TableHead>
                       <TableHead>Criada em</TableHead>
@@ -981,10 +981,10 @@ const ChurchDetailsPage: React.FC = () => {
               <div className="text-center py-8">
                 <Building className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Nenhuma filial encontrada
+                  Nenhuma congregação encontrada
                 </h3>
                 <p className="text-gray-600 mb-4">
-                  Esta igreja ainda não possui filiais cadastradas.
+                  Esta igreja ainda não possui congregações cadastradas.
                 </p>
                 {permissions.canCreateBranches && (
                   <Button onClick={handleCreateBranch}>
@@ -1191,9 +1191,9 @@ const ChurchDetailsPage: React.FC = () => {
       <AlertDialog open={!!branchToDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir filial?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir congregação?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. A filial será removida do sistema.
+              Esta ação não pode ser desfeita. A congregação será removida do sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

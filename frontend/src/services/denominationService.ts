@@ -207,7 +207,7 @@ export const churchService = {
   },
 
   /**
-   * Lista filiais de uma igreja
+   * Lista congregações de uma igreja
    */
   async getChurchBranches(
     churchId: number, 
@@ -230,7 +230,7 @@ export const churchService = {
   },
 
   /**
-   * Cria nova filial
+   * Cria nova congregação
    */
   async createBranch(churchId: number, branchData: CreateBranchFormData): Promise<BranchDetails> {
     try {
@@ -266,11 +266,11 @@ export const churchService = {
   },
 };
 
-// ===== SERVIÇOS DE FILIAIS =====
+// ===== SERVIÇOS DE CONGREGAÇÕES =====
 
 export const branchService = {
   /**
-   * Lista filiais que o usuário pode gerenciar
+   * Lista congregações que o usuário pode gerenciar
    */
   async getManagedBranches(): Promise<BranchDetails[]> {
     try {
@@ -282,7 +282,7 @@ export const branchService = {
   },
 
   /**
-   * Obtém detalhes de uma filial específica
+   * Obtém detalhes de uma congregação específica
    */
   async getBranchDetails(branchId: number): Promise<BranchDetails> {
     try {
@@ -294,7 +294,7 @@ export const branchService = {
   },
 
   /**
-   * Atualiza dados de uma filial
+   * Atualiza dados de uma congregação
    */
   async updateBranch(branchId: number, data: Partial<BranchDetails>): Promise<BranchDetails> {
     try {
@@ -306,7 +306,7 @@ export const branchService = {
   },
 
   /**
-   * Dashboard da filial
+   * Dashboard da congregação
    */
   async getBranchDashboard(branchId: number): Promise<BranchStats> {
     try {
@@ -318,7 +318,7 @@ export const branchService = {
   },
 
   /**
-   * Regenerar QR code da filial
+   * Regenerar QR code da congregação
    */
   async regenerateQRCode(branchId: number): Promise<{ qr_code_uuid: string; qr_code_image: string }> {
     try {
@@ -330,7 +330,7 @@ export const branchService = {
   },
 
   /**
-   * Designar gestor para filial
+   * Designar gestor para congregação
    */
   async assignBranchManager(branchId: number, managerData: AssignAdminFormData): Promise<AdminUser> {
     try {
@@ -358,7 +358,7 @@ export const hierarchyUserService = {
   },
 
   /**
-   * Designar usuário para gerenciar filial
+   * Designar usuário para gerenciar congregação
    */
   async assignToBranch(data: {
     user_id: number;
@@ -429,7 +429,7 @@ export const hierarchyReportService = {
   },
 
   /**
-   * Resumo de filiais da igreja
+   * Resumo de congregações da igreja
    */
   async getChurchBranchesSummary(
     churchId: number,
@@ -534,7 +534,7 @@ export const hierarchyBatchService = {
   },
 
   /**
-   * Executar ação em batch em filiais
+   * Executar ação em batch em congregações
    */
   async batchActionBranches(request: BatchActionRequest): Promise<BatchActionResponse> {
     try {

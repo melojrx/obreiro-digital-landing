@@ -362,7 +362,7 @@ const HierarchyViewPage: React.FC = () => {
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Filiais</p>
+                            <p>Congregações</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -528,7 +528,7 @@ const HierarchyViewPage: React.FC = () => {
                   <SelectItem value="all">Todos os tipos</SelectItem>
                   <SelectItem value="denomination">Denominações</SelectItem>
                   <SelectItem value="church">Igrejas</SelectItem>
-                  <SelectItem value="branch">Filiais</SelectItem>
+                  <SelectItem value="branch">Congregações</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -555,7 +555,7 @@ const HierarchyViewPage: React.FC = () => {
                 <div className="flex items-center">
                   <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
                   <div className="ml-2 sm:ml-4 min-w-0">
-                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Filiais</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Congregações</p>
                     <p className="text-lg sm:text-2xl font-bold text-gray-900">{hierarchyStats.total_branches?.toLocaleString() || 0}</p>
                   </div>
                 </div>

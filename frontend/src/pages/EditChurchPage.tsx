@@ -111,8 +111,8 @@ const churchEditFormSchema = z.object({
     .max(10000, 'Máximo de 10.000 membros')
     .optional(),
   max_branches: z.number()
-    .min(0, 'Número de filiais deve ser positivo')
-    .max(100, 'Máximo de 100 filiais')
+    .min(0, 'Número de congregações deve ser positivo')
+    .max(100, 'Máximo de 100 congregações')
     .optional(),
 });
 
@@ -650,7 +650,7 @@ const EditChurchPage: React.FC = () => {
                 </div>
                 <Separator orientation="vertical" className="h-12" />
                 <div>
-                  <p className="text-sm text-gray-600">Filiais</p>
+                  <p className="text-sm text-gray-600">Congregações</p>
                   <p className="font-semibold">
                     {church.branches_count || 0} / {church.max_branches}
                   </p>

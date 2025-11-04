@@ -1,6 +1,6 @@
 /**
  * Componente de Visualização Hierárquica
- * Exibe a estrutura denominação → igreja → filiais de forma visual
+ * Exibe a estrutura denominação → igreja → congregações de forma visual
  */
 
 import React, { useState } from 'react';

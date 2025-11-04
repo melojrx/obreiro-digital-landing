@@ -135,7 +135,7 @@ const ChurchFilters: React.FC<{
               checked={filters.has_branches}
               onCheckedChange={(checked) => onFiltersChange({ ...filters, has_branches: checked as boolean })}
             />
-            <label htmlFor="has-branches" className="text-sm">Tem filiais</label>
+            <label htmlFor="has-branches" className="text-sm">Tem congregações</label>
           </div>
           
           <div className="flex items-center space-x-2">

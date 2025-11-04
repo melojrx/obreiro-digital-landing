@@ -305,8 +305,8 @@ export function ConvertAdminToMemberModal({
             Seus dados pessoais do perfil serão utilizados automaticamente.
             <br />
             <span className="text-slate-700">
-              Vínculo: sua filiação será associada à filial <span className="font-semibold">{branchName}</span>.
-              Caso nenhuma filial ativa esteja configurada, utilizaremos a Matriz.
+              Vínculo: sua filiação será associada à congregação <span className="font-semibold">{branchName}</span>.
+              Caso nenhuma congregação ativa esteja configurada, utilizaremos a Matriz.
             </span>
           </DialogDescription>
         </DialogHeader>

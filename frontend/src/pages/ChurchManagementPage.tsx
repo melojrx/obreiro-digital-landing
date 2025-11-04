@@ -562,7 +562,7 @@ const ChurchManagementPage: React.FC = () => {
                     <MapPin className="h-8 w-8 text-purple-600" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-600 truncate">Filiais</p>
+                    <p className="text-xs font-medium text-gray-600 truncate">Congregações</p>
                     <p className="text-xl sm:text-2xl font-bold text-gray-900">
                       {churches.reduce((sum, church) => sum + getBranchesCount(church), 0)}
                     </p>
@@ -664,7 +664,7 @@ const ChurchManagementPage: React.FC = () => {
                             {getSortIcon('total_members')}
                           </div>
                         </TableHead>
-                        <TableHead>Filiais</TableHead>
+                        <TableHead>Congregações</TableHead>
                         <TableHead 
                           className="cursor-pointer hover:bg-gray-50"
                           onClick={() => handleSort('created_at')}

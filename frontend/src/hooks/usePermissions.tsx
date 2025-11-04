@@ -23,7 +23,7 @@ export interface UserPermissions {
   canDeleteActivities: boolean;
   canManageActivities: boolean;
   
-  // Filiais
+  // Congregações
   canViewBranches: boolean;
   canCreateBranches: boolean;
   canEditBranches: boolean;
@@ -77,7 +77,7 @@ export interface UserPermissions {
 const ROLE_PERMISSIONS = {
   // CHURCH_ADMIN: Administrador principal do SaaS (usuário pagante)
   // Escolhe UMA denominação e pode criar múltiplas igrejas dentro dela
-  // Tem controle total sobre todas as igrejas, filiais, membros e atividades
+  // Tem controle total sobre todas as igrejas, congregações, membros e atividades
   CHURCH_ADMIN: {
     canViewMembers: true,
     canCreateMembers: true,
@@ -132,8 +132,8 @@ const ROLE_PERMISSIONS = {
     isMember: false,
   },
   
-  // BRANCH_MANAGER: Gerente de filiais específicas
-  // Designado por Church Admin para gerenciar uma ou mais filiais
+  // BRANCH_MANAGER: Gerente de congregações específicas
+  // Designado por Church Admin para gerenciar uma ou mais congregações
   BRANCH_MANAGER: {
     canViewMembers: true,
     canCreateMembers: true,
@@ -151,8 +151,8 @@ const ROLE_PERMISSIONS = {
     canDeleteActivities: false,
     canManageActivities: true,
     canViewBranches: true,
-    canCreateBranches: false, // Não cria novas filiais
-    canEditBranches: true, // Pode editar suas filiais designadas
+    canCreateBranches: false, // Não cria novas congregações
+    canEditBranches: true, // Pode editar suas congregações designadas
     canDeleteBranches: false,
     canManageBranches: false, // Gestão limitada
     // Permissões hierárquicas limitadas
@@ -513,9 +513,9 @@ export const usePermissions = (): UserPermissions => {
       return ROLE_PERMISSIONS.CHURCH_ADMIN;
     }
     
-    // Verificar se é gerente de filial
-    if (user.email?.includes('filial.admin') || user.email?.includes('branch.manager')) {
-      console.log('🔍 usePermissions - Email contém filial/branch, usando BRANCH_MANAGER');
+    // Verificar se é gerente de congregação
+    if (user.email?.includes('congregação.admin') || user.email?.includes('branch.manager')) {
+      console.log('🔍 usePermissions - Email contém congregação/branch, usando BRANCH_MANAGER');
       return ROLE_PERMISSIONS.BRANCH_MANAGER;
     }
     

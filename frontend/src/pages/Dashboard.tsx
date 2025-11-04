@@ -97,7 +97,7 @@ const Dashboard = () => {
 
             const hasMemberRecord = !!status.is_member;
 
-            // Mostrar card de transferência quando for membro e a filial ativa diferir
+            // Mostrar card de transferência quando for membro e a congregação ativa diferir
             const activeBranchId = activeChurchInfo?.active_branch?.id;
             const memberBranchId = status.branch?.id ?? null;
             const shouldSuggestTransfer = hasMemberRecord && !!activeBranchId && memberBranchId !== activeBranchId;
@@ -282,10 +282,10 @@ const Dashboard = () => {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-amber-900">
                                 <UserCheck className="h-5 w-5" />
-                                Transferir minha lotação para esta filial
+                                Transferir minha lotação para esta congregação
                             </CardTitle>
                             <CardDescription>
-                                Sua lotação atual é diferente da filial ativa. Você pode transferir sua lotação para a filial "{activeChurchInfo.active_branch.name}".
+                                Sua lotação atual é diferente da congregação ativa. Você pode transferir sua lotação para a congregação "{activeChurchInfo.active_branch.name}".
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -307,7 +307,7 @@ const Dashboard = () => {
                                 disabled={transferring}
                                 className="w-full sm:w-auto"
                             >
-                                {transferring ? 'Transferindo...' : 'Transferir para esta filial'}
+                                {transferring ? 'Transferindo...' : 'Transferir para esta congregação'}
                             </Button>
                         </CardContent>
                     </Card>

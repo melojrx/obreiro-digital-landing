@@ -115,8 +115,8 @@ const churchFormSchema = z.object({
     .max(10000, 'Máximo de 10.000 membros')
     .optional(),
   max_branches: z.number()
-    .min(0, 'Número de filiais deve ser positivo')
-    .max(100, 'Máximo de 100 filiais')
+    .min(0, 'Número de congregações deve ser positivo')
+    .max(100, 'Máximo de 100 congregações')
     .optional(),
 });
 
@@ -1042,7 +1042,7 @@ const CreateChurchPage: React.FC = () => {
                     name="max_branches"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Limite de Filiais</FormLabel>
+                        <FormLabel>Limite de Congregações</FormLabel>
                         <FormControl>
                           <Input 
                             type="number"
@@ -1053,7 +1053,7 @@ const CreateChurchPage: React.FC = () => {
                           />
                         </FormControl>
                         <FormDescription>
-                          Número máximo de filiais permitidas
+                          Número máximo de congregações permitidas
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

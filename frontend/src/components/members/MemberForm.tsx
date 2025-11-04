@@ -172,7 +172,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   // Papéis de acesso ao sistema (conforme documento de permissões)
   const roleCatalog = [
     { value: 'denomination_admin', label: 'Administrador da Denominação (Nível 3)', description: 'Administra múltiplas igrejas da denominação' },
-    { value: 'church_admin', label: 'Administrador da Igreja (Nível 2)', description: 'Administra a igreja (Matriz e Filiais)' },
+    { value: 'church_admin', label: 'Administrador da Igreja (Nível 2)', description: 'Administra a igreja (Matriz e Congregações)' },
     { value: 'secretary', label: 'Secretário(a) (Nível 1)', description: 'Gestão de cadastros de Membros e Visitantes' },
   ] as const;
 
@@ -444,7 +444,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         throw new Error('Igreja ativa não encontrada. Selecione uma igreja antes de cadastrar membros.');
       }
       
-      // Determinar filial para associar o novo membro
+      // Determinar congregação para associar o novo membro
       let branchId: number | undefined = activeChurch.active_branch?.id;
       if (!branchId && data.church_id) {
         try {
@@ -455,7 +455,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
           branchId = (hq?.id || branches[0]?.id) as number | undefined;
           console.log('🏷️ Branch selecionada para novo membro:', branchId);
         } catch (e) {
-          console.warn('⚠️ Não foi possível carregar filiais para definir branch do membro. Prosseguindo sem branch.', e);
+          console.warn('⚠️ Não foi possível carregar congregações para definir branch do membro. Prosseguindo sem branch.', e);
         }
       }
 
@@ -1498,7 +1498,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                                   <li>Gerenciar todos os membros e visitantes</li>
                                   <li>Criar e gerenciar atividades e ministérios</li>
                                   <li>Acessar relatórios e dashboards</li>
-                                  <li>Gerenciar filiais da igreja</li>
+                                  <li>Gerenciar congregações da igreja</li>
                                 </>
                               )}
                               {form.watch('system_role') === 'secretary' && (
@@ -1776,7 +1776,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                                 {form.watch('system_role') === 'church_admin' && (
                                   <>
                                     <li>Gerenciar dados da igreja e membros</li>
-                                    <li>Gerenciar filiais e atividades</li>
+                                    <li>Gerenciar congregações e atividades</li>
                                     <li>Acessar relatórios consolidados</li>
                                   </>
                                 )}

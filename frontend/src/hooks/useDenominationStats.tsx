@@ -204,7 +204,7 @@ export const useDenominationStats = (): UseDenominationStatsReturn => {
         branchesStats: [...prev.branchesStats.filter(s => s !== stats), stats],
       }));
     } catch (error) {
-      console.error('Erro ao carregar estatísticas da filial:', error);
+      console.error('Erro ao carregar estatísticas da congregação:', error);
     }
   }, []);
 
@@ -286,7 +286,7 @@ export const useDenominationStats = (): UseDenominationStatsReturn => {
   const refreshAllStats = useCallback(async (denominationId: number) => {
     await loadDenominationStats(denominationId);
     
-    // Recarregar estatísticas das igrejas e filiais se necessário
+    // Recarregar estatísticas das igrejas e congregações se necessário
     // Esta lógica dependeria da implementação específica
   }, [loadDenominationStats]);
 

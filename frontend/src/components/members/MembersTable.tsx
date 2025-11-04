@@ -121,7 +121,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                 <TableHead className="w-12"></TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Contato</TableHead>
-                <TableHead>Filial</TableHead>
+                <TableHead>Congregação</TableHead>
                 <TableHead>Função</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Membro desde</TableHead>
@@ -373,7 +373,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
               </div>
               
               <div>
-                <span className="text-gray-500 block">Filial:</span>
+                <span className="text-gray-500 block">Congregação:</span>
                 <div className="mt-1 text-gray-900">
                   {member.branch_name || '—'}
                 </div>

@@ -177,7 +177,7 @@ class ChurchService {
   }
 
   /**
-   * Obtém filiais da igreja
+   * Obtém congregações da igreja
    */
   async getChurchBranches(id: number): Promise<BranchDetails[]> {
     const response = await api.get(`${this.baseURL}/${id}/branches/`);

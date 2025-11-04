@@ -53,7 +53,7 @@ class BranchService {
   private baseURL = '/branches';
 
   /**
-   * Lista filiais com filtros e paginação
+   * Lista congregações com filtros e paginação
    */
   async getBranches(
     filters?: BranchFilters,
@@ -78,7 +78,7 @@ class BranchService {
   }
 
   /**
-   * Busca filiais por termo
+   * Busca congregações por termo
    */
   async searchBranches(
     searchTerm: string,
@@ -100,7 +100,7 @@ class BranchService {
   }
 
   /**
-   * Obtém detalhes de uma filial
+   * Obtém detalhes de uma congregação
    */
   async getBranch(id: number): Promise<BranchDetails> {
     const response = await api.get(`${this.baseURL}/${id}/`);
@@ -108,7 +108,7 @@ class BranchService {
   }
 
   /**
-   * Cria uma nova filial
+   * Cria uma nova congregação
    */
   async createBranch(data: CreateBranchRequest): Promise<BranchDetails> {
     const response = await api.post(`${this.baseURL}/`, data);
@@ -116,7 +116,7 @@ class BranchService {
   }
 
   /**
-   * Atualiza uma filial (completo)
+   * Atualiza uma congregação (completo)
    */
   async updateBranch(id: number, data: Partial<BranchDetails>): Promise<BranchDetails> {
     const response = await api.put(`${this.baseURL}/${id}/`, data);
@@ -124,7 +124,7 @@ class BranchService {
   }
 
   /**
-   * Atualiza uma filial (parcial)
+   * Atualiza uma congregação (parcial)
    */
   async patchBranch(id: number, data: Partial<BranchDetails>): Promise<BranchDetails> {
     const response = await api.patch(`${this.baseURL}/${id}/`, data);
@@ -132,14 +132,14 @@ class BranchService {
   }
 
   /**
-   * Remove uma filial (soft delete)
+   * Remove uma congregação (soft delete)
    */
   async deleteBranch(id: number): Promise<void> {
     await api.delete(`${this.baseURL}/${id}/`);
   }
 
   /**
-   * Lista todas as filiais com informações de QR Code
+   * Lista todas as congregações com informações de QR Code
    */
   async getBranchesQRCodes(): Promise<BranchQRCode[]> {
     const response = await api.get(`${this.baseURL}/qr_codes/`);
@@ -147,7 +147,7 @@ class BranchService {
   }
 
   /**
-   * Alterna status do QR Code de uma filial
+   * Alterna status do QR Code de uma congregação
    */
   async toggleQRCode(branchId: number): Promise<{
     message: string;
@@ -158,7 +158,7 @@ class BranchService {
   }
 
   /**
-   * Regenera QR Code de uma filial
+   * Regenera QR Code de uma congregação
    */
   async regenerateQRCode(branchId: number): Promise<{
     message: string;
@@ -169,7 +169,7 @@ class BranchService {
   }
 
   /**
-   * Obtém estatísticas de visitantes de uma filial
+   * Obtém estatísticas de visitantes de uma congregação
    */
   async getVisitorStats(branchId: number): Promise<{
     branch_id: number;
@@ -181,7 +181,7 @@ class BranchService {
   }
 
   /**
-   * Obtém estatísticas detalhadas da filial
+   * Obtém estatísticas detalhadas da congregação
    */
   async getBranchStatistics(id: number): Promise<BranchStats> {
     const response = await api.get(`${this.baseURL}/${id}/statistics/`);
@@ -197,7 +197,7 @@ class BranchService {
   }
 
   /**
-   * Obtém filiais de uma igreja
+   * Obtém congregações de uma igreja
    */
   async getBranchesByChurch(
     churchId: number,
@@ -214,21 +214,21 @@ class BranchService {
   }
 
   /**
-   * Atribui gerente à filial
+   * Atribui gerente à congregação
    */
   async assignManager(id: number, data: AssignManagerRequest): Promise<void> {
     await api.post(`${this.baseURL}/${id}/assign-manager/`, data);
   }
 
   /**
-   * Remove gerente da filial
+   * Remove gerente da congregação
    */
   async removeManager(id: number, data: RemoveManagerRequest): Promise<void> {
     await api.post(`${this.baseURL}/${id}/remove-manager/`, data);
   }
 
   /**
-   * Ações em lote (ativar/desativar/deletar múltiplas filiais)
+   * Ações em lote (ativar/desativar/deletar múltiplas congregações)
    */
   async batchAction(data: BatchActionRequest): Promise<BatchActionResponse> {
     const response = await api.post(`${this.baseURL}/batch-action/`, data);
@@ -236,7 +236,7 @@ class BranchService {
   }
 
   /**
-   * Valida disponibilidade para criar filial
+   * Valida disponibilidade para criar congregação
    */
   async checkCreateAvailability(churchId: number): Promise<{
     can_create: boolean;
@@ -259,7 +259,7 @@ class BranchService {
   }
 
   /**
-   * Exporta dados das filiais
+   * Exporta dados das congregações
    */
   async exportBranches(
     format: 'csv' | 'xlsx' | 'pdf',

@@ -38,8 +38,8 @@ const TransferMemberModal: React.FC<TransferMemberModalProps> = ({ isOpen, membe
           setSelectedBranchId(String(list[0].id));
         }
       } catch (err) {
-        console.error('Erro ao carregar filiais:', err);
-        toast.error('Não foi possível carregar as filiais da igreja');
+        console.error('Erro ao carregar congregações:', err);
+        toast.error('Não foi possível carregar as congregações da igreja');
       } finally {
         setLoadingBranches(false);
       }
@@ -87,7 +87,7 @@ const TransferMemberModal: React.FC<TransferMemberModalProps> = ({ isOpen, membe
         <DialogHeader>
           <DialogTitle>Transferir membro</DialogTitle>
           <DialogDescription>
-            Selecione a filial de destino dentro da mesma igreja.
+            Selecione a congregação de destino dentro da mesma igreja.
           </DialogDescription>
         </DialogHeader>
 
@@ -104,7 +104,7 @@ const TransferMemberModal: React.FC<TransferMemberModalProps> = ({ isOpen, membe
               <label className="text-sm font-medium">Filial de destino</label>
               <Select disabled={loadingBranches || submitting} value={selectedBranchId} onValueChange={setSelectedBranchId}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={loadingBranches ? 'Carregando filiais...' : 'Selecione a filial de destino'} />
+                  <SelectValue placeholder={loadingBranches ? 'Carregando congregações...' : 'Selecione a congregação de destino'} />
                 </SelectTrigger>
                 <SelectContent>
                   {sortedBranches.map((b) => (

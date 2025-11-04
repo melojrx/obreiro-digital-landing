@@ -286,7 +286,7 @@ const EditBranchModal: React.FC<EditBranchModalProps> = ({ isOpen, branch, onClo
       if (isAxiosError(error)) {
         description = error.response?.data?.message ?? description;
       }
-      toast({ title: 'Erro ao atualizar filial', description, variant: 'destructive' });
+      toast({ title: 'Erro ao atualizar congregação', description, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -303,7 +303,7 @@ const EditBranchModal: React.FC<EditBranchModalProps> = ({ isOpen, branch, onClo
             Editar Filial
           </DialogTitle>
           <DialogDescription>
-            Atualize as informações da filial
+            Atualize as informações da congregação
           </DialogDescription>
         </DialogHeader>
 
@@ -486,7 +486,7 @@ const EditBranchModal: React.FC<EditBranchModalProps> = ({ isOpen, branch, onClo
                   <FormItem>
                     <FormLabel>Descrição</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Descrição da filial" {...field} />
+                      <Textarea placeholder="Descrição da congregação" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

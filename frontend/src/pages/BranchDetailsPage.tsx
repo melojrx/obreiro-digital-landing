@@ -74,8 +74,8 @@ const BranchDetailsPage: React.FC = () => {
       const data = await branchService.getBranch(Number(id));
       setBranch(data);
     } catch (error) {
-      console.error('Erro ao carregar filial:', error);
-      toast({ title: 'Erro ao carregar filial', variant: 'destructive' });
+      console.error('Erro ao carregar congregação:', error);
+      toast({ title: 'Erro ao carregar congregação', variant: 'destructive' });
       navigate('/denominacao/churches');
     } finally {
       setIsLoading(false);
@@ -89,7 +89,7 @@ const BranchDetailsPage: React.FC = () => {
       setVisitorStats(stats);
     } catch (error) {
       // Não é crítico para a página
-      console.warn('Não foi possível carregar estatísticas da filial.');
+      console.warn('Não foi possível carregar estatísticas da congregação.');
     }
   }, [id]);
 
@@ -172,7 +172,7 @@ const BranchDetailsPage: React.FC = () => {
       toast({ title: 'Filial excluída com sucesso' });
       handleBack();
     } catch (error) {
-      toast({ title: 'Erro ao excluir filial', variant: 'destructive' });
+      toast({ title: 'Erro ao excluir congregação', variant: 'destructive' });
     } finally {
       setIsDeleting(false);
       setConfirmDelete(false);
@@ -182,7 +182,7 @@ const BranchDetailsPage: React.FC = () => {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="p-6">Carregando filial...</div>
+        <div className="p-6">Carregando congregação...</div>
       </AppLayout>
     );
   }
@@ -450,7 +450,7 @@ const BranchDetailsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <div className="font-semibold">1. Ativar QR Code</div>
-                <div className="text-gray-600">Ative o QR Code da filial para permitir que visitantes se registrem.</div>
+                <div className="text-gray-600">Ative o QR Code da congregação para permitir que visitantes se registrem.</div>
               </div>
               <div>
                 <div className="font-semibold">2. Baixar e Imprimir</div>
@@ -485,9 +485,9 @@ const BranchDetailsPage: React.FC = () => {
       <AlertDialog open={confirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir filial?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir congregação?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. A filial será removida do sistema.
+              Esta ação não pode ser desfeita. A congregação será removida do sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -149,7 +149,7 @@ export const API_ENDPOINTS = {
     create: '/members/',
     update: (id: number) => `/members/${id}/`,
     delete: (id: number) => `/members/${id}/`,
-    // Transferência assistida (admin) entre filiais da mesma igreja
+    // Transferência assistida (admin) entre congregações da mesma igreja
     transferBranch: (id: number) => `/members/${id}/transfer-branch/`,
     dashboard: '/members/dashboard/',
     statistics: '/members/statistics/',
@@ -160,7 +160,7 @@ export const API_ENDPOINTS = {
     statusHistory: (id: number) => `/members/${id}/status_history/`,
     export: '/members/export/',
     availableForSpouse: '/members/available_for_spouse/',
-    // Rotas do próprio usuário (sem filtrar por filial)
+    // Rotas do próprio usuário (sem filtrar por congregação)
     me: {
       status: '/members/me/status/',
       transferBranch: '/members/me/transfer-branch/',
@@ -181,7 +181,7 @@ export const API_ENDPOINTS = {
     changeStatus: (memberId: number) => `/members/${memberId}/change-status/`,
   },
   
-  // Branches (Filiais)
+  // Branches (Congregações)
   branches: {
     list: '/branches/',
     detail: (id: number) => `/branches/${id}/`,

@@ -1,5 +1,5 @@
 /**
- * Tipos TypeScript para o Módulo de Gestão de Igrejas e Filiais
+ * Tipos TypeScript para o Módulo de Gestão de Igrejas e Congregações
  * Extensão dos tipos existentes para suporte hierárquico
  */
 
@@ -74,7 +74,7 @@ export interface ChurchDetails extends BaseHierarchyEntity {
   branches_count?: number;
 }
 
-// Tipos para filiais
+// Tipos para congregações
 export interface BranchDetails extends BaseHierarchyEntity {
   church_id: number;
   church?: {
@@ -358,7 +358,7 @@ export interface HierarchyPermissions {
   canManageBranchManagers: boolean;
   canViewChurchReports: boolean;
   
-  // Filiais
+  // Congregações
   canViewBranchDashboard: boolean;
   canManageBranch: boolean;
   canRegenerateQRCode: boolean;

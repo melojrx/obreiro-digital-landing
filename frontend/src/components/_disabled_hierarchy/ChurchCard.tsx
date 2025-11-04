@@ -231,7 +231,7 @@ export const ChurchCard: React.FC<ChurchCardProps> = ({
                 {canManage && (
                   <DropdownMenuItem onClick={() => onManageBranches?.(church)}>
                     <Building className="h-4 w-4 mr-2" />
-                    Gerenciar Filiais
+                    Gerenciar Congregações
                   </DropdownMenuItem>
                 )}
                 {canEdit && (
@@ -318,7 +318,7 @@ export const ChurchCard: React.FC<ChurchCardProps> = ({
               </div>
               <div>
                 <div className="text-lg font-semibold">{church.branches_count || 0}</div>
-                <div className="text-xs text-muted-foreground">Filiais</div>
+                <div className="text-xs text-muted-foreground">Congregações</div>
               </div>
             </div>
           </>
@@ -406,7 +406,7 @@ export const ChurchCard: React.FC<ChurchCardProps> = ({
                 {canManage && (
                   <DropdownMenuItem onClick={() => onManageBranches?.(church)}>
                     <Building className="h-4 w-4 mr-2" />
-                    Gerenciar Filiais
+                    Gerenciar Congregações
                   </DropdownMenuItem>
                 )}
                 {canEdit && (
@@ -479,7 +479,7 @@ export const ChurchCard: React.FC<ChurchCardProps> = ({
               </div>
               <div>
                 <div className="text-2xl font-bold text-purple-600">{church.branches_count || 0}</div>
-                <div className="text-xs text-muted-foreground">Filiais</div>
+                <div className="text-xs text-muted-foreground">Congregações</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-orange-600">{church.max_members}</div>
@@ -524,7 +524,7 @@ export const ChurchCard: React.FC<ChurchCardProps> = ({
             </div>
             <div>
               <div className="font-semibold">{church.branches_count || 0}</div>
-              <div className="text-muted-foreground text-xs">Filiais</div>
+              <div className="text-muted-foreground text-xs">Congregações</div>
             </div>
           </div>
         )}

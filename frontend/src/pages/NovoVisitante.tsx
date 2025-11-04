@@ -34,13 +34,13 @@ const NovoVisitante: React.FC = () => {
           );
           branchId = (headquarters?.id ?? branches[0]?.id) ?? null;
         } catch (fallbackError) {
-          console.error('Erro ao buscar filiais para fallback:', fallbackError);
+          console.error('Erro ao buscar congregações para fallback:', fallbackError);
         }
       }
 
       if (!branchId) {
         toast.error(
-          'Não encontramos uma filial ativa. Selecione uma filial na barra superior ou configure a Matriz em Gestão > Filiais.'
+          'Não encontramos uma congregação ativa. Selecione uma congregação na barra superior ou configure a Matriz em Gestão > Congregações.'
         );
         return;
       }

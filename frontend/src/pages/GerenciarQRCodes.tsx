@@ -26,8 +26,8 @@ const GerenciarQRCodes: React.FC = () => {
       const data = await branchService.getBranchesQRCodes();
       setBranches(data);
     } catch (error: any) {
-      console.error('Erro ao carregar filiais:', error);
-      toast.error(error.message || 'Erro ao carregar filiais');
+      console.error('Erro ao carregar congregações:', error);
+      toast.error(error.message || 'Erro ao carregar congregações');
     } finally {
       setLoading(false);
     }
@@ -113,7 +113,7 @@ const GerenciarQRCodes: React.FC = () => {
         <div className="text-center sm:text-left">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Gerenciar QR Codes</h1>
           <p className="text-gray-600 mt-1 text-xs sm:text-sm lg:text-base">
-            Configure e monitore os QR Codes de todas as igrejas e filiais que você tem acesso
+            Configure e monitore os QR Codes de todas as igrejas e congregações que você tem acesso
           </p>
         </div>
 
@@ -124,8 +124,8 @@ const GerenciarQRCodes: React.FC = () => {
               <QrCode className="h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum QR Code encontrado</h3>
               <p className="text-gray-600 text-center max-w-md">
-                Não há filiais com QR Codes disponíveis para as igrejas que você tem acesso. 
-                Entre em contato com o administrador para criar filiais.
+                Não há congregações com QR Codes disponíveis para as igrejas que você tem acesso. 
+                Entre em contato com o administrador para criar congregações.
               </p>
             </CardContent>
           </Card>
@@ -146,7 +146,7 @@ const GerenciarQRCodes: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-semibold text-gray-900">{churchName}</h2>
                   <Badge variant="outline" className="text-xs">
-                    {churchBranches.length} filial{churchBranches.length !== 1 ? 'is' : ''}
+                    {churchBranches.length} congregação{churchBranches.length !== 1 ? 'is' : ''}
                   </Badge>
                 </div>
                 <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
@@ -271,7 +271,7 @@ const GerenciarQRCodes: React.FC = () => {
             <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <h4 className="font-medium text-gray-900 text-xs sm:text-sm">1. Ativar QR Code</h4>
-                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">Ative o QR Code da filial para permitir que visitantes se registrem através dele.</p>
+                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">Ative o QR Code da congregação para permitir que visitantes se registrem através dele.</p>
               </div>
               <div className="space-y-2">
                 <h4 className="font-medium text-gray-900 text-xs sm:text-sm">2. Baixar e Imprimir</h4>
