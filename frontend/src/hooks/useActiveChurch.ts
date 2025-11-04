@@ -16,7 +16,8 @@ export const useUserChurches = () => {
   return useQuery({
     queryKey: ACTIVE_CHURCH_QUERY_KEYS.userChurches(),
     queryFn: () => activeChurchService.getUserChurches(),
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    staleTime: 0, // CRÍTICO: Sem cache para prevenir vazamento de dados entre usuários
+    gcTime: 0, // Limpar imediatamente quando não usado
   });
 };
 
@@ -27,7 +28,8 @@ export const useActiveChurch = () => {
   return useQuery({
     queryKey: ACTIVE_CHURCH_QUERY_KEYS.activeChurch(),
     queryFn: () => activeChurchService.getActiveChurch(),
-    staleTime: 1000 * 30, // 30 segundos (reduzido de 5 minutos)
+    staleTime: 0, // CRÍTICO: Sem cache para prevenir vazamento de dados entre usuários
+    gcTime: 0, // Limpar imediatamente quando não usado
     retry: false, // Não fazer retry se der erro (usuário pode não ter igreja ativa)
   });
 };

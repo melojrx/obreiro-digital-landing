@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { MemberForm } from '../MemberForm';
 import type { Member } from '@/services/membersService';
 import { api } from '@/config/api';
@@ -10,6 +10,25 @@ const authState = {
   userChurch: null,
   uploadAvatar: vi.fn(),
 };
+
+beforeAll(() => {
+  Object.defineProperty(window.HTMLElement.prototype, 'hasPointerCapture', {
+    configurable: true,
+    value: () => false,
+  });
+  Object.defineProperty(window.HTMLElement.prototype, 'setPointerCapture', {
+    configurable: true,
+    value: () => {},
+  });
+  Object.defineProperty(window.HTMLElement.prototype, 'releasePointerCapture', {
+    configurable: true,
+    value: () => {},
+  });
+  Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: () => {},
+  });
+});
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => authState,
@@ -29,7 +48,7 @@ vi.mock('@/hooks/usePermissions', () => ({
 }));
 
 vi.mock('@/hooks/useActiveChurch', () => ({
-  useCurrentActiveChurch: () => ({ id: 1, short_name: 'Matriz' }),
+  useCurrentActiveChurch: () => ({ id: 1, short_name: 'Matriz', active_branch: { id: 101 } }),
 }));
 
 vi.mock('@/services/churchService', () => ({
@@ -152,5 +171,103 @@ describe('MemberForm system access section', () => {
       screen.getByText(/já possui acesso ao sistema vinculado/i)
     ).toBeInTheDocument();
     expect(screen.queryByText(/Usuário terá acesso ao sistema/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('MemberForm membership status confirmation', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(api, 'get').mockResolvedValue({ data: { results: [] } } as any);
+    authState.user = { id: 1, email: 'admin@example.com', full_name: 'Admin User' };
+  });
+
+  it('shows confirmation dialog when changing membership status for existing member', async () => {
+    render(
+      <MemberForm
+        member={baseMember}
+        title="Editar Membro"
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const ministerialTab = screen.getByRole('tab', { name: /Função Ministerial/i });
+    await userEvent.click(ministerialTab);
+
+    const statusTrigger = screen.getByTestId('membership-status-select');
+    expect(statusTrigger).toHaveTextContent('Ativo');
+    await userEvent.click(statusTrigger);
+
+    const inactiveOption = await screen.findByRole('option', { name: 'Inativo' });
+    await userEvent.click(inactiveOption);
+
+    expect(await screen.findByText(/Confirmar alteração de status/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Cancelar/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Confirmar alteração de status/i)).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId('membership-status-select')).toHaveTextContent('Ativo');
+  });
+
+  it('applies membership status change after confirmation', async () => {
+    render(
+      <MemberForm
+        member={baseMember}
+        title="Editar Membro"
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const ministerialTab = screen.getByRole('tab', { name: /Função Ministerial/i });
+    await userEvent.click(ministerialTab);
+
+    const statusTrigger = screen.getByTestId('membership-status-select');
+    expect(statusTrigger).toHaveTextContent('Ativo');
+    await userEvent.click(statusTrigger);
+
+    const inactiveOption = await screen.findByRole('option', { name: 'Inativo' });
+    await userEvent.click(inactiveOption);
+
+    expect(await screen.findByText(/Confirmar alteração de status/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Confirmar alteração/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Confirmar alteração de status/i)).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId('membership-status-select')).toHaveTextContent('Inativo');
+  });
+
+  it('envia alterações de função ministerial ao salvar', async () => {
+    const submitMock = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <MemberForm
+        member={baseMember}
+        title="Editar Membro"
+        onSubmit={submitMock}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const ministerialTab = screen.getByRole('tab', { name: /Função Ministerial/i });
+    await userEvent.click(ministerialTab);
+
+    const functionTrigger = screen.getByTestId('ministerial-function-select');
+    expect(functionTrigger).toHaveTextContent('Membro');
+    await userEvent.click(functionTrigger);
+
+    const pastorOption = await screen.findByRole('option', { name: 'Pastor' });
+    await userEvent.click(pastorOption);
+
+    const saveButton = screen.getByRole('button', { name: /Salvar/i });
+    await userEvent.click(saveButton);
+
+    await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(1));
+    const submittedData = submitMock.mock.calls[0][0];
+    expect(submittedData.ministerial_function).toBe('pastor');
   });
 });

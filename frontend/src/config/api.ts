@@ -55,10 +55,15 @@ api.interceptors.request.use(
 // Interceptor para respostas
 api.interceptors.response.use(
   (response) => {
+    // Log detalhado da resposta (esconde senha no login)
+    const logData = response.config.url?.includes('login') 
+      ? 'LOGIN_DATA_HIDDEN' 
+      : response.data;
+    
     console.log('✅ API Response:', {
       status: response.status,
       url: response.config.url,
-      data: response.config.url?.includes('login') ? 'LOGIN_DATA_HIDDEN' : (typeof response.data === 'object' ? Object.keys(response.data) : response.data)
+      data: logData
     });
     return response;
   },

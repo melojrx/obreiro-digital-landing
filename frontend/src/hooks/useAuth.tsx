@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useContext, createContext, ReactNode, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   authService, 
   LoginCredentials, 
@@ -61,6 +62,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [userChurch, setUserChurch] = useState<UserChurch | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -124,6 +126,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setIsLoading(true);
       setError(null);
+      
+      // IMPORTANTE: Limpar TODO o cache do React Query antes de fazer login
+      // Isso previne vazamento de dados entre usuários (BUG CRÍTICO MULTI-TENANT)
+      console.log('🧹 Limpando cache do React Query antes do login...');
+      queryClient.clear();
+      
       const response = await authService.login(credentials);
       
       // Após login bem-sucedido, buscar dados completos do usuário
@@ -149,7 +157,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsLoading(false);
     }
-  }, [loadChurchData]);
+  }, [loadChurchData, queryClient]);
 
   const register = useCallback(async (data: RegisterData) => {
     try {
@@ -262,11 +270,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
+    // IMPORTANTE: Limpar TODO o cache do React Query ao fazer logout
+    // Isso previne vazamento de dados entre usuários (BUG CRÍTICO MULTI-TENANT)
+    console.log('🧹 Limpando cache do React Query no logout...');
+    queryClient.clear();
+    
     authService.logout();
     setUser(null);
     setUserChurch(null);
     setError(null);
-  }, []);
+  }, [queryClient]);
 
   const getAvailableChurches = async (): Promise<Church[]> => {
     try {

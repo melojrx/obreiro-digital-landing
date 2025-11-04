@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,6 +12,7 @@ import {
   X, 
   MapPin,
   Shield,
+  ArrowRight,
   Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   CreateMemberData, 
   Member, 
   membersService,
@@ -48,6 +57,13 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { usePermissions } from '@/hooks/usePermissions';
+
+const STATUS_IMPACT_MESSAGES: Record<string, string> = {
+  inactive: 'O membro deixará de aparecer nos relatórios e listagens de membros ativos.',
+  transferred: 'O membro será considerado transferido para outra congregação.',
+  disciplined: 'O membro será marcado como disciplinado e poderá ter acesso limitado a atividades.',
+  deceased: 'O membro ficará marcado como falecido e será removido das listagens operacionais.',
+};
 
 // Schema de validação
 const phoneRegex = /^\(\d{2}\) \d{4,5}-\d{4}$/;
@@ -225,12 +241,18 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     id: number;
     full_name: string;
     cpf?: string;
-    birth_date: string;
-    age: number;
-    gender: string;
-    membership_date: string;
+    birth_date?: string;
+    age?: number;
+    gender?: string;
+    membership_date?: string;
   }>>([]);
   const [spousesLoading, setSpousesLoading] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    current: string;
+    next: string;
+  } | null>(null);
+  const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
+  const membershipStatusApplyRef = useRef<((value: string) => void) | null>(null);
 
   const form = useForm<MemberFormData>({
     resolver: zodResolver(memberSchema),
@@ -288,6 +310,53 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     },
   });
 
+  const getStatusLabel = useCallback((value: string) => {
+    return MEMBERSHIP_STATUS_CHOICES[value as keyof typeof MEMBERSHIP_STATUS_CHOICES] || value;
+  }, []);
+
+  const getStatusImpactMessage = useCallback((value: string) => {
+    return STATUS_IMPACT_MESSAGES[value] ?? 'Esta alteração pode impactar relatórios e permissões associadas ao membro.';
+  }, []);
+
+  const handleMembershipStatusSelection = useCallback((value: string, onChange: (val: string) => void) => {
+    if (!member) {
+      onChange(value);
+      return;
+    }
+
+    const currentValue = form.getValues('membership_status') || '';
+    if (currentValue === value) {
+      onChange(value);
+      return;
+    }
+
+    membershipStatusApplyRef.current = onChange;
+    setPendingStatusChange({
+      current: currentValue,
+      next: value,
+    });
+    setStatusConfirmOpen(true);
+  }, [form, member]);
+
+  const confirmStatusChange = useCallback(() => {
+    if (pendingStatusChange) {
+      membershipStatusApplyRef.current?.(pendingStatusChange.next);
+      form.setValue('membership_status', pendingStatusChange.next, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+    setPendingStatusChange(null);
+    membershipStatusApplyRef.current = null;
+    setStatusConfirmOpen(false);
+  }, [form, pendingStatusChange]);
+
+  const cancelStatusChange = useCallback(() => {
+    setPendingStatusChange(null);
+    membershipStatusApplyRef.current = null;
+    setStatusConfirmOpen(false);
+  }, []);
+
   useEffect(() => {
     if (isEditingSelf || alreadyHasSystemAccess) {
       form.setValue('create_system_user', false, { shouldDirty: false, shouldValidate: false });
@@ -321,7 +390,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   // Função para carregar membros disponíveis para cônjuge
   const maritalStatus = form.watch('marital_status');
 
-  const loadAvailableSpouses = async () => {
+  const loadAvailableSpouses = useCallback(async () => {
     if (maritalStatus !== 'married') {
       setAvailableSpouses([]);
       return;
@@ -342,11 +411,6 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         results.unshift({
           id: member.spouse,
           full_name: member.spouse_name || 'Membro vinculado',
-          cpf: '',
-          birth_date: '',
-          age: 0,
-          gender: '',
-          membership_date: '',
         });
       }
 
@@ -357,16 +421,19 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     } finally {
       setSpousesLoading(false);
     }
-  };
+  }, [maritalStatus, member?.id, member?.spouse, member?.spouse_name]);
 
   useEffect(() => {
     if (maritalStatus === 'married') {
+      if (!form.getValues('spouse')) {
+        form.setValue('spouse', 'non-member', { shouldDirty: false, shouldValidate: true });
+      }
       loadAvailableSpouses();
     } else {
       setAvailableSpouses([]);
       form.setValue('spouse', '', { shouldDirty: false, shouldValidate: true });
     }
-  }, [maritalStatus]);
+  }, [form, loadAvailableSpouses, maritalStatus]);
 
   const handleSubmit = async (data: MemberFormData) => {
     try {
@@ -509,6 +576,21 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     form.setValue(field, formattedValue);
   };
 
+  useEffect(() => {
+    if (member?.phone) {
+      form.setValue('phone', formatPhone(member.phone), {
+        shouldDirty: false,
+        shouldValidate: true,
+      });
+    }
+    if (member?.phone_secondary) {
+      form.setValue('phone_secondary', formatPhone(member.phone_secondary), {
+        shouldDirty: false,
+        shouldValidate: true,
+      });
+    }
+  }, [form, member?.phone, member?.phone_secondary]);
+
   // Função para formatar CPF
   const formatCPF = (value: string): string => {
     // Remove tudo que não é dígito
@@ -537,32 +619,27 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-          <p className="text-gray-600 mt-1">
-            {member ? 'Edite as informações do membro' : 'Preencha os dados do novo membro'}
-          </p>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
+            <p className="text-gray-600 mt-1">
+              {member ? 'Edite as informações do membro' : 'Preencha os dados do novo membro'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              <Save className="h-4 w-4 mr-2" />
+              {isLoading ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onCancel}>
-            <X className="h-4 w-4 mr-2" />
-            Cancelar
-          </Button>
-          <Button 
-            onClick={form.handleSubmit(handleSubmit)}
-            disabled={isLoading}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {isLoading ? 'Salvando...' : 'Salvar'}
-          </Button>
-        </div>
-      </div>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="personal" className="flex items-center gap-2">
@@ -741,8 +818,8 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                           <FormItem>
                             <FormLabel>Vincular Cônjuge</FormLabel>
                             <Select
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
+                              value={field.value}
+                              onValueChange={(value) => field.onChange(value)}
                             >
                               <FormControl>
                                 <SelectTrigger>
@@ -1192,9 +1269,12 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Status de Membresia</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select
+                            value={field.value}
+                            onValueChange={(value) => handleMembershipStatusSelection(value, field.onChange)}
+                          >
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger data-testid="membership-status-select">
                                 <SelectValue placeholder="Selecione o status" />
                               </SelectTrigger>
                             </FormControl>
@@ -1216,9 +1296,9 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Função Ministerial</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select value={field.value} onValueChange={field.onChange}>
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger data-testid="ministerial-function-select">
                                 <SelectValue placeholder="Selecione a função" />
                               </SelectTrigger>
                             </FormControl>
@@ -1736,8 +1816,55 @@ export const MemberForm: React.FC<MemberFormProps> = ({
               )}
             </TabsContent>
           </Tabs>
-        </form>
-      </Form>
-    </div>
+
+          <Dialog
+            open={statusConfirmOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                cancelStatusChange();
+              } else {
+                setStatusConfirmOpen(true);
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirmar alteração de status</DialogTitle>
+                <DialogDescription>
+                  Revise a mudança de status de membresia antes de salvá-la.
+                </DialogDescription>
+              </DialogHeader>
+
+              {pendingStatusChange && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {pendingStatusChange.current
+                        ? getStatusLabel(pendingStatusChange.current)
+                        : 'Sem status anterior'}
+                    </Badge>
+                    <ArrowRight className="h-4 w-4 text-gray-400" />
+                    <Badge>
+                      {getStatusLabel(pendingStatusChange.next)}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {getStatusImpactMessage(pendingStatusChange.next)}
+                  </p>
+                </div>
+              )}
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={cancelStatusChange}>
+                  Cancelar
+                </Button>
+                <Button onClick={confirmStatusChange}>
+                  Confirmar alteração
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+      </form>
+    </Form>
   );
-}; 
+};

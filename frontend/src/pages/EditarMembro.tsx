@@ -2,9 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { MemberForm } from '@/components/members/MemberForm';
-import { membersService, CreateMemberData, Member } from '@/services/membersService';
+import { membersService, CreateMemberData, Member, MEMBERSHIP_STATUS_CHOICES } from '@/services/membersService';
 import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/usePermissions';
+
+const getStatusLabel = (status?: string | null) => {
+  if (!status) {
+    return 'Sem status definido';
+  }
+  return (
+    MEMBERSHIP_STATUS_CHOICES[status as keyof typeof MEMBERSHIP_STATUS_CHOICES] ?? status
+  );
+};
 
 const EditarMembro: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,10 +49,14 @@ const EditarMembro: React.FC = () => {
     try {
       setSaving(true);
       const { create_system_user, system_role, user_email, user_password, church, ...memberUpdateData } = (data as any);
-      await membersService.updateMember(Number(id), memberUpdateData);
+      const previousStatus = member?.membership_status ?? null;
+      const memberHadSystemUser = Boolean(member?.user);
+      const updatedMember = await membersService.updateMember(Number(id), memberUpdateData);
+      const newStatus = updatedMember?.membership_status ?? null;
+      const statusChanged = (previousStatus ?? null) !== (newStatus ?? null);
 
       // Se for para criar usuário do sistema e o membro ainda não tem usuário vinculado
-      if (member && !member.user && create_system_user) {
+      if (!memberHadSystemUser && !updatedMember.user && create_system_user) {
         if (system_role && user_email && user_password) {
           const normalizedRole = system_role === 'denomination_admin' ? 'church_admin' : system_role;
           const res = await membersService.createSystemUser(Number(id), { system_role: normalizedRole, user_email, user_password });
@@ -61,7 +74,32 @@ const EditarMembro: React.FC = () => {
           }
         }
       }
-      toast.success('Membro atualizado com sucesso!');
+
+      if (statusChanged) {
+        const previousStatusLabel = getStatusLabel(previousStatus);
+        const newStatusLabel = getStatusLabel(newStatus);
+
+        toast.success('Membro atualizado com sucesso!', {
+          description: `Status alterado de ${previousStatusLabel} para ${newStatusLabel}.`,
+          duration: 10000,
+          action: previousStatus !== null ? {
+            label: 'Desfazer',
+            onClick: () => {
+              membersService.updateMember(Number(id), {
+                membership_status: previousStatus ?? undefined,
+              }).then(() => {
+                toast.success(`Status revertido para ${previousStatusLabel}.`);
+              }).catch((undoError) => {
+                console.error('Erro ao desfazer mudança de status:', undoError);
+                toast.error('Não foi possível desfazer a alteração do status.');
+              });
+            },
+          } : undefined,
+        });
+      } else {
+        toast.success('Membro atualizado com sucesso!');
+      }
+
       navigate(`/membros/${id}`);
     } catch (error) {
       console.error('Erro ao atualizar membro:', error);
