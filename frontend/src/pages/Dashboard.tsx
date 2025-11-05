@@ -207,14 +207,15 @@ const Dashboard = () => {
                         isLoading={activitiesLoading}
                         color="bg-gradient-to-r from-yellow-500 to-amber-400"
                     />
-                    <StatsCard
+                    {/* Card de Dízimos temporariamente oculto */}
+                    {/* <StatsCard
                         title="Dízimos (mês)"
                         value={formatCurrency(data?.tithes.total ?? 0)}
                         change={data?.tithes.change}
                         icon={<DollarSign className="h-5 w-5" />}
                         isLoading={isLoading}
                         color="bg-gradient-to-r from-purple-500 to-fuchsia-400"
-                    />
+                    /> */}
                 </div>
 
                 {/* Card de Conversão de Admin para Membro */}
