@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Member, MembershipStatus, MembershipStatusLog, MemberTransferLog, MinisterialFunctionHistory
+from .models import Member, MembershipStatus, MembershipStatusLog, MemberTransferLog, BranchTransferLog, MinisterialFunctionHistory
 
 
 @admin.register(Member)
@@ -83,6 +83,34 @@ class MemberTransferLogAdmin(admin.ModelAdmin):
     search_fields = ['member__full_name', 'reason']
     ordering = ['-created_at']
     readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(BranchTransferLog)
+class BranchTransferLogAdmin(admin.ModelAdmin):
+    """Admin configuration for BranchTransferLog model - FASE 2"""
+    list_display = [
+        'member', 'from_branch', 'to_branch', 'transfer_date', 'transfer_type', 'transferred_by'
+    ]
+    list_filter = ['transfer_type', 'transfer_date', 'from_branch', 'to_branch']
+    search_fields = ['member__full_name', 'reason']
+    ordering = ['-transfer_date', '-created_at']
+    readonly_fields = ['created_at', 'updated_at', 'duration_in_previous_branch']
+    
+    fieldsets = (
+        ('Informações da Transferência', {
+            'fields': ('member', 'from_branch', 'to_branch', 'transfer_date', 'transfer_type')
+        }),
+        ('Dados da Congregação Anterior', {
+            'fields': ('previous_membership_start_date', 'duration_in_previous_branch')
+        }),
+        ('Detalhes', {
+            'fields': ('transferred_by', 'reason')
+        }),
+        ('Auditoria', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
 
 
 @admin.register(MinisterialFunctionHistory)

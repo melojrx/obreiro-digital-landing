@@ -8,6 +8,9 @@ export interface Member {
   marital_status?: 'single' | 'married' | 'divorced' | 'widowed';
   membership_status: 'active' | 'inactive' | 'transferred' | 'deceased';
   membership_date?: string;
+  first_membership_date?: string;
+  membership_start_date?: string;
+  membership_end_date?: string;
   ministerial_function?: 'member' | 'leader' | 'pastor' | 'elder' | 'deacon' | 'deaconess';
   photo?: string;
   church_id: number;

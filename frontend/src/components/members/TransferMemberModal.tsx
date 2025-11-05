@@ -3,6 +3,7 @@ import { Loader2, MoveRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
@@ -22,6 +23,7 @@ const TransferMemberModal: React.FC<TransferMemberModalProps> = ({ isOpen, membe
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+  const [reason, setReason] = useState<string>('');
 
   const churchId = member?.church ?? null;
 
@@ -33,9 +35,12 @@ const TransferMemberModal: React.FC<TransferMemberModalProps> = ({ isOpen, membe
         const paginated = await branchService.getBranchesByChurch(churchId, 1, 100);
         const list = paginated.results || [];
         setBranches(list);
-        // se houver matriz, priorizar seleção automática para evitar confusão
+        // Selecionar automaticamente a primeira branch que NÃO seja a atual
         if (!selectedBranchId && list.length > 0) {
-          setSelectedBranchId(String(list[0].id));
+          const otherBranches = list.filter(b => b.id !== member?.branch);
+          if (otherBranches.length > 0) {
+            setSelectedBranchId(String(otherBranches[0].id));
+          }
         }
       } catch (err) {
         console.error('Erro ao carregar congregações:', err);
@@ -48,8 +53,10 @@ const TransferMemberModal: React.FC<TransferMemberModalProps> = ({ isOpen, membe
     // reset on close
     if (!isOpen) {
       setSelectedBranchId('');
+      setReason('');
       setBranches([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, churchId]);
 
   const sortedBranches = useMemo(() => {
@@ -69,12 +76,14 @@ const TransferMemberModal: React.FC<TransferMemberModalProps> = ({ isOpen, membe
     setSubmitting(true);
     try {
       const targetBranchId = Number(selectedBranchId);
-      const { member: updated } = await membersService.transferBranch(member.id, targetBranchId);
+      const { member: updated } = await membersService.transferBranch(member.id, targetBranchId, reason);
       toast.success('Membro transferido com sucesso');
       onTransferred?.(updated);
       onClose();
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Erro ao transferir membro';
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorData = (err as any)?.response?.data;
+      const msg = errorData?.error || errorData?.message || 'Erro ao transferir membro';
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -107,13 +116,41 @@ const TransferMemberModal: React.FC<TransferMemberModalProps> = ({ isOpen, membe
                   <SelectValue placeholder={loadingBranches ? 'Carregando congregações...' : 'Selecione a congregação de destino'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {sortedBranches.map((b) => (
-                    <SelectItem key={b.id} value={String(b.id)}>
-                      {b.is_headquarters ? 'Matriz — ' : ''}{b.name} ({b.city}/{b.state})
-                    </SelectItem>
-                  ))}
+                  {sortedBranches.map((b) => {
+                    const isCurrentBranch = member?.branch === b.id;
+                    return (
+                      <SelectItem 
+                        key={b.id} 
+                        value={String(b.id)}
+                        disabled={isCurrentBranch}
+                      >
+                        {b.is_headquarters ? 'Matriz — ' : ''}{b.name} ({b.city}/{b.state})
+                        {isCurrentBranch && ' (atual)'}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              {member?.branch && (
+                <p className="text-xs text-muted-foreground">
+                  Congregação atual: {sortedBranches.find(b => b.id === member.branch)?.name || 'N/A'}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo da transferência (opcional)</label>
+              <Textarea
+                placeholder="Ex: Mudança de residência, proximidade geográfica, ministério específico..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                disabled={submitting}
+                rows={3}
+                className="resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                O motivo será registrado no histórico de transferências do membro.
+              </p>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

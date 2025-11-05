@@ -292,11 +292,18 @@ class Member(BaseModel):
     )
 
     # Campos novos (compat) – período explícito da membresia
+    first_membership_date = models.DateField(
+        "Primeira Membresia",
+        blank=True,
+        null=True,
+        help_text="Data original de entrada na denominação/igreja (nunca muda após criação)"
+    )
+    
     membership_start_date = models.DateField(
         "Início da Membresia",
         blank=True,
         null=True,
-        help_text="Data de início da membresia (compatível com membership_date)"
+        help_text="Data de início na congregação atual"
     )
 
     membership_end_date = models.DateField(
@@ -454,6 +461,10 @@ class Member(BaseModel):
         # Formatar campos
         if self.state:
             self.state = self.state.upper()
+        
+        # FASE 2: Definir first_membership_date apenas na criação
+        if not self.pk and not self.first_membership_date and self.membership_start_date:
+            self.first_membership_date = self.membership_start_date
         
         # Validar datas lógicas
         self._validate_dates()
@@ -844,6 +855,98 @@ class MemberTransferLog(BaseModel):
     
     def __str__(self):
         return f"{self.member.full_name}: {self.from_church.short_name} → {self.to_church.short_name}"
+
+
+class BranchTransferLog(BaseModel):
+    """
+    Log de transferências de membros entre congregações (branches).
+    Registra todo o histórico de movimentação entre matriz e filiais.
+    """
+    
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='branch_transfer_history',
+        verbose_name="Membro"
+    )
+    
+    from_branch = models.ForeignKey(
+        'branches.Branch',
+        on_delete=models.CASCADE,
+        related_name='members_transferred_out',
+        verbose_name="Congregação de Origem"
+    )
+    
+    to_branch = models.ForeignKey(
+        'branches.Branch',
+        on_delete=models.CASCADE,
+        related_name='members_transferred_in',
+        verbose_name="Congregação de Destino"
+    )
+    
+    # Preservar datas da membresia na congregação antiga
+    previous_membership_start_date = models.DateField(
+        "Data Início na Congregação Anterior",
+        null=True,
+        blank=True,
+        help_text="Quando o membro entrou na congregação de origem"
+    )
+    
+    # Data de transferência (redundante com created_at, mas mais explícito)
+    transfer_date = models.DateField(
+        "Data da Transferência",
+        help_text="Data em que a transferência foi realizada"
+    )
+    
+    transferred_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='branch_transfers_made',
+        verbose_name="Transferido por"
+    )
+    
+    reason = models.TextField(
+        "Motivo",
+        blank=True,
+        help_text="Motivo da transferência entre congregações"
+    )
+    
+    # Informação adicional: tipo de transferência
+    TRANSFER_TYPE_CHOICES = [
+        ('same_church', 'Entre congregações da mesma igreja'),
+        ('different_church', 'Entre igrejas diferentes (mesma denominação)'),
+    ]
+    
+    transfer_type = models.CharField(
+        "Tipo de Transferência",
+        max_length=20,
+        choices=TRANSFER_TYPE_CHOICES,
+        default='same_church',
+        help_text="Indica se a transferência foi dentro da mesma igreja ou entre igrejas"
+    )
+    
+    class Meta:
+        verbose_name = "Log de Transferência entre Congregações"
+        verbose_name_plural = "Logs de Transferências entre Congregações"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['member', '-created_at']),
+            models.Index(fields=['from_branch', '-created_at']),
+            models.Index(fields=['to_branch', '-created_at']),
+            models.Index(fields=['transfer_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.member.full_name}: {self.from_branch.name} → {self.to_branch.name} ({self.transfer_date.strftime('%d/%m/%Y')})"
+    
+    @property
+    def duration_in_previous_branch(self):
+        """Calcula quanto tempo o membro ficou na congregação anterior (em dias)"""
+        if self.previous_membership_start_date and self.transfer_date:
+            return (self.transfer_date - self.previous_membership_start_date).days
+        return None
 
 
 # =====================================

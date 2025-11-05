@@ -483,9 +483,10 @@ export const membersService = {
   },
 
   // Transferência assistida de um membro (admin/secretário) para outra congregação da mesma igreja
-  async transferBranch(memberId: number, branchId: number): Promise<{ message: string; member: Member }> {
+  async transferBranch(memberId: number, branchId: number, reason?: string): Promise<{ message: string; member: Member }> {
     const response = await api.post(API_ENDPOINTS.members.transferBranch(memberId), {
       branch_id: branchId,
+      reason: reason || '',
     });
     return response.data;
   },

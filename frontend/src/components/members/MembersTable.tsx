@@ -222,7 +222,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
               </TableCell>
               <TableCell>
                 <span className="text-sm text-gray-600">
-                  {formatDate(member.membership_date)}
+                  {formatDate(member.membership_start_date || member.membership_date)}
                 </span>
               </TableCell>
               <TableCell className="text-right">

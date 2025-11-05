@@ -250,7 +250,7 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
               <div className="mt-4 text-sm text-gray-500">
                 <span>Membro há {member.membership_years} anos</span>
                 <span className="mx-2">•</span>
-                <span>Desde {formatDate(member.membership_date)}</span>
+                <span>Na congregação desde {formatDate(member.membership_start_date || member.membership_date)}</span>
               </div>
             </div>
           </div>
@@ -513,8 +513,15 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Data de Membresia</label>
-                    <p className="text-gray-900">{formatDate(member.membership_date)}</p>
+                    <label className="text-sm font-medium text-gray-500">Data de Entrada na Congregação</label>
+                    <p className="text-gray-900">
+                      {formatDate(member.membership_start_date || member.membership_date)}
+                    </p>
+                    {member.first_membership_date && member.membership_start_date !== member.first_membership_date && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Primeira membresia: {formatDate(member.first_membership_date)}
+                      </p>
+                    )}
                   </div>
                   
                   

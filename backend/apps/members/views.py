@@ -264,6 +264,10 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='transfer-branch')
     def transfer_branch_admin(self, request, pk=None):
         """Transfere a lotação (branch) de um membro para outra filial da mesma igreja."""
+        from datetime import date
+        from apps.branches.models import Branch
+        from apps.members.models import MembershipStatusLog, BranchTransferLog
+        
         try:
             target_branch_id = int(request.data.get('branch_id'))
         except (TypeError, ValueError):
@@ -271,7 +275,6 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
 
         member = self.get_object()
 
-        from apps.branches.models import Branch
         try:
             target_branch = Branch.objects.get(id=target_branch_id, is_active=True)
         except Branch.DoesNotExist:
@@ -283,15 +286,62 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
         if not self._user_can_write_branch(request.user, target_branch):
             raise PermissionDenied('Sem permissão para transferir para esta filial.')
 
+        # Validar: não permitir transferência para a mesma branch
+        if member.branch_id == target_branch_id:
+            return Response({'error': 'Membro já está lotado nesta congregação'}, status=status.HTTP_400_BAD_REQUEST)
+
         old_branch = member.branch
+        old_status = member.membership_status
+        old_membership_start_date = member.membership_start_date
+        transfer_date = date.today()
+        reason = request.data.get('reason', '')
+
+        # FASE 1: Criar log de status - saída da branch antiga
+        if old_branch:
+            MembershipStatusLog.objects.create(
+                member=member,
+                old_status=old_status,
+                new_status='transferred',
+                changed_by=request.user,
+                reason=f"Transferido de {old_branch.name} para {target_branch.name}"
+            )
+
+        # FASE 2: Criar log de transferência entre branches
+        if old_branch:
+            # Determinar tipo de transferência
+            transfer_type = 'same_church' if target_branch.church_id == old_branch.church_id else 'different_church'
+            
+            BranchTransferLog.objects.create(
+                member=member,
+                from_branch=old_branch,
+                to_branch=target_branch,
+                previous_membership_start_date=old_membership_start_date,
+                transfer_date=transfer_date,
+                transferred_by=request.user,
+                reason=reason,
+                transfer_type=transfer_type
+            )
+
+        # FASE 1: Atualizar datas de membresia
+        # membership_start_date = data de entrada na branch atual
+        # membership_end_date = None (membro ativo, sem data de saída)
+        member.membership_start_date = transfer_date
+        member.membership_end_date = None  # Membro ativo na nova branch (sem data de saída)
+        
+        # FASE 1: Atualizar status para 'active' na nova branch
+        member.membership_status = 'active'
+        
+        # Atualizar branch
         member.branch = target_branch
-        member.save(update_fields=['branch', 'updated_at'])
+        
+        member.save(update_fields=['branch', 'membership_status', 'membership_start_date', 'membership_end_date', 'updated_at'])
 
         return Response({
             'message': 'Membro transferido com sucesso para a filial selecionada',
             'member': MemberSerializer(member, context={'request': request}).data,
             'old_branch': {'id': old_branch.id, 'name': old_branch.name} if old_branch else None,
             'new_branch': {'id': target_branch.id, 'name': target_branch.name},
+            'transfer_date': transfer_date.isoformat(),
         })
     
     def get_serializer_class(self):
