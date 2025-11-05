@@ -28,6 +28,22 @@ api.interceptors.request.use(
       config.headers['Authorization'] = `Token ${token}`;
     }
     
+    // Adicionar cabeçalhos de contexto multi-tenant
+    const activeChurch = localStorage.getItem('active_church');
+    const activeBranch = localStorage.getItem('active_branch');
+    
+    console.log('📦 localStorage values:', { activeChurch, activeBranch });
+    
+    if (activeChurch) {
+      config.headers['X-Church'] = activeChurch;
+      console.log('✅ X-Church header definido:', activeChurch);
+    }
+    
+    if (activeBranch) {
+      config.headers['X-Branch'] = activeBranch;
+      console.log('✅ X-Branch header definido:', activeBranch);
+    }
+    
     // Log da requisição para debug
     console.log('🚀 API Request:', {
       method: config.method?.toUpperCase(),
@@ -36,7 +52,9 @@ api.interceptors.request.use(
       fullURL: `${config.baseURL}${config.url}`,
       headers: {
         'Content-Type': config.headers['Content-Type'],
-        'Authorization': config.headers['Authorization'] ? '***' : 'none'
+        'Authorization': config.headers['Authorization'] ? '***' : 'none',
+        'X-Church': config.headers['X-Church'] || 'none',
+        'X-Branch': config.headers['X-Branch'] || 'none',
       },
       data: config.data,
       dataType: typeof config.data,

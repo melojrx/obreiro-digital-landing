@@ -65,6 +65,17 @@ export const activeChurchService = {
       church_id: churchId,
       branch_id: branchId,
     });
+    
+    // Salvar no localStorage para que os cabeçalhos HTTP sejam adicionados automaticamente
+    localStorage.setItem('active_church', String(churchId));
+    if (branchId) {
+      localStorage.setItem('active_branch', String(branchId));
+    } else {
+      localStorage.removeItem('active_branch');
+    }
+    
+    console.log(' ✅ Igreja/Branch ativa salva no localStorage:', { churchId, branchId });
+    
     return response.data;
   },
 
@@ -73,6 +84,23 @@ export const activeChurchService = {
    */
   async getActiveChurch(): Promise<ActiveChurchResponse> {
     const response = await api.get<ActiveChurchResponse>('/auth/active-church/');
+    
+    // Salvar no localStorage para que os cabeçalhos HTTP sejam adicionados automaticamente
+    if (response.data.active_church) {
+      localStorage.setItem('active_church', String(response.data.active_church.id));
+      
+      if (response.data.active_church.active_branch) {
+        localStorage.setItem('active_branch', String(response.data.active_church.active_branch.id));
+      } else {
+        localStorage.removeItem('active_branch');
+      }
+      
+      console.log('✅ Igreja/Branch ativa carregada no localStorage:', { 
+        churchId: response.data.active_church.id, 
+        branchId: response.data.active_church.active_branch?.id 
+      });
+    }
+    
     return response.data;
   },
 };

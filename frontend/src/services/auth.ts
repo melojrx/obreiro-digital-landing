@@ -363,10 +363,12 @@ export const authService = {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
     localStorage.removeItem('last_activity');
+    localStorage.removeItem('active_church');
+    localStorage.removeItem('active_branch');
     
     // Limpeza adicional - remover qualquer chave relacionada à auth
     Object.keys(localStorage).forEach(key => {
-      if (key.includes('auth') || key.includes('user') || key.includes('token')) {
+      if (key.includes('auth') || key.includes('user') || key.includes('token') || key.includes('church') || key.includes('branch')) {
         localStorage.removeItem(key);
       }
     });
@@ -437,6 +439,13 @@ export const authService = {
   async getUserChurch(): Promise<UserChurch> {
     try {
       const response = await api.get<UserChurch>('/users/my_church/');
+      
+      // Salvar church_id e branch_id no localStorage para headers HTTP
+      if (response.data.id) {
+        localStorage.setItem('active_church', String(response.data.id));
+        console.log('✅ Igreja ativa salva no localStorage:', response.data.id);
+      }
+      
       return response.data;
     } catch (error) {
       throw handleApiError(error);
