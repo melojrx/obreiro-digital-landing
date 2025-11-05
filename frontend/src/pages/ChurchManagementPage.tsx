@@ -249,19 +249,13 @@ const ChurchManagementPage: React.FC = () => {
 
   const handleExportData = async () => {
     try {
-      const filters: ChurchFilters = {
-        search: debouncedSearchTerm || undefined,
-        state: filterState !== 'all' ? filterState : undefined,
-        subscription_plan: filterPlan !== 'all' ? filterPlan : undefined,
-        subscription_status: filterStatus !== 'all' ? filterStatus : undefined,
-      };
-
-      const blob = await churchService.exportChurches('xlsx', filters);
+      // Exportar em CSV (método que funciona)
+      const blob = await churchService.exportChurchesCSV();
       
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `igrejas-${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.download = `igrejas-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -272,6 +266,7 @@ const ChurchManagementPage: React.FC = () => {
         description: 'Os dados das igrejas foram exportados com sucesso.',
       });
     } catch (error) {
+      console.error('Erro ao exportar igrejas:', error);
       toast({
         title: 'Erro na exportação',
         description: 'Erro ao exportar dados. Tente novamente.',

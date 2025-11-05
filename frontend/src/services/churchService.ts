@@ -500,6 +500,22 @@ class ChurchService {
     return response.data;
   }
 
+  /**
+   * Exporta lista de igrejas em formato CSV
+   */
+  async exportChurchesCSV(filters?: {
+    search?: string;
+    state?: string;
+    is_active?: boolean;
+    subscription_plan?: string;
+  }): Promise<Blob> {
+    const response = await api.get(`${this.baseURL}/export_csv/`, {
+      params: filters,
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
 
 }
 

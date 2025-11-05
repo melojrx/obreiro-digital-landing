@@ -4,8 +4,11 @@ Gerencia endpoints de igrejas
 """
 
 import logging
+import csv
+from datetime import datetime
 from django.db.models import Q, Count, Prefetch
 from django.utils import timezone
+from django.http import HttpResponse
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -1147,22 +1150,132 @@ class ChurchViewSet(viewsets.ModelViewSet):
         ]
         return Response(states)
     
-    @action(detail=False, methods=['get'], url_path='export')
-    def export_churches(self, request):
-        """Exporta dados das igrejas"""
-        format_type = request.query_params.get('format', 'csv')
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        """
+        Exporta dados das igrejas em formato CSV com separador ';'
+        Respeita os filtros aplicados na listagem
+        """
+        # Obter queryset com filtros aplicados
+        queryset = self.filter_queryset(self.get_queryset())
         
-        # Por enquanto, retornar dados JSON simples
-        # Em uma implementação completa, geraria Excel, CSV, etc.
-        churches = self.get_queryset()
-        serializer = ChurchListSerializer(churches, many=True)
+        # Aplicar filtros adicionais
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(short_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(cnpj__icontains=search) |
+                Q(city__icontains=search)
+            )
         
-        return Response({
-            'format': format_type,
-            'count': churches.count(),
-            'data': serializer.data,
-            'exported_at': timezone.now().isoformat()
-        })
+        state = request.query_params.get('state')
+        if state:
+            queryset = queryset.filter(state=state)
+        
+        is_active = request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        
+        subscription_plan = request.query_params.get('subscription_plan')
+        if subscription_plan:
+            queryset = queryset.filter(subscription_plan=subscription_plan)
+        
+        # Ordenar por nome
+        queryset = queryset.select_related('denomination').order_by('name')
+        
+        # Preparar resposta CSV
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'igrejas_{timestamp}.csv'
+        
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Criar writer CSV com separador ";"
+        writer = csv.writer(response, delimiter=';', quoting=csv.QUOTE_ALL)
+        
+        # Cabeçalho do CSV
+        header = [
+            'ID',
+            'Nome',
+            'Nome Abreviado',
+            'CNPJ',
+            'Denominação',
+            'Email',
+            'Telefone',
+            'Endereço Completo',
+            'Cidade',
+            'Estado',
+            'CEP',
+            'Site',
+            'Plano de Assinatura',
+            'Status da Assinatura',
+            'Máx. Membros',
+            'Máx. Congregações',
+            'Total de Membros',
+            'Total de Congregações',
+            'Data de Criação',
+            'Ativo'
+        ]
+        writer.writerow(header)
+        
+        # Mapeamento de choices para exibição
+        subscription_plan_map = {
+            'free': 'Gratuito',
+            'basic': 'Básico',
+            'premium': 'Premium',
+            'enterprise': 'Enterprise'
+        }
+        
+        subscription_status_map = {
+            'trial': 'Trial',
+            'active': 'Ativo',
+            'canceled': 'Cancelado',
+            'expired': 'Expirado',
+            'suspended': 'Suspenso'
+        }
+        
+        # Escrever dados das igrejas
+        for church in queryset:
+            # Formatar endereço completo
+            address_parts = []
+            if church.address:
+                address_parts.append(church.address)
+            
+            full_address = ', '.join(filter(None, address_parts))
+            
+            # Formatar data de criação
+            created_at_str = church.created_at.strftime('%d/%m/%Y %H:%M') if church.created_at else ''
+            
+            # Calcular total de congregações ativas
+            total_branches = church.branches.filter(is_active=True).count()
+            
+            row = [
+                church.id,
+                church.name or '',
+                church.short_name or '',
+                church.cnpj or '',
+                church.denomination.name if church.denomination else '',
+                church.email or '',
+                church.phone or '',
+                full_address,
+                church.city or '',
+                church.state or '',
+                church.zipcode or '',
+                church.website or '',
+                subscription_plan_map.get(church.subscription_plan, church.subscription_plan or 'Gratuito'),
+                subscription_status_map.get(church.subscription_status, church.subscription_status or ''),
+                church.max_members or 0,
+                church.max_branches or 0,
+                church.total_members or 0,
+                total_branches,
+                created_at_str,
+                'Sim' if church.is_active else 'Não'
+            ]
+            writer.writerow(row)
+        
+        return response
     
     @action(detail=False, methods=['get'], url_path='cities-by-state')
     def cities_by_state(self, request):

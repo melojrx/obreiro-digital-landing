@@ -86,7 +86,7 @@ interface ChurchHistoryEntry {
 // Importar os novos componentes modais
 import CreateBranchModal from '@/components/modals/CreateBranchModal';
 import ShareChurchModal from '@/components/modals/ShareChurchModal';
-import ExportChurchDataModal from '@/components/modals/ExportChurchDataModal';
+import ExportChurchDataModalSimple from '@/components/modals/ExportChurchDataModalSimple';
 import ChurchMembersCard from '@/components/church/ChurchMembersCard';
 
 const ChurchDetailsPage: React.FC = () => {
@@ -1179,7 +1179,7 @@ const ChurchDetailsPage: React.FC = () => {
             church={church}
           />
 
-          <ExportChurchDataModal
+          <ExportChurchDataModalSimple
             isOpen={isExportModalOpen}
             onClose={() => setIsExportModalOpen(false)}
             church={church}
