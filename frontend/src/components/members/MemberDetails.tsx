@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Member, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
+import { Member, MINISTERIAL_FUNCTION_CHOICES, MEMBERSHIP_STATUS_CHOICES } from '@/services/membersService';
 import { useAuth } from '@/hooks/useAuth';
 import { MinisterialFunctionTimeline } from './MinisterialFunctionTimeline';
 import { MembershipStatusLogTimeline } from './MembershipStatusLogTimeline';
@@ -38,8 +38,12 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
   const [newPassword, setNewPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   
-  const getMinisterialFunctionDisplay = (ministerialFunction: string) => {
-    return MINISTERIAL_FUNCTION_CHOICES[ministerialFunction as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || 'Membro';
+  const getMinisterialFunctionDisplay = (func: string) => {
+    return MINISTERIAL_FUNCTION_CHOICES[func as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || func;
+  };
+
+  const getMembershipStatusDisplay = (status: string) => {
+    return MEMBERSHIP_STATUS_CHOICES[status as keyof typeof MEMBERSHIP_STATUS_CHOICES] || status;
   };
   // Histórico antigo removido (aba "Ministerial")
   const [ministerialHistory, setMinisterialHistory] = useState<MinisterialFunctionHistoryItem[]>([]);
@@ -494,9 +498,17 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                   <div>
                     <label className="text-sm font-medium text-gray-500">Status de Membresia</label>
                     <div className="mt-1">
-                      <Badge variant={member.is_active ? 'default' : 'secondary'} className="text-sm">
-                  {member.is_active ? 'Ativo' : 'Inativo'}
-                </Badge>
+                      <Badge 
+                        variant={
+                          member.membership_status === 'active' ? 'default' : 
+                          member.membership_status === 'inactive' ? 'secondary' : 
+                          member.membership_status === 'deceased' ? 'destructive' : 
+                          'outline'
+                        } 
+                        className="text-sm"
+                      >
+                        {getMembershipStatusDisplay(member.membership_status)}
+                      </Badge>
                     </div>
                   </div>
                   

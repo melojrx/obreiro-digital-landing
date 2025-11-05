@@ -778,14 +778,16 @@ class MembershipStatusSerializer(serializers.ModelSerializer):
 
 class MinisterialFunctionHistorySerializer(serializers.ModelSerializer):
     member_name = serializers.CharField(source='member.full_name', read_only=True)
+    function_display = serializers.CharField(source='get_function_display', read_only=True)
     is_current = serializers.ReadOnlyField()
 
     class Meta:
         model = MinisterialFunctionHistory
         fields = [
-            'id', 'member', 'member_name', 'function', 'start_date', 'end_date', 'is_current', 'notes'
+            'id', 'member', 'member_name', 'function', 'function_display', 
+            'start_date', 'end_date', 'is_current', 'notes'
         ]
-        read_only_fields = ['id', 'member_name', 'is_current']
+        read_only_fields = ['id', 'member_name', 'function_display', 'is_current']
 
     def create(self, validated_data):
         member = validated_data['member']

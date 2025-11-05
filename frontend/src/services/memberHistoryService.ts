@@ -6,6 +6,7 @@ export interface MinisterialFunctionHistoryItem {
   member: number;
   member_name: string;
   function: string; // chave (ex: 'pastor')
+  function_display: string; // nome legível (ex: 'Pastor')
   start_date: string; // YYYY-MM-DD
   end_date?: string | null; // YYYY-MM-DD ou null
   is_current: boolean;

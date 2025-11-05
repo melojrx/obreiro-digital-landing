@@ -13,7 +13,8 @@ import {
   MapPin,
   Shield,
   ArrowRight,
-  Users
+  Users,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -59,10 +61,25 @@ import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { usePermissions } from '@/hooks/usePermissions';
 
 const STATUS_IMPACT_MESSAGES: Record<string, string> = {
-  inactive: 'O membro deixará de aparecer nos relatórios e listagens de membros ativos.',
-  transferred: 'O membro será considerado transferido para outra congregação.',
-  disciplined: 'O membro será marcado como disciplinado e poderá ter acesso limitado a atividades.',
-  deceased: 'O membro ficará marcado como falecido e será removido das listagens operacionais.',
+  active: '✅ Membro ativo participará de todas as atividades e terá acesso total aos recursos da igreja.',
+  inactive: '⚠️ Membro inativo não aparecerá nos relatórios e listagens de membros ativos.',
+  transferred: '📤 Membro transferido será considerado pertencente a outra congregação.',
+  disciplined: '🚫 Membro disciplinado terá acesso limitado a atividades e ministérios.',
+  deceased: '🕊️ Membro falecido será removido das listagens operacionais e relatórios ativos.',
+  excluded: '❌ Membro excluído não terá mais acesso à igreja e será removido de todas as atividades.',
+};
+
+const FUNCTION_IMPACT_MESSAGES: Record<string, string> = {
+  pastor: '🙏 Função de liderança espiritual e pastoral da congregação.',
+  elder: '👨‍💼 Função de liderança e apoio à administração eclesiástica.',
+  deacon: '🤝 Função de serviço e apoio às atividades da igreja.',
+  deaconess: '🤝 Função de serviço e apoio às atividades da igreja.',
+  evangelist: '📢 Função focada em evangelização e pregação do evangelho.',
+  missionary: '🌍 Função dedicada ao trabalho missionário e evangelístico.',
+  leader: '👥 Função de coordenação de grupos e ministérios específicos.',
+  teacher: '📚 Função de ensino e educação cristã.',
+  musician: '🎵 Função no ministério de música e louvor.',
+  member: '👤 Membro comum da congregação.',
 };
 
 // Schema de validação
@@ -253,6 +270,14 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   } | null>(null);
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const membershipStatusApplyRef = useRef<((value: string) => void) | null>(null);
+  
+  // Estados para modal de confirmação de função ministerial
+  const [pendingFunctionChange, setPendingFunctionChange] = useState<{
+    current: string;
+    next: string;
+  } | null>(null);
+  const [functionConfirmOpen, setFunctionConfirmOpen] = useState(false);
+  const ministerialFunctionApplyRef = useRef<((value: string) => void) | null>(null);
 
   const form = useForm<MemberFormData>({
     resolver: zodResolver(memberSchema),
@@ -314,8 +339,25 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     return MEMBERSHIP_STATUS_CHOICES[value as keyof typeof MEMBERSHIP_STATUS_CHOICES] || value;
   }, []);
 
+  const isCriticalChange = useCallback((statusValue: string): boolean => {
+    return ['deceased', 'excluded', 'transferred'].includes(statusValue);
+  }, []);
+
   const getStatusImpactMessage = useCallback((value: string) => {
-    return STATUS_IMPACT_MESSAGES[value] ?? 'Esta alteração pode impactar relatórios e permissões associadas ao membro.';
+    return STATUS_IMPACT_MESSAGES[value] ?? '⚠️ Esta alteração pode impactar relatórios e permissões associadas ao membro.';
+  }, []);
+
+  // Funções auxiliares para função ministerial
+  const getFunctionLabel = useCallback((value: string) => {
+    return MINISTERIAL_FUNCTION_CHOICES[value as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || value;
+  }, []);
+
+  const isSignificantFunctionChange = useCallback((functionValue: string): boolean => {
+    return ['pastor', 'elder', 'deacon', 'deaconess'].includes(functionValue);
+  }, []);
+
+  const getFunctionImpactMessage = useCallback((value: string) => {
+    return FUNCTION_IMPACT_MESSAGES[value] ?? '⚠️ Esta alteração pode impactar a função eclesiástica do membro.';
   }, []);
 
   const handleMembershipStatusSelection = useCallback((value: string, onChange: (val: string) => void) => {
@@ -355,6 +397,46 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     setPendingStatusChange(null);
     membershipStatusApplyRef.current = null;
     setStatusConfirmOpen(false);
+  }, []);
+
+  // Handlers para função ministerial
+  const handleMinisterialFunctionSelection = useCallback((value: string, onChange: (val: string) => void) => {
+    if (!member) {
+      onChange(value);
+      return;
+    }
+
+    const currentValue = form.getValues('ministerial_function') || '';
+    if (currentValue === value) {
+      onChange(value);
+      return;
+    }
+
+    ministerialFunctionApplyRef.current = onChange;
+    setPendingFunctionChange({
+      current: currentValue,
+      next: value,
+    });
+    setFunctionConfirmOpen(true);
+  }, [form, member]);
+
+  const confirmFunctionChange = useCallback(() => {
+    if (pendingFunctionChange) {
+      ministerialFunctionApplyRef.current?.(pendingFunctionChange.next);
+      form.setValue('ministerial_function', pendingFunctionChange.next, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+    setPendingFunctionChange(null);
+    ministerialFunctionApplyRef.current = null;
+    setFunctionConfirmOpen(false);
+  }, [form, pendingFunctionChange]);
+
+  const cancelFunctionChange = useCallback(() => {
+    setPendingFunctionChange(null);
+    ministerialFunctionApplyRef.current = null;
+    setFunctionConfirmOpen(false);
   }, []);
 
   useEffect(() => {
@@ -1243,26 +1325,8 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       </FormItem>
                     )}
                   />
-                </CardContent>
-              </Card>
 
-
-            </TabsContent>
-            
-            {/* Função Ministerial */}
-            <TabsContent value="ministerial" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Função Ministerial
-                  </CardTitle>
-                  <CardDescription>
-                    Informações sobre o status e função ministerial do membro
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <FormField
                       control={form.control}
                       name="membership_status"
@@ -1290,13 +1354,37 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                         </FormItem>
                       )}
                     />
+                  </div>
+                </CardContent>
+              </Card>
+
+
+            </TabsContent>
+            
+            {/* Função Ministerial */}
+            <TabsContent value="ministerial" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Função Ministerial
+                  </CardTitle>
+                  <CardDescription>
+                    Informações sobre a função ministerial do membro
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="ministerial_function"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Função Ministerial</FormLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
+                          <Select 
+                            value={field.value} 
+                            onValueChange={(value) => handleMinisterialFunctionSelection(value, field.onChange)}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="ministerial-function-select">
                                 <SelectValue placeholder="Selecione a função" />
@@ -1829,7 +1917,15 @@ export const MemberForm: React.FC<MemberFormProps> = ({
           >
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Confirmar alteração de status</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  {pendingStatusChange && isCriticalChange(pendingStatusChange.next) && (
+                    <AlertTriangle className="h-5 w-5 text-red-500" />
+                  )}
+                  {pendingStatusChange && !isCriticalChange(pendingStatusChange.next) && (
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  )}
+                  Confirmar alteração de status
+                </DialogTitle>
                 <DialogDescription>
                   Revise a mudança de status de membresia antes de salvá-la.
                 </DialogDescription>
@@ -1837,20 +1933,41 @@ export const MemberForm: React.FC<MemberFormProps> = ({
 
               {pendingStatusChange && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">
+                  {isCriticalChange(pendingStatusChange.next) && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Atenção: Alteração crítica!</AlertTitle>
+                      <AlertDescription>
+                        Esta mudança é irreversível e afetará significativamente o registro do membro.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex items-center gap-2 justify-center">
+                    <Badge 
+                      variant="secondary"
+                      className="text-sm px-3 py-1"
+                    >
                       {pendingStatusChange.current
                         ? getStatusLabel(pendingStatusChange.current)
                         : 'Sem status anterior'}
                     </Badge>
-                    <ArrowRight className="h-4 w-4 text-gray-400" />
-                    <Badge>
+                    <ArrowRight className="h-5 w-5 text-gray-400" />
+                    <Badge 
+                      variant={isCriticalChange(pendingStatusChange.next) ? "destructive" : "default"}
+                      className="text-sm px-3 py-1"
+                    >
                       {getStatusLabel(pendingStatusChange.next)}
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-600">
+
+                  <div className={`text-sm p-3 rounded-md ${
+                    isCriticalChange(pendingStatusChange.next) 
+                      ? 'bg-red-50 text-red-800 border border-red-200' 
+                      : 'bg-blue-50 text-blue-800 border border-blue-200'
+                  }`}>
                     {getStatusImpactMessage(pendingStatusChange.next)}
-                  </p>
+                  </div>
                 </div>
               )}
 
@@ -1858,7 +1975,91 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                 <Button variant="outline" onClick={cancelStatusChange}>
                   Cancelar
                 </Button>
-                <Button onClick={confirmStatusChange}>
+                <Button 
+                  onClick={confirmStatusChange}
+                  variant={pendingStatusChange && isCriticalChange(pendingStatusChange.next) ? "destructive" : "default"}
+                >
+                  Confirmar alteração
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal de Confirmação de Função Ministerial */}
+          <Dialog
+            open={functionConfirmOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                cancelFunctionChange();
+              } else {
+                setFunctionConfirmOpen(true);
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {pendingFunctionChange && isSignificantFunctionChange(pendingFunctionChange.next) && (
+                    <AlertTriangle className="h-5 w-5 text-blue-500" />
+                  )}
+                  {pendingFunctionChange && !isSignificantFunctionChange(pendingFunctionChange.next) && (
+                    <AlertTriangle className="h-5 w-5 text-gray-500" />
+                  )}
+                  Confirmar alteração de função ministerial
+                </DialogTitle>
+                <DialogDescription>
+                  Revise a mudança de função ministerial antes de salvá-la.
+                </DialogDescription>
+              </DialogHeader>
+
+              {pendingFunctionChange && (
+                <div className="space-y-4">
+                  {isSignificantFunctionChange(pendingFunctionChange.next) && (
+                    <Alert>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Atenção: Mudança significativa!</AlertTitle>
+                      <AlertDescription>
+                        Esta mudança afetará a função eclesiástica e responsabilidades ministeriais do membro.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex items-center gap-2 justify-center">
+                    <Badge 
+                      variant="secondary"
+                      className="text-sm px-3 py-1"
+                    >
+                      {pendingFunctionChange.current
+                        ? getFunctionLabel(pendingFunctionChange.current)
+                        : 'Sem função anterior'}
+                    </Badge>
+                    <ArrowRight className="h-5 w-5 text-gray-400" />
+                    <Badge 
+                      variant={isSignificantFunctionChange(pendingFunctionChange.next) ? "default" : "secondary"}
+                      className="text-sm px-3 py-1"
+                    >
+                      {getFunctionLabel(pendingFunctionChange.next)}
+                    </Badge>
+                  </div>
+
+                  <div className={`text-sm p-3 rounded-md ${
+                    isSignificantFunctionChange(pendingFunctionChange.next) 
+                      ? 'bg-blue-50 text-blue-800 border border-blue-200' 
+                      : 'bg-gray-50 text-gray-800 border border-gray-200'
+                  }`}>
+                    {getFunctionImpactMessage(pendingFunctionChange.next)}
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={cancelFunctionChange}>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={confirmFunctionChange}
+                  variant={pendingFunctionChange && isSignificantFunctionChange(pendingFunctionChange.next) ? "default" : "secondary"}
+                >
                   Confirmar alteração
                 </Button>
               </DialogFooter>

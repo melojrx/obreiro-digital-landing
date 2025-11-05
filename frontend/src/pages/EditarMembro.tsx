@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { MemberForm } from '@/components/members/MemberForm';
-import { membersService, CreateMemberData, Member, MEMBERSHIP_STATUS_CHOICES } from '@/services/membersService';
+import { membersService, CreateMemberData, Member, MEMBERSHIP_STATUS_CHOICES, MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
 import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -12,6 +12,15 @@ const getStatusLabel = (status?: string | null) => {
   }
   return (
     MEMBERSHIP_STATUS_CHOICES[status as keyof typeof MEMBERSHIP_STATUS_CHOICES] ?? status
+  );
+};
+
+const getFunctionLabel = (func?: string | null) => {
+  if (!func) {
+    return 'Sem função definida';
+  }
+  return (
+    MINISTERIAL_FUNCTION_CHOICES[func as keyof typeof MINISTERIAL_FUNCTION_CHOICES] ?? func
   );
 };
 
@@ -50,10 +59,13 @@ const EditarMembro: React.FC = () => {
       setSaving(true);
       const { create_system_user, system_role, user_email, user_password, church, ...memberUpdateData } = (data as any);
       const previousStatus = member?.membership_status ?? null;
+      const previousFunction = member?.ministerial_function ?? null;
       const memberHadSystemUser = Boolean(member?.user);
       const updatedMember = await membersService.updateMember(Number(id), memberUpdateData);
       const newStatus = updatedMember?.membership_status ?? null;
+      const newFunction = updatedMember?.ministerial_function ?? null;
       const statusChanged = (previousStatus ?? null) !== (newStatus ?? null);
+      const functionChanged = (previousFunction ?? null) !== (newFunction ?? null);
 
       // Se for para criar usuário do sistema e o membro ainda não tem usuário vinculado
       if (!memberHadSystemUser && !updatedMember.user && create_system_user) {
@@ -92,6 +104,27 @@ const EditarMembro: React.FC = () => {
               }).catch((undoError) => {
                 console.error('Erro ao desfazer mudança de status:', undoError);
                 toast.error('Não foi possível desfazer a alteração do status.');
+              });
+            },
+          } : undefined,
+        });
+      } else if (functionChanged) {
+        const previousFunctionLabel = getFunctionLabel(previousFunction);
+        const newFunctionLabel = getFunctionLabel(newFunction);
+
+        toast.success('Membro atualizado com sucesso!', {
+          description: `Função ministerial alterada de ${previousFunctionLabel} para ${newFunctionLabel}.`,
+          duration: 10000,
+          action: previousFunction !== null ? {
+            label: 'Desfazer',
+            onClick: () => {
+              membersService.updateMember(Number(id), {
+                ministerial_function: previousFunction ?? undefined,
+              }).then(() => {
+                toast.success(`Função revertida para ${previousFunctionLabel}.`);
+              }).catch((undoError) => {
+                console.error('Erro ao desfazer mudança de função:', undoError);
+                toast.error('Não foi possível desfazer a alteração da função.');
               });
             },
           } : undefined,

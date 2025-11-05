@@ -100,7 +100,7 @@ export const MinisterialFunctionTimeline: React.FC<MinisterialFunctionTimelinePr
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <h4 className="text-lg font-semibold">
-                        {MINISTERIAL_FUNCTION_CHOICES[it.function as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || it.function}
+                        {it.function_display || MINISTERIAL_FUNCTION_CHOICES[it.function as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || it.function}
                       </h4>
                       {it.is_current && <Badge className="text-xs">Atual</Badge>}
                     </div>

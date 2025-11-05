@@ -902,6 +902,14 @@ class MembershipStatusLog(BaseModel):
     
     def __str__(self):
         return f"{self.member.full_name}: {self.old_status} → {self.new_status}"
+    
+    def get_old_status_display(self):
+        """Retorna o nome legível do status anterior"""
+        return dict(MembershipStatusChoices.choices).get(self.old_status, self.old_status or 'Sem status')
+    
+    def get_new_status_display(self):
+        """Retorna o nome legível do novo status"""
+        return dict(MembershipStatusChoices.choices).get(self.new_status, self.new_status or 'Desconhecido')
 
 
 class MinisterialFunctionHistory(BaseModel):
