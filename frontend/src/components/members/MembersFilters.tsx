@@ -1,6 +1,6 @@
 import React from 'react';
-import { Search, Filter, Download, Plus, Users } from 'lucide-react';
-import { MINISTERIAL_FUNCTION_CHOICES } from '@/services/membersService';
+import { Search, Filter, Download, Plus, Users, Loader2 } from 'lucide-react';
+import { MINISTERIAL_FUNCTION_CHOICES, membersService } from '@/services/membersService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 interface FiltersType {
   search: string;
@@ -36,6 +37,8 @@ export const MembersFilters: React.FC<MembersFiltersProps> = ({
   onFiltersChange,
   loading = false,
 }) => {
+  const [exporting, setExporting] = React.useState(false);
+
   const handleSearchChange = (value: string) => {
     onFiltersChange({
       ...filters,
@@ -67,6 +70,31 @@ export const MembersFilters: React.FC<MembersFiltersProps> = ({
       ministerial_function: '',
       page: 1,
     });
+  };
+
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      const blob = await membersService.exportMembersCSV({
+        search: filters.search,
+        status: filters.status,
+        ministerial_function: filters.ministerial_function
+      });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `membros_${Date.now()}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Membros exportados com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar membros:', error);
+      toast.error('Erro ao exportar membros');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -152,15 +180,19 @@ export const MembersFilters: React.FC<MembersFiltersProps> = ({
           <div className="flex gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={loading}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
+                <Button variant="outline" size="sm" disabled={loading || exporting}>
+                  {exporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  {exporting ? 'Exportando...' : 'Exportar'}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem>Exportar Excel</DropdownMenuItem>
-                <DropdownMenuItem>Exportar PDF</DropdownMenuItem>
-                <DropdownMenuItem>Exportar CSV</DropdownMenuItem>
+                <DropdownMenuItem disabled>Exportar Excel</DropdownMenuItem>
+                <DropdownMenuItem disabled>Exportar PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCSV}>Exportar CSV</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

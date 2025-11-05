@@ -177,6 +177,7 @@ export const API_ENDPOINTS = {
     // Histórico de status de membresia (auditoria simples)
     statusHistory: (id: number) => `/members/${id}/status_history/`,
     export: '/members/export/',
+    exportCsv: '/members/export_csv/',
     availableForSpouse: '/members/available_for_spouse/',
     // Rotas do próprio usuário (sem filtrar por congregação)
     me: {

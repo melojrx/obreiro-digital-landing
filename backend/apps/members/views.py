@@ -14,6 +14,8 @@ from datetime import datetime, date
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import HttpResponse
+import csv
 
 from .models import Member, MembershipStatusLog, MinisterialFunctionHistory, MembershipStatus
 from apps.core.mixins import ChurchScopedQuerysetMixin
@@ -704,6 +706,163 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
             'exported_at': datetime.now().isoformat(),
             'members': serializer.data
         })
+
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        """
+        Exportar membros em formato CSV com separador ';'
+        Respeita os filtros aplicados na listagem (busca, status, função ministerial, branch)
+        """
+        # Obter queryset com filtros aplicados (incluindo escopo multi-tenant)
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Aplicar filtros adicionais
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(full_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(cpf__icontains=search) |
+                Q(phone__icontains=search) |
+                Q(phone_secondary__icontains=search)
+            )
+        
+        membership_status = request.query_params.get('status')
+        if membership_status:
+            queryset = queryset.filter(membership_status=membership_status)
+        
+        ministerial_function = request.query_params.get('ministerial_function')
+        if ministerial_function:
+            queryset = queryset.filter(ministerial_function=ministerial_function)
+        
+        # Ordenar por nome
+        queryset = queryset.select_related('church', 'branch').order_by('full_name')
+        
+        # Preparar resposta CSV
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        church_name = getattr(request.church, 'short_name', 'igreja').replace(' ', '_')
+        filename = f'membros_{church_name}_{timestamp}.csv'
+        
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Criar writer CSV com separador ";"
+        writer = csv.writer(response, delimiter=';', quoting=csv.QUOTE_ALL)
+        
+        # Cabeçalho do CSV
+        header = [
+            'ID',
+            'Nome Completo',
+            'CPF',
+            'RG',
+            'Data Nascimento',
+            'Idade',
+            'Gênero',
+            'Estado Civil',
+            'Email',
+            'Telefone',
+            'Celular',
+            'CEP',
+            'Endereço',
+            'Número',
+            'Complemento',
+            'Bairro',
+            'Cidade',
+            'Estado',
+            'Igreja',
+            'Congregação',
+            'Função Ministerial',
+            'Status Membresia',
+            'Data Membresia',
+            'Data Primeira Membresia',
+            'Data Cadastro'
+        ]
+        writer.writerow(header)
+        
+        # Mapeamento de choices para exibição
+        gender_map = {'M': 'Masculino', 'F': 'Feminino', 'O': 'Outro'}
+        marital_status_map = {
+            'single': 'Solteiro(a)',
+            'married': 'Casado(a)',
+            'divorced': 'Divorciado(a)',
+            'widowed': 'Viúvo(a)'
+        }
+        membership_status_map = {
+            'active': 'Ativo',
+            'inactive': 'Inativo',
+            'transferred': 'Transferido',
+            'disciplined': 'Disciplinado',
+            'deceased': 'Falecido'
+        }
+        ministerial_function_map = {
+            'member': 'Membro',
+            'deacon': 'Diácono',
+            'deaconess': 'Diaconisa',
+            'elder': 'Presbítero',
+            'evangelist': 'Evangelista',
+            'pastor': 'Pastor',
+            'missionary': 'Missionário',
+            'leader': 'Líder',
+            'cooperator': 'Cooperador',
+            'auxiliary': 'Auxiliar'
+        }
+        
+        # Escrever dados dos membros
+        for member in queryset:
+            # Formatar data de nascimento
+            birth_date_str = member.birth_date.strftime('%d/%m/%Y') if member.birth_date else ''
+            
+            # Calcular idade
+            age = ''
+            if member.birth_date:
+                today = date.today()
+                age = today.year - member.birth_date.year - (
+                    (today.month, today.day) < (member.birth_date.month, member.birth_date.day)
+                )
+            
+            # Formatar datas
+            membership_date_str = ''
+            if hasattr(member, 'membership_start_date') and member.membership_start_date:
+                membership_date_str = member.membership_start_date.strftime('%d/%m/%Y')
+            elif hasattr(member, 'membership_date') and member.membership_date:
+                membership_date_str = member.membership_date.strftime('%d/%m/%Y')
+            
+            first_membership_str = ''
+            if hasattr(member, 'first_membership_date') and member.first_membership_date:
+                first_membership_str = member.first_membership_date.strftime('%d/%m/%Y')
+            
+            created_at_str = member.created_at.strftime('%d/%m/%Y %H:%M') if member.created_at else ''
+            
+            row = [
+                member.id,
+                member.full_name,
+                member.cpf or '',
+                member.rg or '',
+                birth_date_str,
+                age,
+                gender_map.get(member.gender, member.gender or ''),
+                marital_status_map.get(member.marital_status, member.marital_status or ''),
+                member.email or '',
+                member.phone or '',
+                member.phone_secondary or '',
+                member.zipcode or '',
+                member.address or '',
+                member.number or '',
+                member.complement or '',
+                member.neighborhood or '',
+                member.city or '',
+                member.state or '',
+                member.church.name if member.church else '',
+                member.branch.name if member.branch else 'Matriz',
+                ministerial_function_map.get(member.ministerial_function, member.ministerial_function or 'Membro'),
+                membership_status_map.get(member.membership_status, member.membership_status or ''),
+                membership_date_str,
+                first_membership_str,
+                created_at_str
+            ]
+            writer.writerow(row)
+        
+        return response
 
     @action(detail=False, methods=['get'])
     def available_for_spouse(self, request):

@@ -414,6 +414,19 @@ export const membersService = {
     return response.data;
   },
 
+  // Exportar membros em formato CSV
+  async exportMembersCSV(filters?: {
+    search?: string;
+    status?: string;
+    ministerial_function?: string;
+  }): Promise<Blob> {
+    const response = await api.get(API_ENDPOINTS.members.exportCsv, {
+      params: filters,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
   // Buscar membros disponíveis para vinculação de cônjuge
   async getAvailableForSpouse(params?: {
     exclude_member_id?: number;
