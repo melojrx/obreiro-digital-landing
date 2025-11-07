@@ -43,10 +43,14 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # =================================
-# EMAIL - Console backend para desenvolvimento
+# EMAIL - Usa configuração do .env_dev
 # =================================
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Permite configurar via .env_dev (padrão: console para logs, smtp para envio real)
+EMAIL_BACKEND = env(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend'
+)
 
 # =================================
 # CACHE - Redis para consistência com produção

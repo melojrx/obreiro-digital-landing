@@ -3,6 +3,8 @@ Serializers para o app Members
 Gerencia serialização de membros
 """
 
+import secrets
+import logging
 from rest_framework import serializers
 from datetime import date
 from django.contrib.auth import get_user_model
@@ -13,8 +15,11 @@ from apps.branches.models import Branch
 from apps.core.models import MembershipStatusChoices, MinisterialFunctionChoices, RoleChoices
 from apps.accounts.models import ChurchUser
 from .models import MinisterialFunctionHistory
+from apps.core.services import EmailService
+from apps.core.services.email_service import EmailServiceError
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class MemberSerializer(serializers.ModelSerializer):
@@ -176,7 +181,7 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         write_only=True
     )
     user_email = serializers.EmailField(required=False, write_only=True)
-    user_password = serializers.CharField(min_length=8, required=False, write_only=True)
+    # REMOVIDO: user_password - senha será gerada automaticamente e enviada por email
     
     branch = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.none(),
@@ -219,7 +224,8 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             'accept_sms', 'accept_email', 'accept_whatsapp',
             
             # Campos para criação de usuário do sistema
-            'create_system_user', 'system_role', 'user_email', 'user_password'
+            # NOTA: user_password foi removido - senha é gerada automaticamente
+            'create_system_user', 'system_role', 'user_email'
         ]
     
     def validate_cpf(self, value):
@@ -370,23 +376,40 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         # Validações para criação de usuário do sistema
         if attrs.get('create_system_user'):
             if not attrs.get('system_role'):
-                raise serializers.ValidationError("Papel do sistema é obrigatório quando criar usuário do sistema está marcado.")
+                raise serializers.ValidationError(
+                    "Papel do sistema é obrigatório quando criar usuário do sistema está marcado."
+                )
             
             if not attrs.get('user_email'):
-                raise serializers.ValidationError("E-mail para login é obrigatório quando criar usuário do sistema está marcado.")
+                raise serializers.ValidationError(
+                    "E-mail para login é obrigatório quando criar usuário do sistema está marcado."
+                )
             
-            if not attrs.get('user_password'):
-                raise serializers.ValidationError("Senha inicial é obrigatória quando criar usuário do sistema está marcado.")
+            # Validar se o e-mail já existe NESTA IGREJA (tenant isolation)
+            # Um mesmo e-mail pode ser usado em igrejas diferentes
+            user_email = attrs['user_email']
+            request = self.context.get('request')
             
-            # Validar se o e-mail já existe (apenas usuários ativos)
-            if User.objects.filter(email=attrs['user_email'], is_active=True).exists():
-                raise serializers.ValidationError("Este e-mail já está sendo usado por outro usuário ativo do sistema.")
+            if request and hasattr(request, 'church') and request.church:
+                # Verificar se já existe um usuário com este e-mail vinculado a ESTA igreja
+                from apps.accounts.models import ChurchUser
+                
+                existing_user = User.objects.filter(email=user_email, is_active=True).first()
+                if existing_user:
+                    # Verificar se este usuário já está vinculado à igreja atual
+                    is_in_church = ChurchUser.objects.filter(
+                        user=existing_user,
+                        church=request.church,
+                        is_active=True
+                    ).exists()
+                    
+                    if is_in_church:
+                        raise serializers.ValidationError(
+                            f"Este e-mail já está sendo usado por outro usuário nesta igreja."
+                        )
+                    # Se o e-mail existe em outra igreja, permitir (multi-tenant)
             
-            # Validar senha
-            try:
-                validate_password(attrs['user_password'])
-            except DjangoValidationError as e:
-                raise serializers.ValidationError({"user_password": list(e.messages)})
+            # NOTA: Validação de senha removida - senha será gerada automaticamente
         
         return attrs
     
@@ -396,7 +419,7 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         create_system_user = validated_data.pop('create_system_user', False)
         system_role = validated_data.pop('system_role', None)
         user_email = validated_data.pop('user_email', None)
-        user_password = validated_data.pop('user_password', None)
+        # NOTA: user_password removido - será gerado automaticamente
         
         # Criar o membro
         member = super().create(validated_data)
@@ -425,12 +448,20 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             pass
         
         # Criar usuário do sistema se solicitado
-        if create_system_user and system_role and user_email and user_password:
+        if create_system_user and system_role and user_email:
             try:
+                # NOVO: Gerar senha segura automaticamente
+                generated_password = secrets.token_urlsafe(12)
+                
+                logger.info(
+                    f"🔐 Gerando credenciais de sistema para membro {member.full_name} "
+                    f"(email: {user_email}, papel: {system_role})"
+                )
+                
                 # Criar usuário
                 user = User.objects.create_user(
                     email=user_email,
-                    password=user_password,
+                    password=generated_password,  # Senha gerada automaticamente
                     full_name=member.full_name,
                     phone=member.phone or '',
                     is_active=True
@@ -448,9 +479,49 @@ class MemberCreateSerializer(serializers.ModelSerializer):
                     is_active=True
                 )
                 
+                # NOVO: Enviar email com credenciais
+                try:
+                    # Obter nome amigável do papel
+                    role_display = dict([
+                        (RoleChoices.CHURCH_ADMIN, 'Administrador da Igreja'),
+                        (RoleChoices.SECRETARY, 'Secretário(a)'),
+                        (RoleChoices.SUPER_ADMIN, 'Super Administrador'),
+                    ]).get(system_role, system_role)
+                    
+                    EmailService.send_welcome_credentials(
+                        member_name=member.full_name,
+                        user_email=user_email,
+                        user_password=generated_password,
+                        church_name=member.church.name,
+                        role_display=role_display,
+                        role_code=system_role,
+                    )
+                    
+                    logger.info(
+                        f"✅ Email de boas-vindas enviado com sucesso para {user_email}"
+                    )
+                    
+                except EmailServiceError as e:
+                    # Log do erro mas não falha a criação do membro
+                    logger.error(
+                        f"❌ Falha ao enviar email de boas-vindas para {user_email}: {e}",
+                        exc_info=True
+                    )
+                    # Poderia adicionar uma notificação ao admin aqui
+                    
+                except Exception as e:
+                    logger.error(
+                        f"❌ Erro inesperado ao enviar email para {user_email}: {e}",
+                        exc_info=True
+                    )
+                
             except Exception as e:
                 # Se houver erro na criação do usuário, deletar o membro criado
                 member.delete()
+                logger.error(
+                    f"❌ Erro ao criar usuário do sistema para {member.full_name}: {e}",
+                    exc_info=True
+                )
                 raise serializers.ValidationError(f"Erro ao criar usuário do sistema: {str(e)}")
         
         return member
@@ -458,7 +529,8 @@ class MemberCreateSerializer(serializers.ModelSerializer):
 
 class MemberUpdateSerializer(serializers.ModelSerializer):
     """
-    Serializer para atualização de membros
+    Serializer para atualização de membros.
+    Também permite conceder acesso ao sistema para membros existentes.
     """
 
     branch = serializers.PrimaryKeyRelatedField(
@@ -466,6 +538,18 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    
+    # Campos para concessão de acesso ao sistema (opcional)
+    grant_system_access = serializers.BooleanField(required=False, write_only=True)
+    system_role = serializers.ChoiceField(
+        choices=[
+            (RoleChoices.CHURCH_ADMIN, 'Administrador da Igreja'),
+            (RoleChoices.SECRETARY, 'Secretário(a)'),
+        ],
+        required=False,
+        write_only=True
+    )
+    user_email = serializers.EmailField(required=False, write_only=True)
 
     class Meta:
         model = Member
@@ -477,7 +561,9 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             'membership_status', 'membership_start_date', 'membership_end_date', 'previous_church', 'transfer_letter', 
             'ministerial_function', 'spouse', 'children_count', 'responsible', 'profession', 'education_level', 
             'photo', 'notes', 'accept_sms', 'accept_email', 'accept_whatsapp',
-            'branch'
+            'branch',
+            # Campos para conceder acesso ao sistema
+            'grant_system_access', 'system_role', 'user_email'
         ]
     
     def validate_cpf(self, value):
@@ -504,15 +590,70 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         if exists:
             raise serializers.ValidationError("Este CPF já está cadastrado nesta denominação.")
         return value
+    
+    def validate(self, attrs):
+        """Validações gerais incluindo concessão de acesso ao sistema"""
+        # Validações para concessão de acesso ao sistema
+        if attrs.get('grant_system_access'):
+            # Verificar se membro já tem usuário
+            if self.instance and self.instance.user:
+                raise serializers.ValidationError(
+                    "Este membro já possui acesso ao sistema."
+                )
+            
+            if not attrs.get('system_role'):
+                raise serializers.ValidationError(
+                    "Papel do sistema é obrigatório ao conceder acesso."
+                )
+            
+            if not attrs.get('user_email'):
+                raise serializers.ValidationError(
+                    "E-mail para login é obrigatório ao conceder acesso."
+                )
+            
+            # Validar se o e-mail já existe NESTA IGREJA (tenant isolation)
+            # Um mesmo e-mail pode ser usado em igrejas diferentes
+            user_email = attrs['user_email']
+            request = self.context.get('request')
+            
+            if request and hasattr(request, 'church') and request.church:
+                # Verificar se já existe um usuário com este e-mail vinculado a ESTA igreja
+                from apps.accounts.models import ChurchUser
+                
+                existing_user = User.objects.filter(email=user_email, is_active=True).first()
+                if existing_user:
+                    # Verificar se este usuário já está vinculado à igreja atual
+                    is_in_church = ChurchUser.objects.filter(
+                        user=existing_user,
+                        church=request.church,
+                        is_active=True
+                    ).exists()
+                    
+                    if is_in_church:
+                        raise serializers.ValidationError(
+                            f"Este e-mail já está sendo usado por outro usuário nesta igreja."
+                        )
+                    # Se o e-mail existe em outra igreja, permitir (multi-tenant)
+        
+        return attrs
 
     def update(self, instance, validated_data):
-        """Atualiza membro e sincroniza histórico de função quando função muda"""
+        """
+        Atualiza membro e sincroniza histórico de função quando função muda.
+        Também permite conceder acesso ao sistema para membros existentes.
+        """
+        # Extrair dados de concessão de acesso
+        grant_system_access = validated_data.pop('grant_system_access', False)
+        system_role = validated_data.pop('system_role', None)
+        user_email = validated_data.pop('user_email', None)
+        
         old_function = instance.ministerial_function
         new_function = validated_data.get('ministerial_function', old_function)
         old_status = instance.membership_status
         new_status = validated_data.get('membership_status', old_status)
         member = super().update(instance, validated_data)
         
+        # Lógica de histórico de função ministerial (mantida)
         if new_function != old_function:
             from datetime import date, timedelta
             # Encerrar histórico atual (se existir)
@@ -532,7 +673,8 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
                 changed_by=self.context.get('request').user if self.context.get('request') else None,
                 notes='Atualização via edição de membro'
             )
-        # Log de mudança de status de membresia
+        
+        # Log de mudança de status de membresia (mantido)
         if new_status != old_status:
             try:
                 MembershipStatusLog.objects.create(
@@ -544,8 +686,83 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
                 )
             except Exception:
                 pass
+        
+        # NOVO: Conceder acesso ao sistema se solicitado
+        if grant_system_access and system_role and user_email:
+            try:
+                # Gerar senha segura automaticamente
+                generated_password = secrets.token_urlsafe(12)
+                
+                logger.info(
+                    f"🔐 Concedendo acesso ao sistema para membro existente {member.full_name} "
+                    f"(email: {user_email}, papel: {system_role})"
+                )
+                
+                # Criar usuário
+                user = User.objects.create_user(
+                    email=user_email,
+                    password=generated_password,
+                    full_name=member.full_name,
+                    phone=member.phone or '',
+                    is_active=True
+                )
+                
+                # Associar usuário ao membro
+                member.user = user
+                member.save()
+                
+                # Criar ChurchUser com o papel especificado
+                ChurchUser.objects.create(
+                    user=user,
+                    church=member.church,
+                    role=system_role,
+                    is_active=True
+                )
+                
+                # Enviar email com credenciais
+                try:
+                    # Obter nome amigável do papel
+                    role_display = dict([
+                        (RoleChoices.CHURCH_ADMIN, 'Administrador da Igreja'),
+                        (RoleChoices.SECRETARY, 'Secretário(a)'),
+                        (RoleChoices.SUPER_ADMIN, 'Super Administrador'),
+                    ]).get(system_role, system_role)
+                    
+                    EmailService.send_welcome_credentials(
+                        member_name=member.full_name,
+                        user_email=user_email,
+                        user_password=generated_password,
+                        church_name=member.church.name,
+                        role_display=role_display,
+                        role_code=system_role,
+                    )
+                    
+                    logger.info(
+                        f"✅ Email de boas-vindas enviado com sucesso para {user_email}"
+                    )
+                    
+                except EmailServiceError as e:
+                    logger.error(
+                        f"❌ Falha ao enviar email de boas-vindas para {user_email}: {e}",
+                        exc_info=True
+                    )
+                    
+                except Exception as e:
+                    logger.error(
+                        f"❌ Erro inesperado ao enviar email para {user_email}: {e}",
+                        exc_info=True
+                    )
+                
+            except Exception as e:
+                logger.error(
+                    f"❌ Erro ao conceder acesso ao sistema para {member.full_name}: {e}",
+                    exc_info=True
+                )
+                raise serializers.ValidationError(
+                    f"Erro ao conceder acesso ao sistema: {str(e)}"
+                )
+        
         return member
-        return value
     
     def validate_phone(self, value):
         """Validação de telefone na atualização"""

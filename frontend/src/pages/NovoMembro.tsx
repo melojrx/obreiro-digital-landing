@@ -15,7 +15,16 @@ const NovoMembro: React.FC = () => {
     try {
       console.log('Dados enviados para API:', data);
       await membersService.createMember(data);
-      toast.success('Membro cadastrado com sucesso!');
+      
+      // Mensagem de sucesso diferenciada se criou usuário
+      if (data.create_system_user && data.user_email) {
+        toast.success('Membro cadastrado! Credenciais de acesso enviadas por e-mail.', {
+          description: `Um e-mail foi enviado para ${data.user_email} com a senha de acesso.`
+        });
+      } else {
+        toast.success('Membro cadastrado com sucesso!');
+      }
+      
       navigate('/membros');
     } catch (error) {
       console.error('Erro ao criar membro:', error);

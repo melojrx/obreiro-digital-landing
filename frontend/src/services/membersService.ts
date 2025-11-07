@@ -505,7 +505,8 @@ export const membersService = {
   },
 
   // Criação de usuário do sistema a partir da edição do membro
-  async createSystemUser(memberId: number, data: { system_role: string; user_email: string; user_password: string }): Promise<{ message: string; member: Member }> {
+  // NOTA: user_password removido - senha gerada automaticamente pelo backend e enviada por e-mail
+  async createSystemUser(memberId: number, data: { system_role: string; user_email: string }): Promise<{ message: string; member: Member }> {
     const response = await api.post(API_ENDPOINTS.members.createSystemUser(memberId), data);
     return response.data;
   },

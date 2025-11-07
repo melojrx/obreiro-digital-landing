@@ -1,0 +1,65 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Bem-vindo ao Obreiro Virtual{% endblock %}
+
+{% block content %}
+<h2>Olá, {{ member_name }}! 👋</h2>
+
+<p>
+    Seja bem-vindo(a) ao <strong>Obreiro Virtual</strong>! 
+    Estamos felizes em tê-lo(a) como parte da nossa comunidade.
+</p>
+
+<p>
+    Você recebeu acesso ao sistema de gestão da <strong>{{ church_name }}</strong> 
+    com o papel de <strong>{{ role_display }}</strong>.
+</p>
+
+<div class="highlight-box">
+    <p>
+        <strong>🔑 Suas credenciais de acesso foram geradas com sucesso!</strong>
+    </p>
+    <p>
+        Use as informações abaixo para fazer seu primeiro login no sistema.
+    </p>
+</div>
+
+<div class="credentials">
+    <p><strong>📧 E-mail:</strong></p>
+    <p class="value">{{ user_email }}</p>
+    
+    <p style="margin-top: 15px;"><strong>🔐 Senha temporária:</strong></p>
+    <p class="value">{{ user_password }}</p>
+</div>
+
+<div class="security-warning">
+    <p><strong>⚠️ Importante - Segurança da Conta:</strong></p>
+    <p>
+        • Esta é uma senha temporária gerada automaticamente<br>
+        • Recomendamos fortemente que você altere sua senha após o primeiro acesso<br>
+        • Não compartilhe suas credenciais com outras pessoas<br>
+        • Guarde esta senha em um local seguro
+    </p>
+</div>
+
+<div style="text-align: center;">
+    <a href="{{ login_url }}" class="button">
+        🚀 Acessar o Sistema
+    </a>
+</div>
+
+<div class="highlight-box" style="margin-top: 30px;">
+    <p><strong>📋 O que você pode fazer no sistema:</strong></p>
+    <p>{{ role_description }}</p>
+</div>
+
+<p style="margin-top: 30px;">
+    Se você tiver alguma dúvida ou precisar de ajuda, não hesite em entrar em contato 
+    com o administrador da sua igreja ou com nossa equipe de suporte.
+</p>
+
+<p style="margin-top: 20px;">
+    <strong>Boas-vindas e bom trabalho!</strong><br>
+    Equipe Obreiro Virtual
+</p>
+{% endblock %}

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Obreiro Virtual{% endblock %}</title>
+    <style>
+        /* Reset e estilos globais */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Header */
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .email-header .subtitle {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        /* Body */
+        .email-body {
+            padding: 30px 20px;
+        }
+        
+        .email-body h2 {
+            color: #667eea;
+            font-size: 20px;
+            margin: 0 0 15px 0;
+        }
+        
+        .email-body p {
+            margin: 0 0 15px 0;
+            color: #555555;
+        }
+        
+        /* Caixa de destaque */
+        .highlight-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .highlight-box strong {
+            color: #667eea;
+        }
+        
+        /* Credenciais */
+        .credentials {
+            background-color: #f8f9fa;
+            border: 2px dashed #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .credentials p {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .credentials .value {
+            font-family: 'Courier New', monospace;
+            background-color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 5px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        /* Botão */
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: opacity 0.3s;
+        }
+        
+        .button:hover {
+            opacity: 0.9;
+        }
+        
+        /* Aviso de segurança */
+        .security-warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .security-warning p {
+            margin: 5px 0;
+            color: #856404;
+            font-size: 14px;
+        }
+        
+        /* Footer */
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .email-footer p {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        .email-footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        /* Responsividade */
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            
+            .email-header,
+            .email-body,
+            .email-footer {
+                padding: 20px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="email-header">
+            <h1>🏛️ Obreiro Virtual</h1>
+            <p class="subtitle">Sistema de Gestão Eclesiástica</p>
+        </div>
+        
+        <!-- Body Content -->
+        <div class="email-body">
+            {% block content %}
+            <!-- Conteúdo específico do email -->
+            {% endblock %}
+        </div>
+        
+        <!-- Footer -->
+        <div class="email-footer">
+            <p><strong>Obreiro Virtual</strong></p>
+            <p>Sistema de gestão para igrejas e denominações</p>
+            <p>
+                <a href="{{ frontend_url }}">Acessar o sistema</a> | 
+                <a href="mailto:suporteobreirovirtual@gmail.com">Suporte</a>
+            </p>
+            <p style="margin-top: 15px; font-size: 11px;">
+                Este é um e-mail automático, por favor não responda diretamente.<br>
+                Em caso de dúvidas, entre em contato com o suporte.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

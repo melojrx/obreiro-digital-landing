@@ -57,7 +57,8 @@ const EditarMembro: React.FC = () => {
 
     try {
       setSaving(true);
-      const { create_system_user, system_role, user_email, user_password, church, ...memberUpdateData } = (data as any);
+      // NOTA: user_password removido - senha gerada automaticamente pelo backend
+      const { create_system_user, system_role, user_email, church, ...memberUpdateData } = (data as any);
       const previousStatus = member?.membership_status ?? null;
       const previousFunction = member?.ministerial_function ?? null;
       const memberHadSystemUser = Boolean(member?.user);
@@ -69,9 +70,14 @@ const EditarMembro: React.FC = () => {
 
       // Se for para criar usuário do sistema e o membro ainda não tem usuário vinculado
       if (!memberHadSystemUser && !updatedMember.user && create_system_user) {
-        if (system_role && user_email && user_password) {
+        if (system_role && user_email) {
           const normalizedRole = system_role === 'denomination_admin' ? 'church_admin' : system_role;
-          const res = await membersService.createSystemUser(Number(id), { system_role: normalizedRole, user_email, user_password });
+          // Backend gera senha automaticamente e envia por e-mail
+          const res = await membersService.createSystemUser(Number(id), { 
+            system_role: normalizedRole, 
+            user_email 
+          });
+          
           // Feedback explícito quando e-mail já existia (backend retorna 'atualizado' na mensagem)
           const roleLabel = (role: string) => (
             role === 'denomination_admin' ? 'Administrador da Denominação (Nível 3)' :
@@ -80,9 +86,13 @@ const EditarMembro: React.FC = () => {
           );
           const chosenLabel = roleLabel(system_role);
           if ((res?.message || '').toLowerCase().includes('atualiz')) {
-            toast.success(`E-mail já existia: senha atualizada e usuário vinculado como ${chosenLabel}.`);
+            toast.success(`E-mail já existia: usuário vinculado como ${chosenLabel}.`, {
+              description: 'Credenciais enviadas por e-mail.'
+            });
           } else {
-            toast.success(`Usuário do sistema criado e vinculado como ${chosenLabel}.`);
+            toast.success(`Usuário do sistema criado como ${chosenLabel}!`, {
+              description: `Credenciais enviadas para ${user_email}.`
+            });
           }
         }
       }

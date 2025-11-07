@@ -127,16 +127,12 @@ class CustomUser(AbstractUser):
     objects = CustomUserManager()
     
     class Meta:
-        verbose_name = "Usuário"
-        verbose_name_plural = "Usuários"
-        ordering = ['full_name', 'email']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['email'],
-                condition=models.Q(is_active=True),
-                name='unique_active_email'
-            )
-        ]
+        verbose_name = 'Usuário'
+        verbose_name_plural = 'Usuários'
+        db_table = 'accounts_customuser'
+        # Email uniqueness is enforced per-church via serializers
+        # to support multi-tenant architecture where same email
+        # can exist in different churches
     
     def __str__(self):
         return f"{self.full_name} ({self.email})"

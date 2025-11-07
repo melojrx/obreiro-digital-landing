@@ -62,6 +62,50 @@ Documentação detalhada: `docs/Sistema_de_Permissoes.md`
 - Visitantes: cadastro público por QR, gestão administrativa e estatísticas por filial.
 - Membros: CRUD completo, transferência assistida entre filiais dentro da mesma igreja, criação de acesso ao sistema a partir do cadastro.
 - Perfil: atualização de dados pessoais e dados de igreja (endpoints expostos e integrados ao frontend).
+- **Envio de Senha por Email**: ao conceder acesso ao sistema para um membro, uma senha segura é gerada automaticamente e enviada por email com template personalizado.
+
+### 📧 Funcionalidade de Envio de Senha por Email
+
+Quando um administrador concede acesso ao sistema para um membro, o sistema:
+
+1. **Gera senha automática** (16 caracteres seguros)
+2. **Cria usuário** com credenciais
+3. **Envia email** com template personalizado contendo:
+   - Nome do membro
+   - Nome da igreja
+   - Email de acesso
+   - Senha temporária
+   - Papel/permissão atribuída
+   - Instruções de primeiro acesso
+
+**Configuração Necessária (Dev e Prod):**
+
+```env
+# .env_dev ou .env_prod
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=suporteobreirovirtual@gmail.com
+EMAIL_HOST_PASSWORD=sua-senha-de-app-gmail-aqui
+DEFAULT_FROM_EMAIL=suporteobreirovirtual@gmail.com
+```
+
+**⚠️ IMPORTANTE - Gmail App Password:**
+- NÃO use a senha normal do Gmail
+- Gere uma "Senha de app" em: https://myaccount.google.com/apppasswords
+- Copie a senha SEM espaços (ex: `wrwcjirnbxguidqn`)
+- Autenticação de 2 fatores DEVE estar habilitada
+
+**Testar envio de email:**
+
+```bash
+# Desenvolvimento
+docker compose -f docker-compose.dev.yml exec backend python test_member_with_email.py
+
+# Produção
+docker compose -f docker-compose.prod.yml exec backend python test_smtp_production.py
+```
 
 Docs dos planos e decisões:
 - `docs/plano-reestruturacao-modelos.md`
@@ -96,6 +140,12 @@ docker compose -f docker-compose.dev.yml restart backend
 
 ## 💡 Troubleshooting (dev)
 
+- **Email não está sendo enviado:**
+  - Verifique `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend` no `.env_dev`
+  - Confirme que a senha do Gmail é uma "senha de app" (não a senha normal)
+  - Reinicie o backend: `docker compose -f docker-compose.dev.yml down backend && docker compose -f docker-compose.dev.yml up -d backend`
+  - Execute o teste: `docker compose -f docker-compose.dev.yml exec backend python test_member_with_email.py`
+
 - Erro CORS/Network no login (vite → backend):
   - Verifique `FRONTEND_URL=http://localhost:5173` e `CORS_ALLOW_ALL_ORIGINS=True` no `.env_dev` do backend.
   - Reinicie o backend: `docker compose -f docker-compose.dev.yml restart backend`.
@@ -116,6 +166,7 @@ docker compose -f docker-compose.dev.yml restart backend
 ## 📚 Documentação
 
 - Sistema de Permissões: `docs/Sistema_de_Permissoes.md`
+- Deploy e Configuração de Email: `docs/DEPLOY_EMAIL.md`
 - Plano de reestruturação de modelos: `docs/plano-reestruturacao-modelos.md`
 - Plano CRUD de Filiais: `docs/plano-crud-filiais.md`
 - Plano de permissões (passo a passo): `docs/plano-permissoes.md`

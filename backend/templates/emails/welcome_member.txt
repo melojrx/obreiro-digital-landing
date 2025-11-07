@@ -1,0 +1,56 @@
+================================================================================
+OBREIRO DIGITAL - BEM-VINDO AO SISTEMA
+================================================================================
+
+Olá, {{ member_name }}!
+
+Seja bem-vindo(a) ao Obreiro Digital!
+Estamos felizes em tê-lo(a) como parte da nossa comunidade.
+
+Você recebeu acesso ao sistema de gestão da {{ church_name }}
+com o papel de {{ role_display }}.
+
+================================================================================
+SUAS CREDENCIAIS DE ACESSO
+================================================================================
+
+📧 E-mail:
+   {{ user_email }}
+
+🔐 Senha temporária:
+   {{ user_password }}
+
+================================================================================
+⚠️  IMPORTANTE - SEGURANÇA DA CONTA
+================================================================================
+
+• Esta é uma senha temporária gerada automaticamente
+• Recomendamos fortemente que você altere sua senha após o primeiro acesso
+• Não compartilhe suas credenciais com outras pessoas
+• Guarde esta senha em um local seguro
+
+================================================================================
+ACESSO AO SISTEMA
+================================================================================
+
+Acesse o sistema através do link:
+{{ login_url }}
+
+================================================================================
+O QUE VOCÊ PODE FAZER NO SISTEMA
+================================================================================
+
+{{ role_description }}
+
+================================================================================
+
+Se você tiver alguma dúvida ou precisar de ajuda, não hesite em entrar em
+contato com o administrador da sua igreja ou com nossa equipe de suporte.
+
+Boas-vindas e bom trabalho!
+Equipe Obreiro Digital
+
+---
+Este é um e-mail automático, por favor não responda diretamente.
+Em caso de dúvidas, entre em contato com: suporteobreirovirtual@gmail.com
+================================================================================

@@ -248,17 +248,29 @@ class RoleChoices(models.TextChoices):
     """
     Papéis de usuário no sistema.
     
-    CHURCH_ADMIN: Papel do usuário pagante que gerencia uma ou múltiplas igrejas.
-                  Este papel substitui o antigo DENOMINATION_ADMIN e centraliza
-                  toda a administração de igrejas e denominações.
+    ROLES ATIVOS (usados no sistema):
+    - SUPER_ADMIN: Administrador técnico da plataforma (oculto do frontend)
+    - CHURCH_ADMIN: Administrador que gerencia uma ou múltiplas igrejas
+                     (substitui o antigo DENOMINATION_ADMIN que era simbólico)
+    - SECRETARY: Secretário(a) com permissões limitadas
+    
+    ROLES LEGADOS (mantidos apenas para compatibilidade de banco de dados):
+    - PASTOR, LEADER, MEMBER, READ_ONLY: Não são mais utilizados no frontend
+                                          e não devem ser atribuídos a novos usuários.
+                                          Existem apenas para evitar quebra de dados antigos.
+    
+    IMPORTANTE: O frontend (MemberForm.tsx) usa um roleCatalog que expõe apenas:
+                - denomination_admin (simbólico, converte para church_admin)
+                - church_admin (real)
+                - secretary (real)
     """
     SUPER_ADMIN = 'super_admin', 'Super Administrador'
     CHURCH_ADMIN = 'church_admin', 'Administrador da Igreja'
-    PASTOR = 'pastor', 'Pastor'
+    PASTOR = 'pastor', 'Pastor'  # LEGADO - não usar
     SECRETARY = 'secretary', 'Secretário(a)'
-    LEADER = 'leader', 'Líder'
-    MEMBER = 'member', 'Membro'
-    READ_ONLY = 'read_only', 'Somente Leitura'
+    LEADER = 'leader', 'Líder'  # LEGADO - não usar
+    MEMBER = 'member', 'Membro'  # LEGADO - não usar
+    READ_ONLY = 'read_only', 'Somente Leitura'  # LEGADO - não usar
 
 
 class MembershipStatusChoices(models.TextChoices):
