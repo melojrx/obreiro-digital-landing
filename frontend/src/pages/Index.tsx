@@ -590,7 +590,7 @@ const Index = () => {
                 Modernizando a gestão eclesiástica com tecnologia de ponta.
               </p>
               <div className="text-slate-400">
-                <p>📧 contato@obreirovirtual.com.br</p>
+                <p>📧 suporteobreirovirtual@gmail.com</p>
                 <p>📞 (11) 3000-0000</p>
               </div>
             </div>
