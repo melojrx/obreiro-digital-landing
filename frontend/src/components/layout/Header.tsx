@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ChurchSelector } from "./ChurchSelector";
 import { BranchSelector } from "./BranchSelector";
+import { NotificationDropdown } from "@/components/notifications";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -72,10 +73,7 @@ const Header: React.FC = () => {
             </Button>
 
             {/* Notifications */}
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
-            </Button>
+            <NotificationDropdown />
 
             {/* User Menu */}
             <DropdownMenu>

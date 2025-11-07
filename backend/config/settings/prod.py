@@ -14,6 +14,24 @@ DEBUG = False
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['obreirovirtual.com', 'www.obreirovirtual.com'])
 
 # =================================
+# NOTIFICATIONS - SSE desabilitado em produção
+# =================================
+
+# ⚠️ SSE DESABILITADO EM PRODUÇÃO
+# Motivo: Requer Gunicorn+Gevent ou servidor ASGI
+# time.sleep() bloqueia workers WSGI, causando travamento com múltiplos usuários
+# 
+# Para habilitar SSE em produção:
+# 1. Migrar para Gunicorn com worker gevent: gunicorn -k gevent
+# 2. OU migrar para ASGI (Uvicorn/Daphne + Django Channels)
+# 3. Implementar cache Redis para contagens (evitar query N+1)
+# 4. Adicionar limite de conexões por usuário
+# 5. Testar com 100+ usuários simultâneos
+#
+# Enquanto isso, polling é estável e confiável (latência 60s é aceitável)
+ENABLE_SSE = False  # Polling ativo como estratégia principal
+
+# =================================
 # DATABASE - PostgreSQL
 # =================================
 

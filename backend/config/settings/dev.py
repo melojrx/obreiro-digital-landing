@@ -19,6 +19,12 @@ ALLOWED_HOSTS = [
 ]
 
 # =================================
+# NOTIFICATIONS - SSE habilitado em dev
+# =================================
+
+ENABLE_SSE = True  # SSE funciona em dev com runserver
+
+# =================================
 # DATABASE - PostgreSQL para consistência
 # =================================
 

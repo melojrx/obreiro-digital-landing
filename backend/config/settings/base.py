@@ -67,6 +67,7 @@ LOCAL_APPS = [
     "apps.visitors",
     "apps.activities",
     "apps.prayers",
+    "apps.notifications",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -252,6 +253,22 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+
+# =================================
+# NOTIFICATIONS CONFIGURATION
+# =================================
+
+# SSE (Server-Sent Events) para notificações em tempo real
+# ⚠️ ATENÇÃO: SSE em produção requer servidor ASGI (Uvicorn/Daphne) ou Gunicorn+Gevent
+# Atualmente desabilitado em produção para evitar bloqueio de workers
+# Ver: docs/SSE_PRODUCTION_REQUIREMENTS.md
+ENABLE_SSE = env.bool("ENABLE_SSE", default=False)  # Padrão: False (usar polling)
+SSE_CHECK_INTERVAL = env.int("SSE_CHECK_INTERVAL", default=3)  # Segundos entre verificações
+SSE_HEARTBEAT_INTERVAL = env.int("SSE_HEARTBEAT_INTERVAL", default=30)  # Heartbeat
+SSE_MAX_CONNECTIONS_PER_USER = env.int("SSE_MAX_CONNECTIONS_PER_USER", default=1)
+
+# Polling como estratégia principal/fallback
+NOTIFICATION_POLLING_INTERVAL = env.int("NOTIFICATION_POLLING_INTERVAL", default=60000)  # ms
 
 # =================================
 # CACHE CONFIGURATION

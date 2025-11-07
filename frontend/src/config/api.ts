@@ -11,6 +11,20 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80
 // URL base do servidor (sem /api/v1)
 export const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8000';
 
+// Configurações de notificações em tempo real
+export const NOTIFICATIONS_CONFIG = {
+  // SSE (Server-Sent Events) - Desabilitado em produção por padrão
+  // Requer Gunicorn+Gevent ou servidor ASGI para funcionar corretamente
+  enableSSE: import.meta.env.VITE_ENABLE_SSE === 'true' || import.meta.env.MODE === 'development',
+  
+  // Polling - Estratégia principal/fallback
+  pollingInterval: parseInt(import.meta.env.VITE_NOTIFICATION_POLLING_INTERVAL || '60000', 10), // 60s
+  
+  // Endpoints
+  sseStreamUrl: '/api/v1/notifications/stream/',
+  unreadCountUrl: '/api/v1/notifications/unread_count/',
+} as const;
+
 // Criação da instância do Axios
 const api = axios.create({
   baseURL: API_BASE_URL,

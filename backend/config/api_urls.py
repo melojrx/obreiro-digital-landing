@@ -15,6 +15,7 @@ from apps.branches.views import BranchViewSet
 from apps.members.views import MemberViewSet, MinisterialFunctionHistoryViewSet, MembershipStatusViewSet
 from apps.visitors.views import VisitorViewSet
 from apps.activities.views import ActivityViewSet, MinistryViewSet
+from apps.notifications.views import NotificationViewSet
 
 # Views de usuários removidas - usar sistema de cadastro existente
 
@@ -31,6 +32,7 @@ router.register(r'membership-status', MembershipStatusViewSet, basename='members
 router.register(r'visitors', VisitorViewSet, basename='visitor')
 router.register(r'activities', ActivityViewSet, basename='activity')
 router.register(r'ministries', MinistryViewSet, basename='ministry')
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 # Importar views necessárias
 from apps.accounts.views import me, my_church, upload_avatar, update_personal_data, update_church_data
