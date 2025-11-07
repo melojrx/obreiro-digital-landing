@@ -119,7 +119,11 @@ const Index = () => {
       <header className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
+            <a 
+              href="https://www.obreirovirtual.com" 
+              className="flex items-center hover:opacity-80 transition-opacity"
+              aria-label="Ir para página inicial do Obreiro Virtual"
+            >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-blue-800 mr-3 flex-shrink-0">
                 <path d="M10 9h4"></path>
                 <path d="M12 7v5"></path>
@@ -131,7 +135,7 @@ const Index = () => {
                 <span className="text-blue-800">Obreiro</span>
                 <span className="text-fuchsia-600">Virtual</span>
               </div>
-            </div>
+            </a>
             
             {/* Desktop Navigation */}
             <nav className="hidden md:flex space-x-8">
@@ -565,7 +569,11 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center mb-4">
+              <a 
+                href="https://www.obreirovirtual.com" 
+                className="flex items-center mb-4 hover:opacity-80 transition-opacity w-fit"
+                aria-label="Ir para página inicial do Obreiro Virtual"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-blue-400 mr-3 flex-shrink-0">
                   <path d="M10 9h4"></path>
                   <path d="M12 7v5"></path>
@@ -577,7 +585,7 @@ const Index = () => {
                   <span className="text-blue-400">Obreiro</span>
                   <span className="text-fuchsia-400">Virtual</span>
                 </div>
-              </div>
+              </a>
               <p className="text-slate-400 mb-4">
                 Modernizando a gestão eclesiástica com tecnologia de ponta.
               </p>

@@ -94,20 +94,25 @@ const Sidebar: React.FC = () => {
             "flex items-center transition-all duration-300",
             isCollapsed ? "justify-center p-4" : "justify-between p-6"
           )}>
-            <div className={cn(
-              "flex items-center transition-all duration-300",
-              isCollapsed ? "space-x-0" : "space-x-2"
-            )}>
-              {!isCollapsed && (
-                <>
-                  <Church className="h-8 w-8 text-white flex-shrink-0" />
-                  <div className="transition-all duration-300 opacity-100">
-                    <h1 className="text-lg font-bold">Obreiro Virtual</h1>
-                    <p className="text-xs text-blue-200">Sistema de Gestão Eclesiástica</p>
-                  </div>
-                </>
+            <Link 
+              to="/" 
+              className={cn(
+                "flex items-center transition-all duration-300 hover:opacity-80",
+                isCollapsed ? "space-x-0" : "space-x-2"
               )}
-            </div>
+              aria-label="Ir para o dashboard"
+            >
+              <Church className={cn(
+                "h-8 w-8 text-white flex-shrink-0",
+                isCollapsed ? "" : ""
+              )} />
+              {!isCollapsed && (
+                <div className="transition-all duration-300 opacity-100">
+                  <h1 className="text-lg font-bold">Obreiro Virtual</h1>
+                  <p className="text-xs text-blue-200">Sistema de Gestão Eclesiástica</p>
+                </div>
+              )}
+            </Link>
             
             {/* Botão de Toggle */}
             <Tooltip>
