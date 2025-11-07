@@ -110,9 +110,27 @@ export const buildApiUrl = (endpoint: string): string => {
 
 // Helper para construir URLs de arquivos de media
 export const buildMediaUrl = (mediaPath: string): string => {
-  if (!mediaPath) return '';
-  if (mediaPath.startsWith('http')) return mediaPath; // URL já completa
-  return `${SERVER_BASE_URL}${mediaPath}`;
+  console.log('🔧 [buildMediaUrl] INPUT:', mediaPath);
+  console.log('🔧 [buildMediaUrl] SERVER_BASE_URL:', SERVER_BASE_URL);
+  
+  if (!mediaPath) {
+    console.log('🔧 [buildMediaUrl] mediaPath vazio, retornando ""');
+    return '';
+  }
+  
+  if (mediaPath.startsWith('http')) {
+    console.log('🔧 [buildMediaUrl] URL já completa, retornando:', mediaPath);
+    return mediaPath; // URL já completa
+  }
+  
+  // Remover barra inicial do mediaPath se existir para evitar //
+  const cleanPath = mediaPath.startsWith('/') ? mediaPath.substring(1) : mediaPath;
+  const finalUrl = `${SERVER_BASE_URL}/${cleanPath}`;
+  
+  console.log('🔧 [buildMediaUrl] cleanPath:', cleanPath);
+  console.log('🔧 [buildMediaUrl] OUTPUT:', finalUrl);
+  
+  return finalUrl;
 };
 
 // Endpoints da API

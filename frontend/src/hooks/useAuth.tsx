@@ -417,28 +417,55 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setError(null);
       setIsLoading(true);
+      
+      console.log('🔄 [uploadAvatar] Iniciando upload...', { fileName: file.name, fileSize: file.size });
+      
       const response = await authService.uploadAvatar(file);
+      
+      console.log('📦 [uploadAvatar] Resposta do backend:', response);
       
       // Atualizar o estado do usuário com a nova URL do avatar
       setUser(prevUser => {
+        console.log('👤 [uploadAvatar] Usuário ANTES da atualização:', prevUser);
+        
+        if (!prevUser) {
+          console.warn('⚠️ [uploadAvatar] prevUser é null, não é possível atualizar!');
+          return prevUser;
+        }
+        
         const updatedUser = {
-          ...response.user,
+          ...prevUser, // Preservar todos os dados existentes
           profile: {
-            ...response.user.profile,
-            avatar: response.avatar_url
+            ...prevUser.profile, // Preservar profile existente
+            avatar: response.avatar_url // Atualizar apenas o avatar
           }
         };
         
+        console.log('👤 [uploadAvatar] Usuário APÓS a atualização:', updatedUser);
+        console.log('🖼️ [uploadAvatar] Avatar URL:', response.avatar_url);
+        
         // Também atualizar o localStorage
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        
-        console.log('✅ Avatar atualizado no contexto:', response.avatar_url);
-        console.log('✅ Usuário atualizado:', updatedUser);
+        console.log('💾 [uploadAvatar] localStorage atualizado');
         
         return updatedUser;
       });
       
+      // Forçar re-busca dos dados do servidor para garantir sincronização
+      console.log('🔄 [uploadAvatar] Recarregando dados do servidor...');
+      try {
+        const freshUserData = await authService.getCurrentUser();
+        console.log('✅ [uploadAvatar] Dados atualizados do servidor:', freshUserData);
+        setUser(freshUserData);
+        localStorage.setItem('user', JSON.stringify(freshUserData));
+      } catch (refreshError) {
+        console.warn('⚠️ [uploadAvatar] Erro ao recarregar dados, mantendo dados da resposta do upload:', refreshError);
+      }
+      
+      console.log('✅ [uploadAvatar] Upload concluído com sucesso!');
+      
     } catch (err) {
+      console.error('❌ [uploadAvatar] Erro durante upload:', err);
       if (err instanceof AuthError) {
         setError(err.message);
       } else {

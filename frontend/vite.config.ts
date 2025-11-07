@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => ({
         target: 'http://backend:8000',
         changeOrigin: true,
         secure: false,
+      },
+      '/media': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
       }
     }
   },

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
-import { buildMediaUrl } from '@/config/api';
 
 interface UserAvatarProps {
   size?: 'sm' | 'md' | 'lg';
@@ -23,14 +22,14 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       .slice(0, 2);
   };
 
-  // Construir URL completa do avatar com cache-busting baseado no timestamp do arquivo
+  // Construir URL do avatar com cache-busting
+  // O Vite proxy irá redirecionar /media/ para http://backend:8000/media/
   const avatarUrl = React.useMemo(() => {
     if (!user?.profile?.avatar) return '';
     
-    const fullUrl = buildMediaUrl(user.profile.avatar);
-    // Usar um hash baseado no nome do arquivo para cache-busting consistente
-    const cacheKey = user.profile.avatar.split('/').pop() || Date.now().toString();
-    return `${fullUrl}?v=${cacheKey}`;
+    // Usar URL diretamente do backend + cache-busting
+    const timestamp = Date.now();
+    return `${user.profile.avatar}?t=${timestamp}`;
   }, [user?.profile?.avatar]);
 
   // Debug: log quando o avatar muda

@@ -53,12 +53,17 @@ const Perfil: React.FC = () => {
       return;
     }
 
+    console.log('📸 Iniciando upload de avatar...');
+    console.log('📸 Usuário ANTES do upload:', user);
+    
     setIsUploadingAvatar(true);
     try {
       await uploadAvatar(file);
+      console.log('📸 Upload concluído!');
+      console.log('📸 Usuário APÓS o upload:', user);
       toast.success('🎉 Foto de perfil atualizada com sucesso!');
     } catch (error) {
-      console.error('Erro ao fazer upload:', error);
+      console.error('❌ Erro ao fazer upload:', error);
       toast.error('❌ Erro ao fazer upload da foto. Tente novamente.');
     } finally {
       setIsUploadingAvatar(false);
