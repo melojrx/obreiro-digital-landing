@@ -283,27 +283,101 @@ class EmailService:
         member_name: Optional[str] = None,
     ) -> bool:
         """
-        Envia email de redefinição de senha (FUTURO).
+        Envia email de redefinição de senha com link para criar nova senha.
         
         Args:
             user_email: Email do usuário
             reset_token: Token de redefinição
-            member_name: Nome do membro (opcional)
+            member_name: Nome do membro (opcional, usa email se não fornecido)
             
         Returns:
             True se enviado com sucesso
             
-        Note:
-            Este método será implementado no futuro quando
-            tivermos o fluxo de redefinição de senha.
+        Raises:
+            EmailServiceError: Se houver erro crítico no envio
+            
+        Exemplo:
+            >>> EmailService.send_password_reset(
+            ...     user_email='joao@example.com',
+            ...     reset_token='abc123xyz789',
+            ...     member_name='João Silva'
+            ... )
+            True
         """
-        logger.warning(
-            f"⚠️  Método send_password_reset ainda não implementado "
-            f"(chamado para {user_email})"
-        )
-        raise NotImplementedError(
-            "Funcionalidade de redefinição de senha será implementada em breve"
-        )
+        try:
+            # Validações básicas
+            if not all([user_email, reset_token]):
+                raise EmailServiceError(
+                    "Email e token são obrigatórios"
+                )
+            
+            # Nome padrão se não fornecido
+            if not member_name:
+                member_name = user_email.split('@')[0].title()
+            
+            logger.info(
+                f"📧 Iniciando envio de email de redefinição de senha para {user_email}"
+            )
+            
+            # Construir link de redefinição
+            reset_url = f'{EmailService.FRONTEND_URL}/redefinir-senha?token={reset_token}'
+            
+            # Contexto para os templates
+            context = {
+                'member_name': member_name,
+                'user_email': user_email,
+                'reset_url': reset_url,
+                'reset_token': reset_token,
+                'frontend_url': EmailService.FRONTEND_URL,
+                'support_email': 'suporteobreirovirtual@gmail.com',
+            }
+            
+            # Renderizar templates
+            try:
+                html_content = render_to_string(
+                    'emails/password_reset.html',
+                    context
+                )
+                text_content = render_to_string(
+                    'emails/password_reset.txt',
+                    context
+                )
+            except Exception as e:
+                logger.error(f"❌ Erro ao renderizar templates: {e}")
+                raise EmailServiceError(f"Falha ao renderizar templates: {e}")
+            
+            # Criar email multipart
+            subject = 'Redefinição de Senha - Obreiro Virtual'
+            
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=EmailService.DEFAULT_FROM_EMAIL,
+                to=[user_email],
+            )
+            
+            # Anexar versão HTML
+            email.attach_alternative(html_content, "text/html")
+            
+            # Enviar email
+            email.send(fail_silently=False)
+            
+            logger.info(
+                f"✅ Email de redefinição de senha enviado com sucesso para {user_email}"
+            )
+            
+            return True
+            
+        except EmailServiceError:
+            # Re-raise exceções de serviço
+            raise
+            
+        except Exception as e:
+            logger.error(
+                f"❌ Erro ao enviar email de redefinição para {user_email}: {e}",
+                exc_info=True
+            )
+            raise EmailServiceError(f"Falha ao enviar email: {e}")
     
     @staticmethod
     def send_notification(

@@ -11,11 +11,21 @@ from .views import (
     update_church_data,
     finalize_registration,
 )
+from .views_password_reset import (
+    request_password_reset,
+    validate_reset_token,
+    reset_password,
+)
 
 urlpatterns = [
     # Auth
     path('login/', CustomAuthToken.as_view(), name='login'),
     path('finalize-registration/', finalize_registration, name='finalize-registration'),
+    
+    # Password Reset
+    path('password-reset/request/', request_password_reset, name='password-reset-request'),
+    path('password-reset/validate/', validate_reset_token, name='password-reset-validate'),
+    path('password-reset/confirm/', reset_password, name='password-reset-confirm'),
 
     # Users endpoints (compat com frontend)
     path('users/me/', me, name='me'),

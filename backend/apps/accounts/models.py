@@ -9,6 +9,8 @@ from django.core.exceptions import ValidationError
 from apps.core.models import BaseModel, ActiveManager, RoleChoices, GenderChoices, SubscriptionPlanChoices
 from apps.core.models import validate_cpf, phone_validator
 
+# Importar modelo de reset de senha
+from .models_password_reset import PasswordResetToken
 
 LEGACY_DENOMINATION_ROLE = 'denomination_admin'
 

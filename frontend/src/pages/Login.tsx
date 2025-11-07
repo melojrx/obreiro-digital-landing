@@ -166,9 +166,9 @@ const Login = () => {
                 </label>
               </div>
               <div className="text-sm">
-                <a href="#" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+                <Link to="/esqueci-senha" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
                   Esqueceu a senha?
-                </a>
+                </Link>
               </div>
             </div>
 

@@ -33,6 +33,8 @@ import QRCodesPage from "./pages/QRCodesPage";
 import RegistroVisitante from "./pages/RegistroVisitante";
 import RegistroSucesso from "./pages/RegistroSucesso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
+import EsqueciSenha from "./pages/EsqueciSenha";
+import RedefinirSenha from "./pages/RedefinirSenha";
 import NotFound, { Pagamento } from "./pages/NotFound";
 
 // Lazy loading para componentes hierárquicos
@@ -82,6 +84,22 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="public">
             <Login />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/esqueci-senha" 
+        element={
+          <ProtectedRoute level="public">
+            <EsqueciSenha />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/redefinir-senha" 
+        element={
+          <ProtectedRoute level="public">
+            <RedefinirSenha />
           </ProtectedRoute>
         } 
       />
