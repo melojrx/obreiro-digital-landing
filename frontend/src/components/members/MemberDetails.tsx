@@ -34,9 +34,6 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [resetOpen, setResetOpen] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
   
   const getMinisterialFunctionDisplay = (func: string) => {
     return MINISTERIAL_FUNCTION_CHOICES[func as keyof typeof MINISTERIAL_FUNCTION_CHOICES] || func;
@@ -100,41 +97,6 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
     if (role === 'denomination_admin') return 'Administrador da Denominação (Nível 3)';
     return role;
   };
-
-  const canResetDirectly = Boolean(member.system_user_email && member.system_user_role);
-
-  const handleResetPassword = async () => {
-    if (!member || !member.id || !member.system_user_email || !member.system_user_role) {
-      setResetOpen(false);
-      return;
-    }
-    if (!newPassword || newPassword.length < 8) {
-      toast({ title: 'Informe uma nova senha válida (mín. 8 caracteres).', variant: 'destructive' });
-      return;
-    }
-    try {
-      setResetLoading(true);
-      const normalizedRole = member.system_user_role === 'denomination_admin' ? 'church_admin' : member.system_user_role;
-      const res = await (await import('@/services/membersService')).membersService.createSystemUser(member.id, {
-        system_role: normalizedRole,
-        user_email: member.system_user_email,
-        user_password: newPassword,
-      });
-      const updated = res?.member;
-      toast({ title: 'Senha redefinida com sucesso.' });
-      setResetOpen(false);
-      setNewPassword('');
-    } catch (error: any) {
-      let message = 'Não foi possível redefinir a senha.';
-      const data = error?.response?.data;
-      if (typeof data === 'string') message = data;
-      else if (data?.detail) message = data.detail;
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
 
   // Handlers antigos removidos
 
@@ -666,53 +628,15 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
                       <p className="text-gray-900">{member.system_user_email || 'Não disponível'}</p>
                     </div>
                     <div className="pt-1">
-                      {canResetDirectly ? (
-                        <Button variant="outline" onClick={() => setResetOpen(true)}>
-                          Definir nova senha
-                        </Button>
-                      ) : (
-                        <Button variant="outline" onClick={onEdit}>
-                          Gerenciar acesso (Editar)
-                        </Button>
-                      )}
+                      <Button variant="outline" onClick={onEdit}>
+                        Gerenciar acesso (Editar)
+                      </Button>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           )}
-
-          {/* Modal de redefinição de senha */}
-          <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Redefinir senha de acesso</DialogTitle>
-                <DialogDescription>
-                  Informe a nova senha para o usuário de acesso ao sistema.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">E-mail</label>
-                  <p className="text-gray-900">{member.system_user_email}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Papel</label>
-                  <p className="text-gray-900">{member.system_user_role_label || roleLabel(member.system_user_role)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500" htmlFor="new-password">Nova Senha</label>
-                  <Input id="new-password" type="password" placeholder="Mínimo 8 caracteres" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setResetOpen(false)} disabled={resetLoading}>Cancelar</Button>
-                <Button onClick={handleResetPassword} disabled={resetLoading || !newPassword}>
-                  {resetLoading ? 'Salvando...' : 'Salvar nova senha'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </TabsContent>
       </Tabs>
       

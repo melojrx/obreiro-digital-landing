@@ -62,39 +62,36 @@ const EditarMembro: React.FC = () => {
       const previousStatus = member?.membership_status ?? null;
       const previousFunction = member?.ministerial_function ?? null;
       const memberHadSystemUser = Boolean(member?.user);
-      const updatedMember = await membersService.updateMember(Number(id), memberUpdateData);
+      
+      // Preparar dados de atualização
+      const updateData: any = { ...memberUpdateData };
+      
+      // Se for para conceder acesso ao sistema, adicionar campos necessários
+      if (!memberHadSystemUser && create_system_user && system_role && user_email) {
+        const normalizedRole = system_role === 'denomination_admin' ? 'church_admin' : system_role;
+        updateData.grant_system_access = true;
+        updateData.system_role = normalizedRole;
+        updateData.user_email = user_email;
+      }
+      
+      // Atualizar membro (e conceder acesso se solicitado)
+      const updatedMember = await membersService.updateMember(Number(id), updateData);
       const newStatus = updatedMember?.membership_status ?? null;
       const newFunction = updatedMember?.ministerial_function ?? null;
       const statusChanged = (previousStatus ?? null) !== (newStatus ?? null);
       const functionChanged = (previousFunction ?? null) !== (newFunction ?? null);
 
-      // Se for para criar usuário do sistema e o membro ainda não tem usuário vinculado
-      if (!memberHadSystemUser && !updatedMember.user && create_system_user) {
-        if (system_role && user_email) {
-          const normalizedRole = system_role === 'denomination_admin' ? 'church_admin' : system_role;
-          // Backend gera senha automaticamente e envia por e-mail
-          const res = await membersService.createSystemUser(Number(id), { 
-            system_role: normalizedRole, 
-            user_email 
-          });
-          
-          // Feedback explícito quando e-mail já existia (backend retorna 'atualizado' na mensagem)
-          const roleLabel = (role: string) => (
-            role === 'denomination_admin' ? 'Administrador da Denominação (Nível 3)' :
-            role === 'church_admin' ? 'Administrador da Igreja (Nível 2)' :
-            role === 'secretary' ? 'Secretário(a) (Nível 1)' : role
-          );
-          const chosenLabel = roleLabel(system_role);
-          if ((res?.message || '').toLowerCase().includes('atualiz')) {
-            toast.success(`E-mail já existia: usuário vinculado como ${chosenLabel}.`, {
-              description: 'Credenciais enviadas por e-mail.'
-            });
-          } else {
-            toast.success(`Usuário do sistema criado como ${chosenLabel}!`, {
-              description: `Credenciais enviadas para ${user_email}.`
-            });
-          }
-        }
+      // Feedback de criação de usuário do sistema
+      if (!memberHadSystemUser && updatedMember.user && create_system_user) {
+        const roleLabel = (role: string) => (
+          role === 'denomination_admin' ? 'Administrador da Denominação (Nível 3)' :
+          role === 'church_admin' ? 'Administrador da Igreja (Nível 2)' :
+          role === 'secretary' ? 'Secretário(a) (Nível 1)' : role
+        );
+        const chosenLabel = roleLabel(system_role);
+        toast.success(`Usuário do sistema criado como ${chosenLabel}!`, {
+          description: `Credenciais enviadas para ${user_email}.`
+        });
       }
 
       if (statusChanged) {
