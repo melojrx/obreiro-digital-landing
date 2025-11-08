@@ -596,12 +596,15 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         accept_sms: data.accept_sms,
         accept_email: data.accept_email,
         accept_whatsapp: data.accept_whatsapp,
-        // Campos de papel do sistema (mapear denomination_admin -> church_admin para compat)
-        create_system_user: data.create_system_user,
-        system_role: mappedRole,
-        user_email: data.user_email,
-        // NOTA: user_password removido - senha gerada automaticamente pelo backend
         
+        // Campos de acesso ao sistema - enviados APENAS quando create_system_user for true
+        // Usa spread condicional para evitar enviar strings vazias que causam erro de validação
+        ...(data.create_system_user && {
+          create_system_user: true,
+          system_role: mappedRole,
+          user_email: data.user_email,
+        }),
+        // NOTA: user_password removido - senha gerada automaticamente pelo backend
         
         // Foto
         photo: selectedPhoto || undefined,
