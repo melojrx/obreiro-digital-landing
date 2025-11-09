@@ -443,7 +443,8 @@ class VisitorViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
             
             visitor.save()
             
-            serializer = VisitorFollowUpSerializer(visitor)
+            # Usar VisitorSerializer completo para retornar todos os dados
+            serializer = VisitorSerializer(visitor)
             return Response(serializer.data)
         
         return Response({
