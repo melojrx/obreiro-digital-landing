@@ -38,6 +38,7 @@ interface VisitorDetailsProps {
   canEdit: boolean;
   canDelete: boolean;
   canConvert: boolean;
+  openConvertModal?: boolean; // Nova prop para controlar abertura do modal externamente
 }
 
 export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
@@ -50,15 +51,23 @@ export const VisitorDetails: React.FC<VisitorDetailsProps> = ({
   canEdit,
   canDelete,
   canConvert,
+  openConvertModal = false, // Valor padrão false
 }) => {
   const [conversionNotes, setConversionNotes] = useState('');
   const [convertPhone, setConvertPhone] = useState('');
   const [convertBirthDate, setConvertBirthDate] = useState('');
   const [followUpNotes, setFollowUpNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [showConvertDialog, setShowConvertDialog] = useState(false);
+  const [showConvertDialog, setShowConvertDialog] = useState(openConvertModal); // Usar prop inicial
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false);
   const [isUpdatingFollowUp, setIsUpdatingFollowUp] = useState(false);
+
+  // Atualizar estado do modal quando a prop mudar
+  React.useEffect(() => {
+    if (openConvertModal && !visitor.converted_to_member) {
+      setShowConvertDialog(true);
+    }
+  }, [openConvertModal, visitor.converted_to_member]);
 
   // Helpers de formatação/validação de telefone (Brasil)
   const formatPhone = (value: string): string => {

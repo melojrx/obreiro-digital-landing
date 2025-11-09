@@ -204,7 +204,8 @@ class VisitorListSerializer(serializers.ModelSerializer):
             'id', 'full_name', 'email', 'phone', 'age', 'branch_name',
             'city', 'state', 'first_visit', 'converted_to_member', 
             'follow_up_status', 'follow_up_status_display', 
-            'contact_attempts', 'last_contact_date', 'created_at'
+            'contact_attempts', 'last_contact_date', 'created_at',
+            'wants_prayer', 'wants_growth_group', 'ministry_interest', 'marital_status', 'gender'
         ]
 
 
@@ -300,6 +301,8 @@ class VisitorConversionSerializer(serializers.ModelSerializer):
                 updated = True
         if updated:
             instance.save(update_fields=[f for f in ['birth_date', 'phone', 'gender', 'marital_status'] if f in validated_data])
+            # Garantir que a instância tem os dados atualizados do banco antes da conversão
+            instance.refresh_from_db()
 
         notes = validated_data.get('conversion_notes', '')
         instance.convert_to_member(notes=notes)

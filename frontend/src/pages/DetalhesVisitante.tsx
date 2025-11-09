@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { VisitorDetails } from '@/components/visitors/VisitorDetails';
 import { getVisitor, deleteVisitor, convertVisitorToMember, updateVisitorFollowUp, type Visitor } from '@/services/visitorsService';
@@ -19,11 +19,15 @@ import {
 const DetalhesVisitante: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const permissions = usePermissions();
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  
+  // Verificar se deve abrir o modal de conversão (vindo da tabela)
+  const openConvertModal = location.state?.openConvertModal || false;
 
   useEffect(() => {
     const loadVisitor = async () => {
@@ -151,6 +155,7 @@ const DetalhesVisitante: React.FC = () => {
         canEdit={permissions.canManageVisitors}
         canDelete={permissions.canManageVisitors}
         canConvert={permissions.canManageMembers}
+        openConvertModal={openConvertModal}
       />
 
       {/* Dialog de confirmação para excluir */}

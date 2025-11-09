@@ -34,7 +34,8 @@ export const VisitorsTable: React.FC<VisitorsTableProps> = ({ visitors, onDelete
   };
 
   const handleConvert = (visitor: Visitor) => {
-    navigate(`/visitantes/${visitor.id}/converter`);
+    // Navega para a página de detalhes onde o modal de conversão está disponível
+    navigate(`/visitantes/${visitor.id}`, { state: { openConvertModal: true } });
   };
 
   const getInitials = (name: string): string => {

@@ -507,7 +507,11 @@ const RegistroVisitante: React.FC = () => {
                 <div className="space-y-3 sm:space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="marital_status" className="text-sm sm:text-base font-medium">Estado Civil</Label>
-                    <Select onValueChange={(value) => setValue('marital_status', value as any)}>
+                    <Select 
+                      onValueChange={(value) => setValue('marital_status', value as any)}
+                      value={watch('marital_status')}
+                      defaultValue="single"
+                    >
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
