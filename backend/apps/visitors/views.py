@@ -514,8 +514,30 @@ def recent_visitors(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated, IsMemberUser])
 def dashboard_stats(request):
-    """Estatísticas para dashboard"""
-    queryset = Visitor.objects.filter(is_active=True)
+    """
+    Estatísticas para dashboard - Multi-tenant scoped
+    Retorna apenas visitantes da igreja do usuário logado
+    """
+    from apps.accounts.models import ChurchUser
+    
+    # Obter igreja do usuário logado (isolamento multi-tenant)
+    church = ChurchUser.objects.get_active_church_for_user(request.user)
+    
+    if not church:
+        return Response({
+            'error': 'Usuário não está vinculado a nenhuma igreja ativa'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Aplicar filtro por igreja (multi-tenant)
+    queryset = Visitor.objects.filter(is_active=True, church=church)
+    
+    # Aplicar filtro por branch se usuário for Secretary (permissão granular)
+    user_church_user = request.user.church_users.filter(church=church, is_active=True).first()
+    if user_church_user and user_church_user.role_effective == 'secretary':
+        # Secretary vê apenas visitantes de sua branch
+        if user_church_user.active_branch:
+            queryset = queryset.filter(branch=user_church_user.active_branch)
+    
     now = timezone.now()
     
     # Estatísticas básicas

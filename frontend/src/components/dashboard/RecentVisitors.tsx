@@ -128,13 +128,13 @@ export const RecentVisitors: React.FC<RecentVisitorsProps> = ({
 
   return (
     <Card className={className}>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <UserPlus className="h-5 w-5" />
             <span>Visitantes Recentes</span>
           </div>
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="text-xs shrink-0">
             {visitors.length}
           </Badge>
         </CardTitle>
@@ -143,57 +143,56 @@ export const RecentVisitors: React.FC<RecentVisitorsProps> = ({
         </CardDescription>
       </CardHeader>
       
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         {visitors.length === 0 ? (
-          <div className="text-center py-8">
-            <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-sm font-medium text-gray-900 mb-2">
+          <div className="text-center py-6">
+            <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+            <h3 className="text-sm font-medium text-gray-900 mb-1">
               Nenhum visitante ainda
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs text-gray-500">
               Os visitantes que se registrarem via QR Code aparecerão aqui
             </p>
           </div>
         ) : (
           <>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {visitors.map((visitor) => (
                 <div 
                   key={visitor.id} 
-                  className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="flex items-start gap-3 p-2.5 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-200"
                 >
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="text-xs font-medium">
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarFallback className="text-xs font-medium bg-gradient-to-br from-blue-500 to-cyan-400 text-white">
                       {getInitials(visitor.full_name)}
                     </AvatarFallback>
                   </Avatar>
                   
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium text-gray-900 truncate">
+                  <div className="flex-1 min-w-0 space-y-1">
+                    {/* Linha 1: Nome e Tempo */}
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="text-sm font-medium text-gray-900 truncate leading-tight">
                         {visitor.full_name}
                       </h4>
-                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 shrink-0">
                         <Clock className="h-3 w-3" />
-                        <span>{formatRelativeTime(visitor.created_at)}</span>
+                        <span className="whitespace-nowrap">{formatRelativeTime(visitor.created_at)}</span>
                       </div>
                     </div>
                     
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="flex items-center space-x-2 text-xs text-gray-500">
-                        <MapPin className="h-3 w-3" />
-                        <span className="truncate">
-                          {visitor.branch_name || visitor.city}
-                        </span>
-                        {visitor.first_visit && (
-                          <Badge variant="outline" className="text-xs py-0">
-                            1ª visita
-                          </Badge>
-                        )}
-                      </div>
-                      
+                    {/* Linha 2: Localização */}
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">
+                        {visitor.branch_name || visitor.city}
+                      </span>
+                    </div>
+                    
+                    {/* Linha 3: Badges e Indicadores */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Badge de Status Principal */}
                       <Badge 
-                        className={`text-xs py-0 ${getStatusColor(
+                        className={`text-[10px] px-1.5 py-0 leading-tight shrink-0 ${getStatusColor(
                           visitor.follow_up_status, 
                           visitor.converted_to_member
                         )}`}
@@ -203,18 +202,23 @@ export const RecentVisitors: React.FC<RecentVisitorsProps> = ({
                           : formatFollowUpStatus(visitor.follow_up_status)
                         }
                       </Badge>
-                    </div>
-                    
-                    {/* Indicadores especiais */}
-                    <div className="flex items-center space-x-2 mt-2">
+                      
+                      {/* Badge Primeira Visita */}
+                      {visitor.first_visit && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 leading-tight shrink-0">
+                          1ª visita
+                        </Badge>
+                      )}
+                      
+                      {/* Indicadores Especiais */}
                       {visitor.wants_prayer && (
-                        <div className="flex items-center space-x-1 text-xs text-red-600">
+                        <div className="flex items-center gap-1 text-[10px] text-red-600 shrink-0">
                           <Heart className="h-3 w-3" />
                           <span>Oração</span>
                         </div>
                       )}
                       {visitor.wants_growth_group && (
-                        <div className="flex items-center space-x-1 text-xs text-blue-600">
+                        <div className="flex items-center gap-1 text-[10px] text-blue-600 shrink-0">
                           <Users className="h-3 w-3" />
                           <span>Grupo</span>
                         </div>
@@ -225,11 +229,11 @@ export const RecentVisitors: React.FC<RecentVisitorsProps> = ({
               ))}
             </div>
             
-            <div className="pt-4 border-t">
+            <div className="pt-2 border-t">
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="w-full"
+                className="w-full text-xs h-8"
                 onClick={() => window.location.href = '/visitantes'}
               >
                 Ver todos visitantes

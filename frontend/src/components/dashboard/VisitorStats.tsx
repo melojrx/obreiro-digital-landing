@@ -83,14 +83,14 @@ export const VisitorStats: React.FC<VisitorStatsProps> = ({ className }) => {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <QrCode className="h-5 w-5" />
-            <span>Visitantes via QR Code</span>
+            <span>Visitantes via QR Code (este mês)</span>
           </div>
           <Badge variant="secondary" className="text-xs">
             Total: {stats.total_visitors}
           </Badge>
         </CardTitle>
         <CardDescription>
-          Estatísticas do sistema de registro por QR Code
+          Estatísticas do sistema de registro por QR Code do mês atual
         </CardDescription>
       </CardHeader>
       

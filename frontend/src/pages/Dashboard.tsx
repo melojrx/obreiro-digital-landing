@@ -192,7 +192,7 @@ const Dashboard = () => {
                         color="bg-gradient-to-r from-blue-500 to-cyan-400"
                     />
                     <StatsCard
-                        title="Visitantes"
+                        title="Visitantes (este mês)"
                         value={data?.visitors.total ?? 0}
                         change={data?.visitors.change}
                         icon={<UserPlus className="h-5 w-5" />}

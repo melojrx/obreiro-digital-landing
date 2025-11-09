@@ -878,17 +878,15 @@ class ChurchViewSet(viewsets.ModelViewSet):
                 total_members = church.total_members or 0
                 
             try:
-                # Contar todos os visitantes da igreja (card mostra total, não apenas do mês)
-                real_visitors_total = Visitor.objects.filter(church=church, is_active=True).count()
-                # Visitantes do mês atual para cálculo de variação
+                # Contar visitantes do mês atual (padronizado com componente de QR Code)
                 real_visitors_this_month = Visitor.objects.filter(
                     church=church, 
                     is_active=True,
                     created_at__gte=start_of_this_month
                 ).count()
-                print(f"📊 Dashboard Visitantes - Total: {real_visitors_total}, Este mês: {real_visitors_this_month}")
-                # Mostrar total geral de visitantes
-                total_visitors_display = real_visitors_total
+                print(f"📊 Dashboard Visitantes - Este mês: {real_visitors_this_month}")
+                # Mostrar visitantes do mês corrente (padronizado)
+                total_visitors_display = real_visitors_this_month
             except Exception as e:
                 print(f"❌ Erro ao contar visitantes: {e}")
                 total_visitors_display = church.total_visitors or 0
@@ -938,8 +936,8 @@ class ChurchViewSet(viewsets.ModelViewSet):
                     'change': calculate_percentage_change(total_members, total_members_last_month)
                 },
                 'visitors': {
-                    'total': total_visitors_display,  # Total geral de visitantes
-                    'change': calculate_percentage_change(real_visitors_this_month, total_visitors_last_month)  # Mudança baseada no mês
+                    'total': total_visitors_display,  # Visitantes do mês corrente (padronizado)
+                    'change': calculate_percentage_change(real_visitors_this_month, total_visitors_last_month)  # Mudança vs mês anterior
                 },
                 'events': {
                     'total': active_events,
