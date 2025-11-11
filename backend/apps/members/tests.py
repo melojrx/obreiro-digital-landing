@@ -5,6 +5,7 @@ from rest_framework.test import APITestCase, APIClient
 from django.contrib.auth import get_user_model
 from datetime import date
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.denominations.models import Denomination
 from apps.churches.models import Church
@@ -604,3 +605,119 @@ class SpouseSynchronizationTest(TestCase):
 
         self.assertEqual(self.member_b.marital_status, "widowed")
         self.assertIsNone(self.member_b.spouse_id)
+
+
+class MemberBulkUploadTests(APITestCase):
+    """Testes para a ação de upload em lote de membros."""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            email="bulk-admin@test.com",
+            password="adminpassword",
+            full_name="Bulk Admin",
+            phone="(11) 99999-9999",
+        )
+
+        self.denomination = Denomination.objects.create(
+            name="Bulk Denomination",
+            short_name="BD",
+            administrator=self.admin_user,
+            email="bulk@test.com",
+            phone="(11) 98888-8888",
+            headquarters_address="Rua 1",
+            headquarters_city="Cidade",
+            headquarters_state="SP",
+            headquarters_zipcode="01010-010",
+        )
+
+        self.church = Church.objects.create(
+            denomination=self.denomination,
+            name="Bulk Church",
+            short_name="BC",
+            email="church@test.com",
+            phone="(11) 97777-7777",
+            address="Rua 2",
+            city="Cidade",
+            state="SP",
+            zipcode="02020-020",
+            subscription_end_date=date(2099, 1, 1),
+        )
+
+        self.branch = Branch.objects.create(
+            church=self.church,
+            name="Bulk Matriz",
+            short_name="Matriz",
+            description="Filial principal",
+            email="branch@test.com",
+            phone="(11) 96666-6666",
+            address="Rua 3",
+            neighborhood="Centro",
+            city="Cidade",
+            state="SP",
+            zipcode="03030-030",
+            qr_code_active=True,
+            is_main=True,
+        )
+
+        ChurchUser.objects.create(
+            user=self.admin_user,
+            church=self.church,
+            role=RoleChoices.CHURCH_ADMIN,
+            is_active=True,
+            is_user_active_church=True,
+            active_branch=self.branch,
+            can_manage_members=True,
+        )
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin_user)
+        self.bulk_url = reverse("member-bulk-upload")
+
+    def _upload(self, csv_content: str, **extra):
+        file = SimpleUploadedFile(
+            "membros.csv", csv_content.encode("utf-8"), content_type="text/csv"
+        )
+        data = {"file": file}
+        data.update(extra)
+        return self.client.post(self.bulk_url, data, format="multipart")
+
+    def test_bulk_upload_success(self):
+        csv_content = (
+            "Nome Completo;CPF;Data Nascimento;Telefone;Email;Genero;Estado Civil;Funcao Ministerial\n"
+            "Fulano da Silva;390.533.447-05;10/01/1990;(11) 91234-5678;fulano@test.com;M;Solteiro(a);Membro\n"
+        )
+        response = self._upload(csv_content)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["success_count"], 1)
+        self.assertEqual(response.data["error_count"], 0)
+        self.assertEqual(Member.objects.filter(church=self.church).count(), 1)
+
+    def test_bulk_upload_duplicate_skipped(self):
+        Member.objects.create(
+            church=self.church,
+            branch=self.branch,
+            full_name="Fulano da Silva",
+            cpf="390.533.447-05",
+            birth_date=date(1990, 1, 10),
+            phone="(11) 91234-5678",
+        )
+
+        csv_content = (
+            "Nome Completo;CPF;Data Nascimento;Telefone;Email;Genero;Estado Civil;Funcao Ministerial\n"
+            "Fulano da Silva;390.533.447-05;10/01/1990;(11) 91234-5678;fulano@test.com;M;Solteiro(a);Membro\n"
+        )
+        response = self._upload(csv_content)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["success_count"], 0)
+        self.assertEqual(response.data["duplicates_skipped"], 1)
+
+    def test_bulk_upload_invalid_phone_reports_error(self):
+        csv_content = (
+            "Nome Completo;CPF;Data Nascimento;Telefone;Email;Genero;Estado Civil;Funcao Ministerial\n"
+            "Fulano da Silva;390.533.447-05;10/01/1990;123;fulano@test.com;M;Solteiro(a);Membro\n"
+        )
+        response = self._upload(csv_content)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["success_count"], 0)
+        self.assertEqual(response.data["error_count"], 1)
+        self.assertTrue(response.data["errors"][0]["messages"])

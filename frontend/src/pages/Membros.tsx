@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Users, UserCheck, UserX, TrendingUp } from 'lucide-react';
+import { Plus, Users, UserCheck, UserX, TrendingUp, UploadCloud } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
@@ -47,6 +47,10 @@ const Membros: React.FC = () => {
 
   const handleCreateMember = () => {
     navigate('/membros/novo');
+  };
+
+  const handleImportMembers = () => {
+    navigate('/membros/importar');
   };
 
   const handleDeleteMember = (memberId: number) => {
@@ -98,6 +102,12 @@ const Membros: React.FC = () => {
             )}
           </div>
           <div className="flex gap-2">
+            {permissions.canManageMembers && (
+              <Button variant="outline" onClick={handleImportMembers}>
+                <UploadCloud className="h-4 w-4 mr-2" />
+                Importar CSV
+              </Button>
+            )}
             {(permissions.canCreateMembers || process.env.NODE_ENV === 'development') && (
               <Button onClick={handleCreateMember} className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />

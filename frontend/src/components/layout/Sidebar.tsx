@@ -11,7 +11,7 @@ import {
   Church,
   HandHeart,
   Menu,
-  ChevronLeft
+  ChevronLeft,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/hooks/useSidebar';

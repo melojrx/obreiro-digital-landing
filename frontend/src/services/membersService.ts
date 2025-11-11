@@ -1,4 +1,5 @@
 import { api, API_ENDPOINTS } from '@/config/api';
+import { BulkImportResult } from '@/types/import';
 
 // Novos tipos para MembershipStatus
 export interface MembershipStatus {
@@ -452,6 +453,22 @@ export const membersService = {
   // Obter opções de status de membresia
   getMembershipStatusChoices() {
     return MEMBERSHIP_STATUS_CHOICES;
+  },
+
+  async bulkUpload(params: { file: File; branchId?: number; skipDuplicates?: boolean }): Promise<BulkImportResult> {
+    const formData = new FormData();
+    formData.append('file', params.file);
+    if (params.branchId) {
+      formData.append('branch_id', String(params.branchId));
+    }
+    formData.append('skip_duplicates', String(params.skipDuplicates ?? true));
+
+    const response = await api.post(API_ENDPOINTS.members.bulkUpload, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
   },
 
   // Converter Church Admin em Membro (simplificado)

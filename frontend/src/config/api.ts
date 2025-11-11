@@ -210,6 +210,7 @@ export const API_ENDPOINTS = {
     export: '/members/export/',
     exportCsv: '/members/export_csv/',
     availableForSpouse: '/members/available_for_spouse/',
+    bulkUpload: '/members/bulk_upload/',
     // Rotas do próprio usuário (sem filtrar por congregação)
     me: {
       status: '/members/me/status/',

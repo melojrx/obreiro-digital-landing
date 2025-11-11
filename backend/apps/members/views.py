@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.parsers import MultiPartParser
 from django.db.models import Count, Q
 from datetime import datetime, date
 from django.contrib.auth import get_user_model
@@ -23,8 +24,10 @@ from .serializers import (
     MemberSerializer, MemberListSerializer, MemberCreateSerializer, 
     MemberUpdateSerializer, MemberSummarySerializer,
     MembershipStatusLogSerializer, MemberStatusChangeSerializer,
-    MinisterialFunctionHistorySerializer, MembershipStatusSerializer
+    MinisterialFunctionHistorySerializer, MembershipStatusSerializer,
+    MemberBulkUploadSerializer
 )
+from .services import MemberBulkImportService
 
 
 class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -565,6 +568,47 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
             'exported_at': datetime.now().isoformat(),
             'members': serializer.data
         })
+
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='bulk_upload',
+        parser_classes=[MultiPartParser],
+    )
+    def bulk_upload(self, request):
+        """
+        Upload em lote de membros via arquivo CSV.
+        Retorna relatório com sucessos, erros e duplicados ignorados.
+        """
+        serializer = MemberBulkUploadSerializer(
+            data=request.data,
+            context={'request': request, 'view': self}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        branch = serializer.validated_data.get('branch')
+        skip_duplicates = serializer.validated_data.get('skip_duplicates', True)
+        uploaded_file = serializer.validated_data['file']
+
+        church = serializer.validated_data.get('church') or getattr(request, 'church', None)
+        if not church:
+            from apps.accounts.models import ChurchUser
+            church = ChurchUser.objects.get_active_church_for_user(request.user)
+
+        if not church:
+            raise DjangoValidationError("Usuário não possui igreja ativa configurada.")
+
+        service = MemberBulkImportService(
+            request=request,
+            church=church,
+            user=request.user,
+            branch=branch,
+        )
+        report = service.process_csv(
+            uploaded_file=uploaded_file,
+            skip_duplicates=skip_duplicates
+        )
+        return Response(report, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'])
     def export_csv(self, request):

@@ -22,6 +22,58 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+class MemberBulkUploadSerializer(serializers.Serializer):
+    """
+    Serializer para upload em lote de membros via CSV.
+    """
+
+    file = serializers.FileField(help_text="Arquivo CSV ou TXT com dados dos membros")
+    branch_id = serializers.IntegerField(
+        required=False, allow_null=True, help_text="ID da filial destino (opcional)"
+    )
+    skip_duplicates = serializers.BooleanField(
+        default=True,
+        help_text="Ignora automaticamente registros duplicados por CPF/email",
+    )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        church = getattr(request, "church", None) if request else None
+        if not church and request and getattr(request, "user", None) and request.user.is_authenticated:
+            from apps.accounts.models import ChurchUser
+            church = ChurchUser.objects.get_active_church_for_user(request.user)
+        branch = None
+
+        branch_id = attrs.pop("branch_id", None)
+        if branch_id:
+            if not church:
+                raise serializers.ValidationError(
+                    "Não foi possível determinar a igreja ativa do usuário."
+                )
+            try:
+                branch = Branch.objects.get(
+                    id=branch_id, church=church, is_active=True
+                )
+            except Branch.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"branch_id": "Filial não encontrada para a igreja selecionada."}
+                )
+            if not request.user.is_superuser:
+                view = self.context.get("view")
+                if view and not view._user_can_write_branch(request.user, branch):
+                    raise serializers.ValidationError(
+                        {"branch_id": "Usuário não possui permissão nesta filial."}
+                    )
+        attrs["branch"] = branch
+        attrs["church"] = church
+
+        uploaded_file = attrs.get("file")
+        if uploaded_file:
+            if uploaded_file.size == 0:
+                raise serializers.ValidationError("Arquivo enviado está vazio.")
+        return attrs
+
+
 class MemberSerializer(serializers.ModelSerializer):
     """
     Serializer completo para Member

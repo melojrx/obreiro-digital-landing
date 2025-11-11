@@ -20,6 +20,8 @@ import Membros from "./pages/Membros";
 import NovoMembro from "./pages/NovoMembro";
 import DetalhesMembro from "./pages/DetalhesMembro";
 import EditarMembro from "./pages/EditarMembro";
+import ImportarMembros from "./pages/ImportarMembros";
+import Configuracoes from "./pages/Configuracoes";
 import Visitantes from "./pages/Visitantes";
 import NovoVisitante from "./pages/NovoVisitante";
 import DetalhesVisitante from "./pages/DetalhesVisitante";
@@ -191,6 +193,14 @@ const AppContent = () => {
           </ProtectedRoute>
         } 
       />
+      <Route 
+        path="/membros/importar" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <ImportarMembros />
+          </ProtectedRoute>
+        } 
+      />
       {/* Rota para gestão de visitantes */}
       <Route 
         path="/visitantes" 
@@ -248,6 +258,14 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="auth_complete">
             <MinistryManagementPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/configuracoes" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <Configuracoes />
           </ProtectedRoute>
         } 
       />
