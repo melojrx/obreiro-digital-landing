@@ -28,6 +28,9 @@ python manage.py migrate --noinput
 
 # Coletar arquivos estáticos
 echo "📦 Coletando arquivos estáticos..."
+# Criar diretório e garantir permissões
+mkdir -p /app/staticfiles /app/media
+chmod -R 777 /app/staticfiles /app/media 2>/dev/null || true
 python manage.py collectstatic --noinput
 
 # Popular denominações sempre (em todos os ambientes)
