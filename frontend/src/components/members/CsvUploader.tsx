@@ -100,12 +100,6 @@ export const CsvUploader: React.FC<CsvUploaderProps> = ({
         <p className="mt-3 font-semibold text-slate-800">
           Arraste e solte o arquivo CSV aqui
         </p>
-        <p className="text-sm text-slate-500">
-          ou{' '}
-          <span className="text-blue-600 underline font-medium">
-            clique para selecionar
-          </span>
-        </p>
         <p className="text-xs text-slate-400 mt-2">
           Suporta {acceptExtensions.join(', ')} • Máximo {maxSizeMB}MB
         </p>
