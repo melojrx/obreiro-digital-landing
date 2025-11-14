@@ -416,12 +416,13 @@ const ChurchDetailsPage: React.FC = () => {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate('/denominacao/churches')}
+              className="w-full sm:w-auto"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar
@@ -462,12 +463,13 @@ const ChurchDetailsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
             {permissions.canManageChurch && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleEdit}
+                className="w-full sm:w-auto"
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
@@ -476,7 +478,7 @@ const ChurchDetailsPage: React.FC = () => {
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -523,7 +525,7 @@ const ChurchDetailsPage: React.FC = () => {
         )}
 
         {/* Métricas Rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center">
@@ -593,28 +595,30 @@ const ChurchDetailsPage: React.FC = () => {
 
         {/* Tabs Principal */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
+          <div className="overflow-x-auto pb-2">
+            <TabsList className="flex flex-wrap gap-2 w-full rounded-lg bg-muted/60 p-1 sm:grid sm:grid-cols-2 lg:grid-cols-5">
+              <TabsTrigger value="overview" className="flex items-center gap-2 w-full justify-start text-xs sm:text-sm sm:justify-center">
               <Eye className="h-4 w-4" />
               Visão Geral
             </TabsTrigger>
-            <TabsTrigger value="statistics" className="flex items-center gap-2">
+            <TabsTrigger value="statistics" className="flex items-center gap-2 w-full justify-start text-xs sm:text-sm sm:justify-center">
               <BarChart3 className="h-4 w-4" />
               Estatísticas
             </TabsTrigger>
-            <TabsTrigger value="branches" className="flex items-center gap-2">
+            <TabsTrigger value="branches" className="flex items-center gap-2 w-full justify-start text-xs sm:text-sm sm:justify-center">
               <Building className="h-4 w-4" />
               Congregações
             </TabsTrigger>
-            <TabsTrigger value="admins" className="flex items-center gap-2">
+            <TabsTrigger value="admins" className="flex items-center gap-2 w-full justify-start text-xs sm:text-sm sm:justify-center">
               <UserPlus className="h-4 w-4" />
               Administradores
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
+            <TabsTrigger value="history" className="flex items-center gap-2 w-full justify-start text-xs sm:text-sm sm:justify-center">
               <History className="h-4 w-4" />
               Histórico
             </TabsTrigger>
-          </TabsList>
+            </TabsList>
+          </div>
 
           {/* Tab: Visão Geral */}
           <TabsContent value="overview" className="space-y-6">

@@ -6,7 +6,6 @@ import { useMainDashboard } from '@/hooks/useDashboard';
 import { useActivities } from '@/hooks/useActivities';
 import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { usePermissions } from '@/hooks/usePermissions';
-import { api } from '@/config/api';
 import { membersService } from '@/services/membersService';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
@@ -18,7 +17,7 @@ import { RecentVisitors } from '@/components/dashboard/RecentVisitors';
 import { ConvertAdminToMemberModal } from '@/components/members/ConvertAdminToMemberModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, Calendar, DollarSign, UserCheck } from 'lucide-react';
+import { Users, UserPlus, Calendar, DollarSign, UserCheck, HandCoins } from 'lucide-react';
 import type { Member } from '@/services/membersService';
 
 interface MemberSearchResponse {
@@ -177,7 +176,7 @@ const Dashboard = () => {
                     <h1 className="text-3xl font-bold text-gray-900">
                         Dashboard
                     </h1>
-                    <p className="text-gray-600 mt-1">
+                    <p className="text-gray-600 mt-1 text-sm sm:text-base">
                         Bem-vindo, {user?.full_name?.split(' ')[0] || 'admin'}! {activeChurchInfo ? `Você está visualizando a igreja ${activeChurchInfo.short_name || activeChurchInfo.name}.` : 'Aqui está o resumo da sua igreja.'}
                     </p>
                 </div>
@@ -206,6 +205,16 @@ const Dashboard = () => {
                         icon={<Calendar className="h-5 w-5" />}
                         isLoading={activitiesLoading}
                         color="bg-gradient-to-r from-yellow-500 to-amber-400"
+                        tag={{ label: 'Em desenvolvimento', variant: 'outline' }}
+                    />
+                    <StatsCard
+                        title="Ofertas (mês)"
+                        value={formatCurrency(data?.offerings?.total ?? 0)}
+                        change={data?.offerings?.change}
+                        icon={<HandCoins className="h-5 w-5" />}
+                        isLoading={isLoading}
+                        color="bg-gradient-to-r from-rose-500 to-pink-400"
+                        tag={{ label: 'Em desenvolvimento', variant: 'outline' }}
                     />
                     {/* Card de Dízimos temporariamente oculto */}
                     {/* <StatsCard

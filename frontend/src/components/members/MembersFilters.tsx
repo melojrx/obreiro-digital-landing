@@ -98,14 +98,14 @@ export const MembersFilters: React.FC<MembersFiltersProps> = ({
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="shadow-sm">
+      <CardHeader className="space-y-1">
         <CardTitle>Filtros e Busca</CardTitle>
         <CardDescription>
           Encontre membros específicos usando os filtros abaixo
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Busca */}
           <div className="md:col-span-2">
@@ -165,22 +165,28 @@ export const MembersFilters: React.FC<MembersFiltersProps> = ({
         </div>
 
         {/* Ações */}
-        <div className="flex justify-between items-center mt-4">
-          <div className="flex gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button 
               variant="outline" 
               size="sm"
               onClick={handleClearFilters}
               disabled={loading}
+              className="w-full sm:w-auto"
             >
               Limpar Filtros
             </Button>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={loading || exporting}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  disabled={loading || exporting}
+                  className="w-full sm:w-auto"
+                >
                   {exporting ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (

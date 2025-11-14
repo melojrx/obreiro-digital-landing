@@ -704,19 +704,19 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
             <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-600 text-sm sm:text-base">
               {member ? 'Edite as informações do membro' : 'Preencha os dados do novo membro'}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>
+          <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-auto sm:justify-end">
+            <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
               <X className="h-4 w-4 mr-2" />
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
               <Save className="h-4 w-4 mr-2" />
               {isLoading ? 'Salvando...' : 'Salvar'}
             </Button>
@@ -724,28 +724,30 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="personal" className="flex items-center gap-2">
+            <div className="overflow-x-auto pb-2">
+              <TabsList className="flex flex-wrap gap-2 w-full rounded-lg bg-muted/60 p-1 sm:grid sm:grid-cols-2 lg:grid-cols-5">
+                <TabsTrigger value="personal" className="flex items-center gap-2 text-xs sm:text-sm w-full justify-start sm:justify-center">
                 <User className="h-4 w-4" />
                 Dados Pessoais
               </TabsTrigger>
-              <TabsTrigger value="contact" className="flex items-center gap-2">
+              <TabsTrigger value="contact" className="flex items-center gap-2 text-xs sm:text-sm w-full justify-start sm:justify-center">
                 <Phone className="h-4 w-4" />
                 Contato
               </TabsTrigger>
-              <TabsTrigger value="church" className="flex items-center gap-2">
+              <TabsTrigger value="church" className="flex items-center gap-2 text-xs sm:text-sm w-full justify-start sm:justify-center">
                 <Heart className="h-4 w-4" />
                 Dados Eclesiásticos
               </TabsTrigger>
-              <TabsTrigger value="ministerial" className="flex items-center gap-2">
+              <TabsTrigger value="ministerial" className="flex items-center gap-2 text-xs sm:text-sm w-full justify-start sm:justify-center">
                 <Shield className="h-4 w-4" />
                 Função Ministerial
               </TabsTrigger>
-              <TabsTrigger value="additional" className="flex items-center gap-2">
+              <TabsTrigger value="additional" className="flex items-center gap-2 text-xs sm:text-sm w-full justify-start sm:justify-center">
                 <Briefcase className="h-4 w-4" />
                 Informações Adicionais
               </TabsTrigger>
-            </TabsList>
+              </TabsList>
+            </div>
 
             {/* Dados Pessoais */}
             <TabsContent value="personal" className="space-y-6">

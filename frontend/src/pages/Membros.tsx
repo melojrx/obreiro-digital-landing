@@ -89,19 +89,19 @@ const Membros: React.FC = () => {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-1">
             <h1 className="text-3xl font-bold text-gray-900">Membros</h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-600 text-sm sm:text-base">
               Gerencie os membros da sua igreja
             </p>
             {activeChurch?.active_branch && (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Filial ativa: <span className="font-medium">{activeChurch.active_branch.name}</span>
               </p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 w-full sm:flex-row sm:flex-wrap sm:justify-end md:w-auto">
             {permissions.canManageMembers && (
               <Button variant="outline" onClick={handleImportMembers}>
                 <UploadCloud className="h-4 w-4 mr-2" />
@@ -109,13 +109,13 @@ const Membros: React.FC = () => {
               </Button>
             )}
             {(permissions.canCreateMembers || process.env.NODE_ENV === 'development') && (
-              <Button onClick={handleCreateMember} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={handleCreateMember} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Membro
               </Button>
             )}
             {process.env.NODE_ENV === 'development' && !permissions.canCreateMembers && (
-              <Button onClick={handleCreateMember} variant="outline" className="border-orange-500 text-orange-600">
+              <Button onClick={handleCreateMember} variant="outline" className="border-orange-500 text-orange-600 w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Membro (Dev)
               </Button>
@@ -125,7 +125,7 @@ const Membros: React.FC = () => {
 
         {/* Dashboard KPIs */}
         {permissions.canViewDashboard && dashboard && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <StatsCard
               title="Total de Membros"
               value={dashboard.total_members}
@@ -189,12 +189,12 @@ const Membros: React.FC = () => {
 
         {/* Informações de Paginação */}
         {totalMembers > 0 && (
-          <div className="flex justify-between items-center text-sm text-gray-600 px-2">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm text-gray-600 px-2">
             <span>
               Mostrando {members.length} de {totalMembers} membros
             </span>
             {filters.search && (
-              <span>
+              <span className="text-gray-500">
                 Filtrado por: "{filters.search}"
               </span>
             )}

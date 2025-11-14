@@ -16,11 +16,13 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ChurchSelector } from "./ChurchSelector";
 import { BranchSelector } from "./BranchSelector";
 import { NotificationDropdown } from "@/components/notifications";
+import { useSidebar } from '@/hooks/useSidebar';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const { toggleMobileSidebar } = useSidebar();
 
   // Função para fazer logout
   const handleLogout = async () => {
@@ -39,6 +41,13 @@ const Header: React.FC = () => {
         <div className="flex items-center justify-between gap-4">
           {/* Left side - Title */}
           <div className="flex items-center space-x-3">
+            <button
+              className="lg:hidden inline-flex items-center justify-center rounded-lg p-2 hover:bg-gray-100 text-gray-600 transition-colors"
+              onClick={toggleMobileSidebar}
+              aria-label="Abrir menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             <div className="flex-1">
               <h2 className="text-lg sm:text-2xl font-semibold text-gray-800">Dashboard</h2>
             </div>

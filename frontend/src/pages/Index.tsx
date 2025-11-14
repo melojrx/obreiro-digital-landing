@@ -599,7 +599,16 @@ const Index = () => {
               <ul className="space-y-2 text-slate-400">
                 <li><a href="#recursos" className="hover:text-white transition-colors">Recursos</a></li>
                 <li><a href="#precos" className="hover:text-white transition-colors">Preços</a></li>
-                <li><a href={`${SERVER_BASE_URL}/api/docs/`} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">API Docs</a></li>
+                <li>
+                  <a 
+                    href={`${SERVER_BASE_URL.replace(/\/$/, '')}/api/v1/schema/swagger-ui/`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="hover:text-white transition-colors"
+                  >
+                    API Docs
+                  </a>
+                </li>
                 <li><a href="#" className="hover:text-white transition-colors">Integrações</a></li>
               </ul>
             </div>

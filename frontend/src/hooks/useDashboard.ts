@@ -7,6 +7,7 @@ export interface DashboardData {
   visitors: { total: number; change: number };
   events: { total: number; change: number };
   tithes: { total: number; change: number };
+  offerings?: { total: number; change: number };
 }
 
 // Query Keys para cache

@@ -130,7 +130,7 @@ export function EventsTable() {
                                 </div>
 
                                 {/* Event Details Grid */}
-                                <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 text-sm">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <span className="text-gray-500 block">Data:</span>
                                         <span className="text-gray-900 font-medium">{event.date}</span>

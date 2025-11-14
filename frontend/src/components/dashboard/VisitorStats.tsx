@@ -80,12 +80,12 @@ export const VisitorStats: React.FC<VisitorStatsProps> = ({ className }) => {
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex flex-col gap-2 text-base sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center space-x-2">
             <QrCode className="h-5 w-5" />
             <span>Visitantes via QR Code (este mês)</span>
           </div>
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="text-xs self-start sm:self-auto">
             Total: {stats.total_visitors}
           </Badge>
         </CardTitle>
@@ -96,7 +96,7 @@ export const VisitorStats: React.FC<VisitorStatsProps> = ({ className }) => {
       
       <CardContent className="space-y-6">
         {/* Métricas principais */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="text-center p-3 bg-blue-50 rounded-lg">
             <UserPlus className="h-6 w-6 text-blue-600 mx-auto mb-2" />
             <div className="text-2xl font-bold text-blue-700">{stats.this_month}</div>
@@ -171,7 +171,7 @@ export const VisitorStats: React.FC<VisitorStatsProps> = ({ className }) => {
 
         {/* Ações rápidas */}
         <div className="pt-2 border-t">
-          <div className="flex justify-between text-xs">
+          <div className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
             <button 
               className="text-blue-600 hover:text-blue-800 font-medium"
               onClick={() => window.location.href = '/visitantes'}

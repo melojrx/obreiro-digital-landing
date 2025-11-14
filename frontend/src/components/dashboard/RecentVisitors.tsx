@@ -129,14 +129,16 @@ export const RecentVisitors: React.FC<RecentVisitorsProps> = ({
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center space-x-2">
             <UserPlus className="h-5 w-5" />
             <span>Visitantes Recentes</span>
           </div>
-          <Badge variant="secondary" className="text-xs shrink-0">
-            {visitors.length}
-          </Badge>
+          <div className="flex w-full sm:w-auto justify-end">
+            <Badge variant="secondary" className="text-xs shrink-0">
+              {visitors.length}
+            </Badge>
+          </div>
         </CardTitle>
         <CardDescription>
           Últimos visitantes registrados via QR Code

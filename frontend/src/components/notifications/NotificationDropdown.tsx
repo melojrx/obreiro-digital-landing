@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 
 export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   className,
-  maxItems = 5,
+  maxItems,
 }) => {
   const {
     notifications,
@@ -55,8 +55,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     }
   };
 
-  const displayNotifications = notifications.slice(0, maxItems);
+  const displayNotifications =
+    typeof maxItems === 'number'
+      ? notifications.slice(0, maxItems)
+      : notifications;
   const hasNotifications = displayNotifications.length > 0;
+  const shouldEnableScroll = displayNotifications.length > 5;
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -119,7 +123,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : hasNotifications ? (
-          <ScrollArea className="max-h-[400px]">
+          <ScrollArea
+            className={cn(
+              "max-h-[60vh]",
+              shouldEnableScroll ? "h-[400px] pr-2" : "h-auto"
+            )}
+          >
             {displayNotifications.map((notification) => (
               <NotificationItem
                 key={notification.id}

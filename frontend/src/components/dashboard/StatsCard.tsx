@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 interface StatsCardProps {
   title: string;
@@ -9,6 +10,10 @@ interface StatsCardProps {
   icon: React.ReactNode;
   isLoading: boolean;
   color: string;
+  tag?: {
+    label: string;
+    variant?: 'default' | 'secondary' | 'destructive' | 'outline';
+  };
 }
 
 export const StatsCard: React.FC<StatsCardProps> = ({
@@ -18,6 +23,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   icon,
   isLoading,
   color,
+  tag,
 }) => {
   const isPositive = change !== undefined && change >= 0;
 
@@ -39,7 +45,14 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   return (
     <Card className="shadow-sm transition-all hover:shadow-lg hover:-translate-y-1">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+          <span>{title}</span>
+          {tag && (
+            <Badge variant={tag.variant ?? 'outline'} className="text-[10px] uppercase tracking-wide">
+              {tag.label}
+            </Badge>
+          )}
+        </CardTitle>
         <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-white', color)}>
           {icon}
         </div>

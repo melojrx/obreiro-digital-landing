@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CalendarPlus, DollarSign, MessageSquare } from 'lucide-react';
+import { PlusCircle, Users, Settings as SettingsIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const actions = [
@@ -16,16 +16,16 @@ const actions = [
     link: '/visitantes/novo'
   },
   {
-    label: 'Realizar um pedido de oração',
-    icon: MessageSquare,
+    label: 'Gerenciar membros',
+    icon: Users,
     color: 'from-purple-600 to-indigo-500',
-    link: '/pedidos-oracao'
+    link: '/membros'
   },
   {
-    label: 'Criar nova atividade',
-    icon: CalendarPlus,
-    color: 'from-green-500 to-emerald-500',
-    link: '/atividades'
+    label: 'Configurações',
+    icon: SettingsIcon,
+    color: 'from-gray-600 to-slate-500',
+    link: '/configuracoes'
   },
 ];
 

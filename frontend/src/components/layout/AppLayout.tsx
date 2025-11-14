@@ -13,13 +13,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { isCollapsed } = useSidebar();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex w-full">
       {/* Sidebar */}
       <Sidebar />
       
       {/* Main Content Area */}
       <div className={cn(
-        "flex-1 flex flex-col transition-all duration-300",
+        "flex-1 flex flex-col transition-all duration-300 min-w-0",
         isCollapsed ? "ml-0" : "ml-0"
       )}>
         {/* Header */}
@@ -27,7 +27,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         
         {/* Page Content */}
         <main className={cn(
-          "flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto transition-all duration-300",
+          "flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto transition-all duration-300 min-w-0",
           // Adiciona mais espaço quando a sidebar está recolhida
           isCollapsed ? "max-w-full" : "max-w-full"
         )}>

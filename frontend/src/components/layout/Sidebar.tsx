@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -12,6 +12,7 @@ import {
   HandHeart,
   Menu,
   ChevronLeft,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/hooks/useSidebar';
@@ -36,7 +37,12 @@ interface NavItem {
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const { user, userChurch, logout } = useAuth();
-  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { 
+    isCollapsed, 
+    toggleSidebar, 
+    isMobileSidebarOpen, 
+    closeMobileSidebar, 
+  } = useSidebar();
   const permissions = usePermissions();
   const activeChurch = useCurrentActiveChurch();
 
@@ -52,9 +58,7 @@ const Sidebar: React.FC = () => {
           { title: 'Igrejas', icon: Church, href: '/denominacao/churches' }
         ] : []),
         { title: 'Membros', icon: Users, href: '/membros' },
-        { title: 'Ministérios', icon: Church, href: '/ministerios' },
         { title: 'Visitantes', icon: UserPlus, href: '/visitantes' },
-        { title: 'Atividades', icon: Calendar, href: '/atividades' },
       ]
     },
     // {
@@ -82,11 +86,27 @@ const Sidebar: React.FC = () => {
 
   const isActive = (href: string) => location.pathname === href;
 
+  useEffect(() => {
+    closeMobileSidebar();
+  }, [location.pathname, closeMobileSidebar]);
+
   return (
     <TooltipProvider>
+      {/* Overlay para mobile */}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 bg-black/40 transition-opacity lg:hidden",
+          isMobileSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+        onClick={closeMobileSidebar}
+        aria-hidden="true"
+      />
+
       <div className={cn(
-        "bg-gradient-to-b from-blue-900 to-blue-800 text-white min-h-screen flex flex-col transition-all duration-300 ease-in-out",
-        isCollapsed ? "w-16" : "w-64"
+        "bg-gradient-to-b from-blue-900 to-blue-800 text-white min-h-screen flex flex-col transition-all duration-300 ease-in-out z-50 overflow-y-auto",
+        "fixed inset-y-0 left-0 w-64 transform lg:static lg:inset-auto lg:translate-x-0",
+        isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        isCollapsed ? "lg:w-16" : "lg:w-64"
       )}>
         {/* Header com Logo e Toggle */}
         <div className="border-b border-blue-700">
@@ -114,27 +134,38 @@ const Sidebar: React.FC = () => {
               )}
             </Link>
             
-            {/* Botão de Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={toggleSidebar}
-                  className={cn(
-                    "p-2 rounded-lg hover:bg-white/10 transition-all duration-200",
-                    isCollapsed && "mt-0"
-                  )}
-                >
-                  {isCollapsed ? (
-                    <Menu className="h-5 w-5 text-blue-200" />
-                  ) : (
-                    <ChevronLeft className="h-5 w-5 text-blue-200" />
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>{isCollapsed ? 'Expandir sidebar' : 'Recolher sidebar'}</p>
-              </TooltipContent>
-            </Tooltip>
+            {/* Botões de Toggle */}
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={toggleSidebar}
+                    className={cn(
+                      "p-2 rounded-lg hover:bg-white/10 transition-all duration-200 hidden lg:inline-flex",
+                      isCollapsed && "mt-0"
+                    )}
+                    aria-label={isCollapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+                  >
+                    {isCollapsed ? (
+                      <Menu className="h-5 w-5 text-blue-200" />
+                    ) : (
+                      <ChevronLeft className="h-5 w-5 text-blue-200" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>{isCollapsed ? 'Expandir sidebar' : 'Recolher sidebar'}</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <button
+                className="p-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-blue-200 lg:hidden"
+                onClick={closeMobileSidebar}
+                aria-label="Fechar menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
 
