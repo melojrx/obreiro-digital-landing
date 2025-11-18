@@ -13,6 +13,12 @@ from django.conf import settings
 import requests
 from rest_framework.views import APIView
 from apps.churches.models import SubscriptionPlanChoices, Church
+from django.db.models import Count, Q
+from django.db.models.functions import TruncMonth
+from apps.members.models import Member
+from apps.visitors.models import Visitor
+from datetime import datetime, timedelta
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -189,3 +195,128 @@ class SubscriptionPlansView(APIView):
             })
 
         return Response(plans, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_charts(request):
+    """
+    Retorna dados para os gráficos do dashboard
+    """
+    from apps.accounts.models import ChurchUser
+    
+    # Determinar a igreja do usuário (multi-tenant)
+    church = getattr(request, 'church', None)
+    
+    # Se não tem church no request, tentar pegar do ChurchUser
+    if not church:
+        try:
+            church_user = ChurchUser.objects.filter(
+                user=request.user,
+                is_active=True
+            ).select_related('church').first()
+            
+            if church_user:
+                church = church_user.church
+        except ChurchUser.DoesNotExist:
+            pass
+    
+    if not church:
+        # Tentar pegar da primeira igreja associada se for admin
+        if request.user.is_superuser:
+             # Superuser pode não ter igreja direta, mas para dashboard precisa de contexto
+             # Aqui retornamos vazio ou erro, dependendo da regra de negócio
+             return Response({'members_evolution': [], 'visitors_stats': []})
+        
+        return Response(
+            {'error': 'Usuário não vinculado a uma igreja'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Período: Últimos 12 meses
+    today = timezone.now().date()
+    start_date = today - timedelta(days=365)
+    
+    # 1. Evolução de Membros
+    # Agrupar por mês de membresia
+    members_data = Member.objects.filter(
+        church=church,
+        membership_date__gte=start_date
+    ).annotate(
+        month=TruncMonth('membership_date')
+    ).values('month').annotate(
+        new_members=Count('id')
+    ).order_by('month')
+    
+    # Calcular total acumulado (precisamos do total antes do período também)
+    total_before = Member.objects.filter(
+        church=church,
+        membership_date__lt=start_date
+    ).count()
+    
+    members_evolution = []
+    current_total = total_before
+    
+    # Criar dicionário para acesso rápido
+    members_by_month = {
+        item['month'].strftime('%Y-%m'): item['new_members'] 
+        for item in members_data if item['month']
+    }
+    
+    # Mapeamento de meses em português
+    meses_pt = {
+        1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
+        7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
+    }
+    
+    # Gerar lista dos últimos 12 meses (incluindo meses sem dados)
+    for i in range(12):
+        date_cursor = (today.replace(day=1) - timedelta(days=30 * (11-i)))
+        month_key = date_cursor.strftime('%Y-%m')
+        month_label = meses_pt[date_cursor.month]
+        
+        new_count = members_by_month.get(month_key, 0)
+        current_total += new_count
+        
+        members_evolution.append({
+            'month': month_label,
+            'full_date': month_key,
+            'new_members': new_count,
+            'total_members': current_total
+        })
+
+    # 2. Estatísticas de Visitantes
+    visitors_data = Visitor.objects.filter(
+        church=church,
+        created_at__date__gte=start_date
+    ).annotate(
+        month=TruncMonth('created_at')
+    ).values('month').annotate(
+        total_visitors=Count('id'),
+        converted=Count('id', filter=Q(converted_to_member=True))
+    ).order_by('month')
+    
+    visitors_stats = []
+    visitors_by_month = {
+        item['month'].strftime('%Y-%m'): item 
+        for item in visitors_data if item['month']
+    }
+    
+    for i in range(12):
+        date_cursor = (today.replace(day=1) - timedelta(days=30 * (11-i)))
+        month_key = date_cursor.strftime('%Y-%m')
+        month_label = meses_pt[date_cursor.month]
+        
+        data = visitors_by_month.get(month_key, {'total_visitors': 0, 'converted': 0})
+        
+        visitors_stats.append({
+            'month': month_label,
+            'full_date': month_key,
+            'visitors': data['total_visitors'],
+            'converted': data['converted']
+        })
+
+    return Response({
+        'members_evolution': members_evolution,
+        'visitors_stats': visitors_stats
+    })

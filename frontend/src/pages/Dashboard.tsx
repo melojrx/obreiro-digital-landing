@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { useMainDashboard } from '@/hooks/useDashboard';
+import { useMainDashboard, useDashboardCharts } from '@/hooks/useDashboard';
 import { useActivities } from '@/hooks/useActivities';
 import { useCurrentActiveChurch } from '@/hooks/useActiveChurch';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -13,6 +13,8 @@ import { RecentActivities } from '@/components/dashboard/RecentActivities';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { EventsTable } from '@/components/dashboard/EventsTable';
 import { VisitorStats } from '@/components/dashboard/VisitorStats';
+import { MemberEvolutionChart } from '@/components/dashboard/MemberEvolutionChart';
+import { VisitorStatsChart } from '@/components/dashboard/VisitorStatsChart';
 import { RecentVisitors } from '@/components/dashboard/RecentVisitors';
 import { ConvertAdminToMemberModal } from '@/components/members/ConvertAdminToMemberModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +34,7 @@ const Dashboard = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const { data, isLoading, error } = useMainDashboard();
+    const { data: chartsData, isLoading: chartsLoading } = useDashboardCharts();
     const { data: activities = [], isLoading: activitiesLoading } = useActivities({});
     const [showConvertModal, setShowConvertModal] = useState(false);
     const [shouldShowConvertButton, setShouldShowConvertButton] = useState(false);
@@ -254,7 +257,10 @@ const Dashboard = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
                     <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-                        <EventsTable />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <MemberEvolutionChart data={chartsData?.members_evolution} isLoading={chartsLoading} />
+                            <VisitorStatsChart data={chartsData?.visitors_stats} isLoading={chartsLoading} />
+                        </div>
                         <VisitorStats />
                     </div>
                     <div className="lg:col-span-1 space-y-6 lg:space-y-8">
@@ -327,4 +333,4 @@ const Dashboard = () => {
     );
 };
 
-export default Dashboard; 
+export default Dashboard;

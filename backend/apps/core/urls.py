@@ -22,4 +22,7 @@ urlpatterns += [
     # Utilitários
     path('cep/<str:cep>/', views.CEPProxyView.as_view(), name='cep-lookup'),
     path('subscription-plans/', views.SubscriptionPlansView.as_view(), name='subscription-plans'),
-] 
+    
+    # Dashboard
+    path('dashboard/charts/', views.dashboard_charts, name='dashboard-charts'),
+]

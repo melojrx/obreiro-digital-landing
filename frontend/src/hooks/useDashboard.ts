@@ -10,6 +10,21 @@ export interface DashboardData {
   offerings?: { total: number; change: number };
 }
 
+export interface DashboardChartsData {
+  members_evolution: Array<{
+    month: string;
+    full_date: string;
+    new_members: number;
+    total_members: number;
+  }>;
+  visitors_stats: Array<{
+    month: string;
+    full_date: string;
+    visitors: number;
+    converted: number;
+  }>;
+}
+
 // Query Keys para cache
 export const DASHBOARD_QUERY_KEYS = {
   all: ['dashboard'] as const,
@@ -47,4 +62,21 @@ export const useInvalidateDashboard = () => {
       queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.mainDashboard() });
     },
   };
+};
+
+/**
+ * Hook para buscar dados dos gráficos do dashboard
+ */
+export const useDashboardCharts = () => {
+  const activeChurch = useCurrentActiveChurch();
+
+  return useQuery({
+    queryKey: [...DASHBOARD_QUERY_KEYS.all, 'charts', activeChurch?.id],
+    queryFn: async () => {
+      const response = await api.get<DashboardChartsData>('core/dashboard/charts/');
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 15, // 15 minutos
+    enabled: !!activeChurch,
+  });
 };
