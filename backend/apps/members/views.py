@@ -28,6 +28,10 @@ from .serializers import (
     MemberBulkUploadSerializer
 )
 from .services import MemberBulkImportService
+import logging
+
+# Logger do app Members (usado para auditoria e tracking de ações sensíveis)
+logger = logging.getLogger('apps.members')
 
 
 class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -1168,7 +1172,27 @@ class MemberViewSet(ChurchScopedQuerysetMixin, viewsets.ModelViewSet):
         }
         
         # Validar e criar o membro (passar o contexto do request)
-        serializer = MemberCreateSerializer(data=member_data, context={'request': request})
+        serializer = MemberCreateSerializer(
+            data=member_data,
+            context={
+                'request': request,
+                # Evitar bloquear auto-conversão por CPF duplicado em outras igrejas/denominações
+                'skip_cpf_uniqueness': True,
+            },
+        )
+        # Auditoria: registrar quando o fluxo pula a validação de unicidade de CPF
+        try:
+            if serializer.context.get('skip_cpf_uniqueness'):
+                logger.warning(
+                    "skip_cpf_uniqueness=True usado em MemberViewSet.create - user_id=%s email=%s church_id=%s cpf=%s",
+                    getattr(request.user, 'id', None),
+                    getattr(request.user, 'email', None),
+                    getattr(active_church, 'id', None) if 'active_church' in locals() else None,
+                    member_data.get('cpf')
+                )
+        except Exception:
+            # Garantir que problemas de logging não interrompam o fluxo principal
+            logger.exception('Falha ao registrar auditoria skip_cpf_uniqueness')
         
         if not serializer.is_valid():
             logger.error(

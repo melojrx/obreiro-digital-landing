@@ -551,7 +551,9 @@ def finalize_registration(request):
         existing_cpfs = UserProfile.objects.filter(cpf__isnull=False).values_list('cpf', flat=True)
         if any(''.join(filter(str.isdigit, existing or '')) == cpf_digits for existing in existing_cpfs):
             return Response(
-                {'error': 'CPF já cadastrado no sistema'},
+                {
+                    'error': 'CPF já cadastrado no sistema. Se você já possui conta, faça login ou recupere sua senha.'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 

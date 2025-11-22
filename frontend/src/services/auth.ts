@@ -170,12 +170,17 @@ function handleApiError(error: unknown): AuthError {
     let errorMessage = 'Ocorreu um erro.';
 
     if (data) {
-      if (typeof data.detail === 'string') {
-        errorMessage = data.detail;
+      if (typeof (data as any).detail === 'string') {
+        errorMessage = (data as any).detail as string;
+      } else if (typeof (data as any).error === 'string') {
+        errorMessage = (data as any).error as string;
       } else {
         const firstErrorKey = Object.keys(data)[0];
-        if (firstErrorKey && Array.isArray(data[firstErrorKey]) && data[firstErrorKey].length > 0) {
-          errorMessage = data[firstErrorKey][0];
+        const firstValue = firstErrorKey ? (data as any)[firstErrorKey] : null;
+        if (Array.isArray(firstValue) && firstValue.length > 0) {
+          errorMessage = firstValue[0];
+        } else if (typeof firstValue === 'string') {
+          errorMessage = firstValue;
         }
       }
     }

@@ -285,6 +285,10 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         if not value or not str(value).strip():
             return None
 
+        # Permitir pular a validação de unicidade em fluxos específicos (ex: self-conversão de admin)
+        if self.context.get('skip_cpf_uniqueness'):
+            return value
+
         # Determinar denominação a partir da igreja
         church = None
         if self.context.get('request'):
