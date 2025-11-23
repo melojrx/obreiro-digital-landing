@@ -323,8 +323,8 @@ def update_personal_data(request):
     phone = data.get('phone')
 
     if email and email != user.email:
-        # Garantir unicidade entre usuários ativos
-        if CustomUser.objects.filter(email=email, is_active=True).exclude(pk=user.pk).exists():
+        # Garantir unicidade global
+        if CustomUser.objects.filter(email=email).exclude(pk=user.pk).exists():
             return Response({'error': 'Este e-mail já está em uso por outro usuário.'}, status=status.HTTP_400_BAD_REQUEST)
         user.email = email
 

@@ -13,13 +13,46 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Member, MembershipStatusLog, MembershipStatus
 from apps.branches.models import Branch
 from apps.core.models import MembershipStatusChoices, MinisterialFunctionChoices, RoleChoices
-from apps.accounts.models import ChurchUser
+from apps.accounts.models import ChurchUser, UserProfile
 from .models import MinisterialFunctionHistory
 from apps.core.services import EmailService
 from apps.core.services.email_service import EmailServiceError
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def _sync_user_profile_from_member(user, member):
+    """
+    Garante que o perfil do usuário receba CPF e dados básicos do membro.
+    Bloqueia CPF duplicado entre usuários do sistema.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+
+    cpf_value = getattr(member, 'cpf', None)
+    if cpf_value:
+        cpf_digits = ''.join(filter(str.isdigit, cpf_value))
+        if cpf_digits:
+            existing_cpfs = UserProfile.objects.exclude(user=user).filter(
+                cpf__isnull=False
+            ).values_list('cpf', flat=True)
+            if any(''.join(filter(str.isdigit, existing or '')) == cpf_digits for existing in existing_cpfs):
+                raise serializers.ValidationError({
+                    "cpf": "CPF já cadastrado no sistema. Se você já possui conta, faça login ou recupere sua senha."
+                })
+        profile.cpf = cpf_value
+
+    # Popular dados complementares apenas se estiverem vazios no perfil
+    optional_fields = [
+        'birth_date', 'gender', 'address', 'zipcode',
+        'number', 'neighborhood', 'city', 'state',
+    ]
+    for field in optional_fields:
+        if getattr(profile, field, None) in (None, '') and hasattr(member, field):
+            setattr(profile, field, getattr(member, field))
+
+    profile.save()
+    return profile
 
 
 class MemberBulkUploadSerializer(serializers.Serializer):
@@ -281,48 +314,10 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate_cpf(self, value):
-        """Validação de CPF (opcional) com unicidade por denominação"""
+        """Validação de CPF (opcional) sem bloquear duplicidade para membros."""
         if not value or not str(value).strip():
             return None
-
-        # Permitir pular a validação de unicidade em fluxos específicos (ex: self-conversão de admin)
-        if self.context.get('skip_cpf_uniqueness'):
-            return value
-
-        # Determinar denominação a partir da igreja
-        church = None
-        if self.context.get('request'):
-            from apps.accounts.models import ChurchUser
-            user = self.context['request'].user
-            church = ChurchUser.objects.get_active_church_for_user(user)
-        if not church and self.initial_data:
-            church_id = self.initial_data.get('church')
-            if church_id:
-                from apps.churches.models import Church
-                try:
-                    church = Church.objects.get(id=church_id)
-                except Church.DoesNotExist:
-                    pass
-
-        if church and church.denomination_id:
-            exists = Member.objects.filter(
-                cpf=value,
-                is_active=True,
-                church__denomination_id=church.denomination_id,
-            ).exists()
-        elif church:
-            exists = Member.objects.filter(
-                cpf=value,
-                is_active=True,
-                church=church,
-            ).exists()
-        else:
-            # fallback conservador: permitir
-            exists = False
-
-        if exists:
-            raise serializers.ValidationError("Este CPF já está cadastrado nesta denominação.")
-        return value
+        return str(value).strip()
 
     def validate_branch(self, value):
         """Garante que a filial pertença à igreja ativa"""
@@ -380,38 +375,9 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         """Validação de email"""
         # Apenas validar se email foi fornecido e não é string vazia
         if value and value.strip():
-            # Tentar obter a igreja do contexto ou dos dados iniciais
-            church = None
-            
-            # Primeiro, tentar obter do contexto do request
-            if self.context.get('request'):
-                from apps.accounts.models import ChurchUser
-                user = self.context['request'].user
-                church = ChurchUser.objects.get_active_church_for_user(user)
-            
-            # Se não conseguiu do contexto, tentar dos dados iniciais (durante criação)
-            if not church and self.initial_data:
-                church_id = self.initial_data.get('church')
-                if church_id:
-                    from apps.churches.models import Church
-                    try:
-                        church = Church.objects.get(id=church_id)
-                    except Church.DoesNotExist:
-                        pass
-            
-            # Se conseguiu obter a igreja, validar unicidade
-            if church:
-                existing = Member.objects.filter(
-                    church=church,
-                    email=value,
-                    is_active=True
-                ).exists()
-                
-                if existing:
-                    raise serializers.ValidationError("Este e-mail já está cadastrado nesta igreja.")
-        
+            return value.strip()
         # Se email é string vazia, retornar None para salvar como NULL no banco
-        return value if value and value.strip() else None
+        return None
     
     def validate(self, attrs):
         """Validações gerais"""
@@ -440,31 +406,13 @@ class MemberCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "E-mail para login é obrigatório quando criar usuário do sistema está marcado."
                 )
-            
-            # Validar se o e-mail já existe NESTA IGREJA (tenant isolation)
-            # Um mesmo e-mail pode ser usado em igrejas diferentes
+
+            # Validar se o e-mail já existe globalmente
             user_email = attrs['user_email']
-            request = self.context.get('request')
-            
-            if request and hasattr(request, 'church') and request.church:
-                # Verificar se já existe um usuário com este e-mail vinculado a ESTA igreja
-                from apps.accounts.models import ChurchUser
-                
-                existing_user = User.objects.filter(email=user_email, is_active=True).first()
-                if existing_user:
-                    # Verificar se este usuário já está vinculado à igreja atual
-                    is_in_church = ChurchUser.objects.filter(
-                        user=existing_user,
-                        church=request.church,
-                        is_active=True
-                    ).exists()
-                    
-                    if is_in_church:
-                        raise serializers.ValidationError(
-                            f"Este e-mail já está sendo usado por outro usuário nesta igreja."
-                        )
-                    # Se o e-mail existe em outra igreja, permitir (multi-tenant)
-            
+            if User.objects.filter(email=user_email).exists():
+                raise serializers.ValidationError({
+                    "user_email": "E-mail já cadastrado no sistema. Faça login ou recupere a senha."
+                })
             # NOTA: Validação de senha removida - senha será gerada automaticamente
         
         return attrs
@@ -522,7 +470,10 @@ class MemberCreateSerializer(serializers.ModelSerializer):
                     phone=member.phone or '',
                     is_active=True
                 )
-                
+
+                # Garantir perfil com CPF e dados básicos
+                _sync_user_profile_from_member(user, member)
+
                 # Associar usuário ao membro
                 member.user = user
                 member.save()
@@ -571,6 +522,9 @@ class MemberCreateSerializer(serializers.ModelSerializer):
                         exc_info=True
                     )
                 
+            except serializers.ValidationError as e:
+                member.delete()
+                raise e
             except Exception as e:
                 # Se houver erro na criação do usuário, deletar o membro criado
                 member.delete()
@@ -623,29 +577,10 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         ]
     
     def validate_cpf(self, value):
-        """Validação de CPF (opcional) na atualização com unicidade por denominação"""
+        """Validação de CPF (opcional) na atualização sem bloquear duplicidade para membros."""
         if not value or not str(value).strip():
             return None
-        
-        church = getattr(self.instance, 'church', None)
-        if church and church.denomination_id:
-            exists = Member.objects.filter(
-                cpf=value,
-                is_active=True,
-                church__denomination_id=church.denomination_id,
-            ).exclude(pk=self.instance.pk).exists()
-        elif church:
-            exists = Member.objects.filter(
-                cpf=value,
-                is_active=True,
-                church=church,
-            ).exclude(pk=self.instance.pk).exists()
-        else:
-            exists = False
-        
-        if exists:
-            raise serializers.ValidationError("Este CPF já está cadastrado nesta denominação.")
-        return value
+        return str(value).strip()
     
     def validate(self, attrs):
         """Validações gerais incluindo concessão de acesso ao sistema"""
@@ -666,30 +601,13 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "E-mail para login é obrigatório ao conceder acesso."
                 )
-            
-            # Validar se o e-mail já existe NESTA IGREJA (tenant isolation)
-            # Um mesmo e-mail pode ser usado em igrejas diferentes
+
+            # Validar se o e-mail já existe globalmente
             user_email = attrs['user_email']
-            request = self.context.get('request')
-            
-            if request and hasattr(request, 'church') and request.church:
-                # Verificar se já existe um usuário com este e-mail vinculado a ESTA igreja
-                from apps.accounts.models import ChurchUser
-                
-                existing_user = User.objects.filter(email=user_email, is_active=True).first()
-                if existing_user:
-                    # Verificar se este usuário já está vinculado à igreja atual
-                    is_in_church = ChurchUser.objects.filter(
-                        user=existing_user,
-                        church=request.church,
-                        is_active=True
-                    ).exists()
-                    
-                    if is_in_church:
-                        raise serializers.ValidationError(
-                            f"Este e-mail já está sendo usado por outro usuário nesta igreja."
-                        )
-                    # Se o e-mail existe em outra igreja, permitir (multi-tenant)
+            if User.objects.filter(email=user_email).exists():
+                raise serializers.ValidationError({
+                    "user_email": "E-mail já cadastrado no sistema. Faça login ou recupere a senha."
+                })
         
         return attrs
 
@@ -762,6 +680,9 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
                     phone=member.phone or '',
                     is_active=True
                 )
+
+                # Garantir perfil com CPF e dados básicos
+                _sync_user_profile_from_member(user, member)
                 
                 # Associar usuário ao membro
                 member.user = user
@@ -809,6 +730,8 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
                         exc_info=True
                     )
                 
+            except serializers.ValidationError as e:
+                raise e
             except Exception as e:
                 logger.error(
                     f"❌ Erro ao conceder acesso ao sistema para {member.full_name}: {e}",
@@ -869,32 +792,9 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         """Validação de email na atualização"""
         # Apenas validar se email foi fornecido e não é string vazia
         if value and value.strip():
-            # Tentar obter a igreja do contexto ou da instância atual
-            church = None
-            
-            # Primeiro, tentar obter da instância sendo atualizada
-            if self.instance and hasattr(self.instance, 'church'):
-                church = self.instance.church
-            
-            # Se não conseguiu, tentar do contexto do request
-            if not church and self.context.get('request'):
-                from apps.accounts.models import ChurchUser
-                user = self.context['request'].user
-                church = ChurchUser.objects.get_active_church_for_user(user)
-            
-            # Se conseguiu obter a igreja, validar unicidade
-            if church:
-                existing = Member.objects.filter(
-                    church=church,
-                    email=value,
-                    is_active=True
-                ).exclude(pk=self.instance.pk).exists()
-                
-                if existing:
-                    raise serializers.ValidationError("Este e-mail já está cadastrado nesta igreja.")
-        
+            return value.strip()
         # Se email é string vazia, retornar None para salvar como NULL no banco
-        return value if value and value.strip() else None
+        return None
 
     def __init__(self, *args, **kwargs):
         request = kwargs.get('context', {}).get('request') if kwargs.get('context') else None

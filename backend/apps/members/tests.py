@@ -11,7 +11,7 @@ from apps.denominations.models import Denomination
 from apps.churches.models import Church
 from apps.branches.models import Branch
 from .models import Member
-from apps.accounts.models import ChurchUser, RoleChoices
+from apps.accounts.models import ChurchUser, RoleChoices, UserProfile
 
 User = get_user_model()
 
@@ -145,8 +145,8 @@ class RequiredFieldsTest(APITestCase):
         member = Member.objects.get(full_name="Member Without CPF")
         self.assertIsNone(member.cpf)
 
-    def test_duplicate_cpf_same_denomination_fails(self):
-        """Mesmo CPF na mesma denominação deve falhar, mesmo em igrejas diferentes"""
+    def test_duplicate_cpf_same_denomination_allowed(self):
+        """Mesmo CPF na mesma denominação deve ser permitido para membros."""
         cpf_value = "390.533.447-05"
         # Primeiro membro na igreja A
         resp1 = self.client.post(self.members_url, {
@@ -182,12 +182,10 @@ class RequiredFieldsTest(APITestCase):
             "cpf": cpf_value,
             "phone": "(11) 91111-1111"
         })
-        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
-        # Mensagem pode variar; checar substring
-        self.assertTrue(any("CPF" in str(v) for v in resp2.data.values()))
+        self.assertEqual(resp2.status_code, status.HTTP_201_CREATED)
 
     def test_duplicate_cpf_different_denomination_ok(self):
-        """Mesmo CPF em denominações diferentes deve ser permitido"""
+        """Mesmo CPF em denominações diferentes continua permitido"""
         cpf_value = "390.533.447-05"
         # Membro na denom A
         resp1 = self.client.post(self.members_url, {
@@ -366,6 +364,7 @@ class SystemUserCreationTest(APITestCase):
         user = member.user
         self.assertEqual(user.email, "churchadmin@test.com")
         self.assertEqual(user.full_name, "Church Admin")
+        self.assertEqual(user.profile.cpf, member.cpf)
         
         # Check ChurchUser was created with correct role
         from apps.accounts.models import ChurchUser
@@ -386,6 +385,58 @@ class SystemUserCreationTest(APITestCase):
         }
         response = self.client.post(self.members_url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_member_system_user_email_must_be_unique_globally(self):
+        """Não permitir criar usuário do sistema com e-mail já existente em outra igreja."""
+        # Usuário pré-existente com email duplicado
+        User.objects.create_user(
+            email="dup@test.com",
+            password="123456",
+            full_name="Other User",
+            phone="(11) 96666-6666"
+        )
+
+        data = {
+            "church": self.church.id,
+            "full_name": "Member With Dup Email",
+            "birth_date": "1985-01-01",
+            "gender": "M",
+            "cpf": "390.533.447-05",
+            "phone": "(11) 80000-0000",
+            "create_system_user": True,
+            "system_role": "church_admin",
+            "user_email": "dup@test.com",
+        }
+        response = self.client.post(self.members_url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("user_email", response.data)
+        self.assertTrue("E-mail" in str(response.data["user_email"]))
+
+    def test_create_member_system_user_cpf_must_be_unique_between_users(self):
+        """CPF duplicado entre usuários do sistema deve bloquear criação do usuário."""
+        existing_user = User.objects.create_user(
+            email="cpfuser@test.com",
+            password="123456",
+            full_name="Existing CPF",
+            phone="(11) 97777-7777"
+        )
+        UserProfile.objects.create(user=existing_user, cpf="390.533.447-05")
+
+        data = {
+            "church": self.church.id,
+            "full_name": "New Member",
+            "birth_date": "1985-01-01",
+            "gender": "M",
+            "cpf": "390.533.447-05",
+            "phone": "(11) 80000-0001",
+            "create_system_user": True,
+            "system_role": "church_admin",
+            "user_email": "newuser@test.com",
+        }
+        response = self.client.post(self.members_url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("cpf", response.data)
+        self.assertTrue("CPF" in str(response.data["cpf"]))
 
 
 class MemberBranchRelationshipTest(TestCase):
@@ -692,7 +743,7 @@ class MemberBulkUploadTests(APITestCase):
         self.assertEqual(response.data["error_count"], 0)
         self.assertEqual(Member.objects.filter(church=self.church).count(), 1)
 
-    def test_bulk_upload_duplicate_skipped(self):
+    def test_bulk_upload_duplicate_allowed(self):
         Member.objects.create(
             church=self.church,
             branch=self.branch,
@@ -708,8 +759,8 @@ class MemberBulkUploadTests(APITestCase):
         )
         response = self._upload(csv_content)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["success_count"], 0)
-        self.assertEqual(response.data["duplicates_skipped"], 1)
+        self.assertEqual(response.data["success_count"], 1)
+        self.assertEqual(response.data["duplicates_skipped"], 0)
 
     def test_bulk_upload_invalid_phone_reports_error(self):
         csv_content = (

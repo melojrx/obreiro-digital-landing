@@ -72,6 +72,7 @@ class CustomUser(AbstractUser):
     # Email único apenas para usuários ativos
     email = models.EmailField(
         "E-mail",
+        unique=True,
         help_text="Endereço de e-mail para login"
     )
     
@@ -132,9 +133,6 @@ class CustomUser(AbstractUser):
         verbose_name = 'Usuário'
         verbose_name_plural = 'Usuários'
         db_table = 'accounts_customuser'
-        # Email uniqueness is enforced per-church via serializers
-        # to support multi-tenant architecture where same email
-        # can exist in different churches
     
     def __str__(self):
         return f"{self.full_name} ({self.email})"
