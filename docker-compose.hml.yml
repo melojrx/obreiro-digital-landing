@@ -1,0 +1,173 @@
+# =================================
+# OBREIRO VIRTUAL - HOMOLOGAÇÃO
+# =================================
+
+services:
+  # =================================
+  # PostgreSQL - Banco de Dados HML
+  # =================================
+  postgres_hml:
+    image: postgres:15-alpine
+    container_name: obreiro_postgres_hml
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Fortaleza
+    command: postgres -c max_connections=300 -c shared_buffers=512MB
+    volumes:
+      - postgres_data_hml:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - obreiro_network_hml
+    restart: unless-stopped
+    ports:
+      - "5433:5432"  # Porta DIFERENTE da produção (5432)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # =================================
+  # Redis - Cache & Celery Broker HML
+  # =================================
+  redis_hml:
+    image: redis:7-alpine
+    container_name: obreiro_redis_hml
+    volumes:
+      - redis_data_hml:/data
+    networks:
+      - obreiro_network_hml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # =================================
+  # Backend Django + Gunicorn HML
+  # =================================
+  backend_hml:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: production
+    container_name: obreiro_backend_hml
+    env_file:
+      - .env_hml
+    volumes:
+      - ./staticfiles:/app/staticfiles
+      - ./media:/app/media
+      - ./logs:/var/log/obreiro
+    depends_on:
+      postgres_hml:
+        condition: service_healthy
+      redis_hml:
+        condition: service_healthy
+    networks:
+      - obreiro_network_hml
+    restart: unless-stopped
+    ports:
+      - "8001:8000"  # Porta DIFERENTE da produção (8000)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =================================
+  # Celery Worker HML
+  # =================================
+  celery_hml:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: production
+    container_name: obreiro_celery_hml
+    env_file:
+      - .env_hml
+    volumes:
+      - ./media:/app/media
+      - ./logs:/var/log/obreiro
+    depends_on:
+      postgres_hml:
+        condition: service_healthy
+      redis_hml:
+        condition: service_healthy
+    command: celery -A config worker -l info --concurrency=2
+    networks:
+      - obreiro_network_hml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "celery", "-A", "config", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =================================
+  # Celery Beat HML (Tarefas agendadas)
+  # =================================
+  celery_beat_hml:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: production
+    container_name: obreiro_celery_beat_hml
+    env_file:
+      - .env_hml
+    volumes:
+      - ./media:/app/media
+      - ./logs:/var/log/obreiro
+    depends_on:
+      postgres_hml:
+        condition: service_healthy
+      redis_hml:
+        condition: service_healthy
+    command: celery -A config beat -l info
+    networks:
+      - obreiro_network_hml
+    restart: unless-stopped
+
+  # =================================
+  # Frontend React Build HML
+  # =================================
+  frontend_hml:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      target: production
+      args:
+        - VITE_API_URL=https://hml.obreirovirtual.com/api/v1
+        - VITE_ENABLE_SSE=false
+        - VITE_NOTIFICATION_POLLING_INTERVAL=60000
+    container_name: obreiro_frontend_hml
+    networks:
+      - obreiro_network_hml
+    restart: unless-stopped
+    ports:
+      - "3001:80"  # Porta DIFERENTE da produção
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =================================
+# Volumes Persistentes HML
+# =================================
+volumes:
+  postgres_data_hml:
+    driver: local
+  redis_data_hml:
+    driver: local
+
+# =================================
+# Rede Isolada HML
+# =================================
+networks:
+  obreiro_network_hml:
+    name: obreiro_network_hml
+    driver: bridge

@@ -479,6 +479,7 @@ server_config.sh
 static_prod/
 media_prod/
 frontend_build/
+frontend-build/
 logs/
 
 # Arquivos de ambiente específicos
