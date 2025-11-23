@@ -438,6 +438,59 @@ class SystemUserCreationTest(APITestCase):
         self.assertIn("cpf", response.data)
         self.assertTrue("CPF" in str(response.data["cpf"]))
 
+    def test_update_member_system_user_role_change(self):
+        """Permite ajustar o papel de acesso para membro que já tem usuário."""
+        create_resp = self.client.post(self.members_url, {
+            "church": self.church.id,
+            "full_name": "Role Change Member",
+            "birth_date": "1985-01-01",
+            "gender": "M",
+            "cpf": "390.533.447-05",
+            "phone": "(11) 80000-1000",
+            "create_system_user": True,
+            "system_role": "church_admin",
+            "user_email": "rolechange@test.com",
+        })
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+        member = Member.objects.get(cpf="390.533.447-05")
+        church_user = ChurchUser.objects.get(user=member.user, church=self.church)
+        self.assertEqual(church_user.role, RoleChoices.CHURCH_ADMIN)
+
+        detail_url = reverse("member-detail", args=[member.id])
+        patch_resp = self.client.patch(detail_url, {
+            "system_role": RoleChoices.SECRETARY,
+        })
+        self.assertEqual(patch_resp.status_code, status.HTTP_200_OK)
+        church_user.refresh_from_db()
+        self.assertEqual(church_user.role, RoleChoices.SECRETARY)
+
+    def test_update_member_system_user_revoke_access(self):
+        """Permite remover acesso ao sistema de membro existente."""
+        create_resp = self.client.post(self.members_url, {
+            "church": self.church.id,
+            "full_name": "Revoke Member",
+            "birth_date": "1985-01-01",
+            "gender": "M",
+            "cpf": "529.982.247-25",
+            "phone": "(11) 80000-2000",
+            "create_system_user": True,
+            "system_role": "church_admin",
+            "user_email": "revokemember@test.com",
+        })
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+        member = Member.objects.get(cpf="529.982.247-25")
+        user = member.user
+        self.assertIsNotNone(user)
+        detail_url = reverse("member-detail", args=[member.id])
+
+        patch_resp = self.client.patch(detail_url, {
+            "revoke_system_access": True,
+        })
+        self.assertEqual(patch_resp.status_code, status.HTTP_200_OK)
+        member.refresh_from_db()
+        self.assertIsNone(member.user)
+        self.assertFalse(ChurchUser.objects.filter(user=user, church=self.church, is_active=True).exists())
+
 
 class MemberBranchRelationshipTest(TestCase):
     """Validates that members respect church ↔ filial constraints."""

@@ -240,6 +240,7 @@ export interface CreateMemberData {
   create_system_user?: boolean;
   system_role?: string;
   user_email?: string;
+  revoke_system_access?: boolean;
   user_password?: string;
   
   // Novo campo para status ministerial inicial

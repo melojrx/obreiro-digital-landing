@@ -560,6 +560,7 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         write_only=True
     )
     user_email = serializers.EmailField(required=False, write_only=True)
+    revoke_system_access = serializers.BooleanField(required=False, write_only=True)
 
     class Meta:
         model = Member
@@ -572,8 +573,8 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             'ministerial_function', 'spouse', 'children_count', 'responsible', 'profession', 'education_level', 
             'photo', 'notes', 'accept_sms', 'accept_email', 'accept_whatsapp',
             'branch',
-            # Campos para conceder acesso ao sistema
-            'grant_system_access', 'system_role', 'user_email'
+            # Campos para conceder/ajustar/revogar acesso ao sistema
+            'grant_system_access', 'system_role', 'user_email', 'revoke_system_access'
         ]
     
     def validate_cpf(self, value):
@@ -584,6 +585,11 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         """Validações gerais incluindo concessão de acesso ao sistema"""
+        revoke_access = attrs.get('revoke_system_access')
+
+        if revoke_access and attrs.get('grant_system_access'):
+            raise serializers.ValidationError("Não é possível conceder e revogar acesso simultaneamente.")
+
         # Validações para concessão de acesso ao sistema
         if attrs.get('grant_system_access'):
             # Verificar se membro já tem usuário
@@ -608,6 +614,16 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     "user_email": "E-mail já cadastrado no sistema. Faça login ou recupere a senha."
                 })
+
+        # Validação para ajuste de papel quando já possui acesso
+        if attrs.get('system_role') and not attrs.get('grant_system_access'):
+            if not self.instance or not self.instance.user:
+                raise serializers.ValidationError(
+                    "Papel do sistema só pode ser ajustado para membros que já possuem acesso."
+                )
+
+        if revoke_access and (not self.instance or not self.instance.user):
+            raise serializers.ValidationError("Este membro não possui acesso ao sistema para ser removido.")
         
         return attrs
 
@@ -620,6 +636,7 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         grant_system_access = validated_data.pop('grant_system_access', False)
         system_role = validated_data.pop('system_role', None)
         user_email = validated_data.pop('user_email', None)
+        revoke_system_access = validated_data.pop('revoke_system_access', False)
         
         old_function = instance.ministerial_function
         new_function = validated_data.get('ministerial_function', old_function)
@@ -661,6 +678,51 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             except Exception:
                 pass
         
+        # NOVO: Remover acesso ao sistema, se solicitado
+        if revoke_system_access and member.user_id:
+            try:
+                # Desativar vínculos ChurchUser deste membro na igreja atual
+                qs = ChurchUser.objects.filter(user=member.user, church=member.church)
+                for cu in qs:
+                    cu.is_active = False
+                    cu.is_user_active_church = False
+                    cu.active_branch = None
+                    cu.save(update_fields=['is_active', 'is_user_active_church', 'active_branch', 'updated_at'])
+
+                # Opcional: desativar usuário se não houver mais vínculos ativos
+                user = member.user
+                has_other_active = ChurchUser.objects.filter(user=user, is_active=True).exists()
+                if not has_other_active:
+                    user.is_active = False
+                    user.save(update_fields=['is_active'])
+
+                # Remover vínculo com o membro
+                member.user = None
+                member.save(update_fields=['user', 'updated_at'])
+            except Exception as e:
+                logger.error("Erro ao revogar acesso ao sistema para membro %s: %s", member.id, e, exc_info=True)
+                raise serializers.ValidationError("Não foi possível remover o acesso ao sistema. Tente novamente.")
+            return member
+
+        # NOVO: Ajustar papel do sistema para membro que já possui acesso
+        if system_role and member.user_id and not grant_system_access:
+            try:
+                church_user = ChurchUser.objects.filter(user=member.user, church=member.church).first()
+                if not church_user:
+                    church_user = ChurchUser.objects.create(
+                        user=member.user,
+                        church=member.church,
+                        role=system_role,
+                        is_active=True
+                    )
+                else:
+                    church_user.role = system_role
+                    church_user.is_active = True
+                    church_user.save(update_fields=['role', 'is_active', 'updated_at'])
+            except Exception as e:
+                logger.error("Erro ao ajustar papel do sistema para membro %s: %s", member.id, e, exc_info=True)
+                raise serializers.ValidationError("Não foi possível atualizar o papel de acesso ao sistema.")
+
         # NOVO: Conceder acesso ao sistema se solicitado
         if grant_system_access and system_role and user_email:
             try:

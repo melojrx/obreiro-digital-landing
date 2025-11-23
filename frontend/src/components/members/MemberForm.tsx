@@ -139,6 +139,7 @@ const memberSchema = z.object({
   create_system_user: z.boolean().optional(),
   system_role: z.string().optional(),
   user_email: z.string().optional(),
+  remove_system_access: z.boolean().optional(),
   // NOTA: user_password removido - senha gerada automaticamente pelo backend
   
 }).refine((data) => {
@@ -215,6 +216,10 @@ export const MemberForm: React.FC<MemberFormProps> = ({
   }, [allowedRoleCodes]);
 
   const canAssignRoles = availableRoles.length > 0;
+  const mappedExistingRole = member?.system_user_role === 'denomination_admin'
+    ? 'church_admin'
+    : (member?.system_user_role || '');
+  const defaultSystemEmail = (member?.system_user_email || member?.email || '').trim();
   const rolesLoading = false;
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
@@ -322,8 +327,9 @@ export const MemberForm: React.FC<MemberFormProps> = ({
       accept_whatsapp: member?.accept_whatsapp ?? true,
       // Campos de papel do sistema
       create_system_user: false,
-      system_role: '',
-      user_email: '',
+      system_role: mappedExistingRole,
+      user_email: defaultSystemEmail,
+      remove_system_access: false,
       // NOTA: user_password removido - não é mais necessário
 
       
@@ -1505,203 +1511,290 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       <Users className="h-5 w-5" />
                       Acesso ao Sistema
                     </CardTitle>
-                    <CardDescription>
-                      Configure se este membro terá acesso ao sistema de gestão
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {alreadyHasSystemAccess && (
-                      <div className="p-3 rounded border bg-gray-50 text-sm text-gray-700">
-                        Este membro já possui acesso ao sistema vinculado.
-                      </div>
-                    )}
-
-                    {!alreadyHasSystemAccess && !canAssignRoles && (
-                      <div className="p-3 rounded border bg-gray-50 text-sm text-gray-600">
-                        Você não tem permissão para atribuir papéis de acesso ao sistema.
-                      </div>
-                    )}
-
-                    {!alreadyHasSystemAccess && canAssignRoles && (
+                  <CardDescription>
+                    Configure se este membro terá acesso ao sistema de gestão
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {alreadyHasSystemAccess ? (
                       <>
-                        <FormField
-                      control={form.control}
-                      name="create_system_user"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={(checked) => {
-                                field.onChange(checked);
-                                if (checked) {
-                                  // Pré-selecionar papel quando houver apenas uma opção disponível
-                                  const currentRole = form.getValues('system_role');
-                                  if (!currentRole && availableRoles.length === 1) {
-                                    form.setValue('system_role', availableRoles[0].value);
-                                  }
-                                  // Pré-preencher e-mail com o do membro (se existir)
-                                  const currentEmail = form.getValues('user_email');
-                                  if (!currentEmail && (member?.email || '').trim()) {
-                                    form.setValue('user_email', member!.email!, { shouldValidate: true });
-                                  }
-                                }
-                              }}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Usuário terá acesso ao sistema?</FormLabel>
-                            <FormDescription>
-                              Marque para criar um usuário que poderá fazer login no sistema. Após marcar, selecione o papel e informe e-mail e senha de acesso.
-                            </FormDescription>
+                        <div className="p-3 rounded border bg-blue-50 text-sm text-blue-900">
+                          <div className="font-medium">Acesso ativo</div>
+                          <div className="text-blue-800 mt-1">
+                            E-mail: {member?.system_user_email || member?.email || '—'}
                           </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {form.watch('create_system_user') && (
-                      <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
-                        <h4 className="font-medium text-blue-900 flex items-center gap-2">
-                          <Shield className="h-4 w-4" />
-                          Configurações de Acesso ao Sistema
-                        </h4>
-                        
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                          <p className="text-sm text-yellow-800">
-                            <strong>Importante:</strong> Ao marcar esta opção, será criado um usuário que poderá fazer login no sistema.
-                            Escolha o papel adequado baseado nas responsabilidades da pessoa na igreja.
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="system_role"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Papel no Sistema *</FormLabel>
-                                <Select 
-                                  onValueChange={field.onChange} 
-                                  defaultValue={field.value}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Selecione o papel" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {availableRoles.map((role) => (
-                                      <SelectItem key={role.value} value={role.value}>
-                                        <div className="flex flex-col">
-                                          <span className="font-medium">{role.label}</span>
-                                          <span className="text-xs text-gray-500">{role.description}</span>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormDescription>
-                                  Define as permissões do usuário no sistema
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="user_email"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>E-mail para Login *</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="email" 
-                                    placeholder="email@exemplo.com" 
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormDescription>
-                                  E-mail que será usado para fazer login no sistema
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        {/* Aviso sobre geração automática de senha */}
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <div className="flex items-start gap-3">
-                            <svg 
-                              className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth={2} 
-                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
-                              />
-                            </svg>
-                            <div className="flex-1">
-                              <h4 className="font-medium text-blue-900 text-sm mb-1">
-                                🔐 Senha Gerada Automaticamente
-                              </h4>
-                              <p className="text-sm text-blue-700 mb-2">
-                                Uma senha segura será gerada automaticamente e enviada para o e-mail cadastrado.
-                              </p>
-                              <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
-                                <li>O membro receberá um e-mail com as credenciais de acesso</li>
-                                <li>A senha é única e segura (16 caracteres aleatórios)</li>
-                                <li>O usuário poderá alterá-la no primeiro acesso</li>
-                                <li>Por segurança, administradores não têm acesso à senha</li>
-                              </ul>
-                            </div>
+                          <div className="text-blue-800">
+                            Papel: {member?.system_user_role_label || '—'}
                           </div>
                         </div>
 
-                        {form.watch('system_role') && (
-                          <div className="p-3 bg-blue-100 border border-blue-300 rounded-lg">
-                            <h5 className="font-medium text-blue-900 mb-2">
-                              Papel Selecionado: {availableRoles.find(r => r.value === form.watch('system_role'))?.label}
-                            </h5>
-                            <p className="text-sm text-blue-700">
-                              {availableRoles.find(r => r.value === form.watch('system_role'))?.description}
-                            </p>
-                            
-                            <div className="mt-2 text-xs text-blue-600">
-                              <strong>O que este papel pode fazer:</strong>
-                              <ul className="list-disc pl-5 space-y-1">
-                                <li>Permissões variam por papel e igreja</li>
-                                {form.watch('system_role') === 'denomination_admin' && (
-                                  <>
-                                    <li>Administrar denominação e igrejas vinculadas</li>
-                                    <li>Relatórios consolidados da denominação</li>
-                                  </>
-                                )}
-                                {form.watch('system_role') === 'church_admin' && (
-                                  <>
-                                    <li>Gerenciar dados da igreja e membros</li>
-                                    <li>Gerenciar congregações e atividades</li>
-                                    <li>Acessar relatórios consolidados</li>
-                                  </>
-                                )}
-                                {form.watch('system_role') === 'secretary' && (
-                                  <>
-                                    <li>Gestão de cadastros</li>
-                                    <li>Relatórios básicos</li>
-                                  </>
-                                )}
-                              </ul>
-                            </div>
+                        {!canAssignRoles && (
+                          <div className="p-3 rounded border bg-gray-50 text-sm text-gray-600">
+                            Você não tem permissão para ajustar ou remover o acesso deste membro.
                           </div>
                         )}
-                      </div>
-                    )}
+
+                        {canAssignRoles && (
+                          <div className="space-y-4">
+                            <FormField
+                              control={form.control}
+                              name="system_role"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Novo papel no sistema</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                    disabled={form.watch('remove_system_access')}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o papel" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {availableRoles.map((role) => (
+                                        <SelectItem key={role.value} value={role.value}>
+                                          <div className="flex flex-col">
+                                            <span className="font-medium">{role.label}</span>
+                                            <span className="text-xs text-gray-500">{role.description}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormDescription>
+                                    Ajuste o nível de acesso do membro ao sistema.
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="remove_system_access"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value}
+                                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                                    />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel>Remover acesso ao sistema</FormLabel>
+                                    <FormDescription>
+                                      Desative o login deste membro e remova o vínculo de acesso.
+                                    </FormDescription>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            {form.watch('remove_system_access') && (
+                              <Alert variant="destructive">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Confirmação necessária</AlertTitle>
+                                <AlertDescription>
+                                  Ao salvar, o vínculo com o usuário será removido e o login será desativado para este membro.
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {!canAssignRoles && (
+                          <div className="p-3 rounded border bg-gray-50 text-sm text-gray-600">
+                            Você não tem permissão para atribuir papéis de acesso ao sistema.
+                          </div>
+                        )}
+
+                        {canAssignRoles && (
+                          <>
+                            <FormField
+                          control={form.control}
+                          name="create_system_user"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={(checked) => {
+                                    field.onChange(checked);
+                                    if (checked) {
+                                      // Pré-selecionar papel quando houver apenas uma opção disponível
+                                      const currentRole = form.getValues('system_role');
+                                      if (!currentRole && availableRoles.length === 1) {
+                                        form.setValue('system_role', availableRoles[0].value);
+                                      }
+                                      // Pré-preencher e-mail com o do membro (se existir)
+                                      const currentEmail = form.getValues('user_email');
+                                      if (!currentEmail && (member?.email || '').trim()) {
+                                        form.setValue('user_email', member!.email!, { shouldValidate: true });
+                                      }
+                                    }
+                                  }}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Usuário terá acesso ao sistema?</FormLabel>
+                                <FormDescription>
+                                  Marque para criar um usuário que poderá fazer login no sistema. Após marcar, selecione o papel e informe e-mail e senha de acesso.
+                                </FormDescription>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {form.watch('create_system_user') && (
+                          <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
+                            <h4 className="font-medium text-blue-900 flex items-center gap-2">
+                              <Shield className="h-4 w-4" />
+                              Configurações de Acesso ao Sistema
+                            </h4>
+                            
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                              <p className="text-sm text-yellow-800">
+                                <strong>Importante:</strong> Ao marcar esta opção, será criado um usuário que poderá fazer login no sistema.
+                                Escolha o papel adequado baseado nas responsabilidades da pessoa na igreja.
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField
+                                control={form.control}
+                                name="system_role"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Papel no Sistema *</FormLabel>
+                                    <Select 
+                                      onValueChange={field.onChange} 
+                                      defaultValue={field.value}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Selecione o papel" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {availableRoles.map((role) => (
+                                          <SelectItem key={role.value} value={role.value}>
+                                            <div className="flex flex-col">
+                                              <span className="font-medium">{role.label}</span>
+                                              <span className="text-xs text-gray-500">{role.description}</span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                      Define as permissões do usuário no sistema
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name="user_email"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>E-mail para Login *</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="email" 
+                                        placeholder="email@exemplo.com" 
+                                        {...field} 
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      E-mail que será usado para fazer login no sistema
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+
+                            {/* Aviso sobre geração automática de senha */}
+                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-start gap-3">
+                                <svg 
+                                  className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" 
+                                  fill="none" 
+                                  stroke="currentColor" 
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round" 
+                                    strokeWidth={2} 
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                                  />
+                                </svg>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-blue-900 text-sm mb-1">
+                                    🔐 Senha Gerada Automaticamente
+                                  </h4>
+                                  <p className="text-sm text-blue-700 mb-2">
+                                    Uma senha segura será gerada automaticamente e enviada para o e-mail cadastrado.
+                                  </p>
+                                  <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
+                                    <li>O membro receberá um e-mail com as credenciais de acesso</li>
+                                    <li>A senha é única e segura (16 caracteres aleatórios)</li>
+                                    <li>O usuário poderá alterá-la no primeiro acesso</li>
+                                    <li>Por segurança, administradores não têm acesso à senha</li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+
+                            {form.watch('system_role') && (
+                              <div className="p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                                <h5 className="font-medium text-blue-900 mb-2">
+                                  Papel Selecionado: {availableRoles.find(r => r.value === form.watch('system_role'))?.label}
+                                </h5>
+                                <p className="text-sm text-blue-700">
+                                  {availableRoles.find(r => r.value === form.watch('system_role'))?.description}
+                                </p>
+                                
+                                <div className="mt-2 text-xs text-blue-600">
+                                  <strong>O que este papel pode fazer:</strong>
+                                  <ul className="list-disc pl-5 space-y-1">
+                                    <li>Permissões variam por papel e igreja</li>
+                                    {form.watch('system_role') === 'denomination_admin' && (
+                                      <>
+                                        <li>Administrar denominação e igrejas vinculadas</li>
+                                        <li>Relatórios consolidados da denominação</li>
+                                      </>
+                                    )}
+                                    {form.watch('system_role') === 'church_admin' && (
+                                      <>
+                                        <li>Gerenciar dados da igreja e membros</li>
+                                        <li>Gerenciar congregações e atividades</li>
+                                        <li>Acessar relatórios consolidados</li>
+                                      </>
+                                    )}
+                                    {form.watch('system_role') === 'secretary' && (
+                                      <>
+                                        <li>Gestão de cadastros</li>
+                                        <li>Relatórios básicos</li>
+                                      </>
+                                    )}
+                                  </ul>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                          </>
+                        )}
                       </>
                     )}
                   </CardContent>
