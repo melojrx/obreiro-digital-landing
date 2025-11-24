@@ -106,27 +106,33 @@ jobs:
             echo "🔐 Ajustando permissões..."
             chmod -R 755 /root/obreiro-hml/frontend-build
 
-            # 14. Verificar arquivos do frontend
-            if [ ! -f /root/obreiro-hml/frontend-build/index.html ]; then
-              echo "❌ Erro: Build do frontend não foi copiado corretamente!"
-              ls -la /root/obreiro-hml/frontend-build/
+            # 14. Copiar frontend para diretório do nginx
+            echo "📦 Copiando frontend para /var/www/html/hml/..."
+            sudo mkdir -p /var/www/html/hml
+            sudo cp -r /root/obreiro-hml/frontend-build/* /var/www/html/hml/
+            sudo chmod -R 755 /var/www/html/hml
+
+            # 15. Verificar arquivos do frontend
+            if [ ! -f /var/www/html/hml/index.html ]; then
+              echo "❌ Erro: Frontend não foi copiado para /var/www/html/hml/!"
+              ls -la /var/www/html/hml/
               exit 1
             fi
-            echo "✅ Frontend build copiado: $(ls -lh /root/obreiro-hml/frontend-build/ | wc -l) arquivos"
+            echo "✅ Frontend disponível em /var/www/html/hml/: $(ls -lh /var/www/html/hml/ | wc -l) arquivos"
 
-            # 15. Testar configuração do NGINX
+            # 16. Testar configuração do NGINX
             echo "🔍 Testando configuração do NGINX..."
             sudo nginx -t
 
-            # 16. Recarregar NGINX
+            # 17. Recarregar NGINX
             echo "🔄 Recarregando NGINX..."
             sudo systemctl reload nginx
 
-            # 17. Verificar status dos serviços
+            # 18. Verificar status dos serviços
             echo "📊 Status dos containers:"
             docker-compose -f docker-compose.hml.yml ps
 
-            # 18. Health check do backend
+            # 19. Health check do backend
             echo "🏥 Executando health check..."
             sleep 5
 
