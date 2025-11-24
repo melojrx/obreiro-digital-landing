@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from apps.denominations.models import Denomination
 from apps.churches.models import Church
 from apps.branches.models import Branch
-from .models import Member
+from .models import Member, FamilyRelationship
 from apps.accounts.models import ChurchUser, RoleChoices, UserProfile
 
 User = get_user_model()
@@ -598,6 +598,145 @@ class MemberBranchRelationshipTest(TestCase):
             phone="(11) 91111-2222"
         )
         self.assertEqual(member.branch, self.branch)
+
+
+class FamilyRelationshipTest(APITestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            email="family-admin@test.com",
+            password="adminpassword",
+            full_name="Family Admin",
+            phone="(11) 95555-1111"
+        )
+
+        self.denomination = Denomination.objects.create(
+            name="Fam Denomination",
+            short_name="FD",
+            administrator=self.admin_user,
+            email="famdenom@test.com",
+            phone="(11) 95555-2222",
+            headquarters_address="Rua Central, 10",
+            headquarters_city="Cidade F",
+            headquarters_state="SP",
+            headquarters_zipcode="01010-100"
+        )
+
+        self.church = Church.objects.create(
+            denomination=self.denomination,
+            name="Fam Church",
+            short_name="FC",
+            email="famchurch@test.com",
+            phone="(11) 95555-3333",
+            address="Rua da Igreja, 20",
+            city="Cidade F",
+            state="SP",
+            zipcode="02020-200",
+            subscription_end_date=date(2099, 1, 1)
+        )
+
+        self.branch, _ = Branch.objects.get_or_create(
+            church=self.church,
+            name="Fam Church - Matriz",
+            defaults={
+                'short_name': "Matriz F",
+                'description': "Filial principal",
+                'email': "fambranch@test.com",
+                'phone': "(11) 94444-4444",
+                'address': "Rua Principal, 30",
+                'neighborhood': "Centro",
+                'city': "Cidade F",
+                'state': "SP",
+                'zipcode': "03030-300",
+                'qr_code_active': True,
+                'is_main': True,
+            }
+        )
+
+        ChurchUser.objects.get_or_create(
+            user=self.admin_user,
+            church=self.church,
+            defaults={
+                'role': RoleChoices.CHURCH_ADMIN,
+                'is_active': True,
+                'is_user_active_church': True,
+                'active_branch': self.branch,
+                'can_manage_members': True,
+            }
+        )
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin_user)
+        self.members_url = reverse("member-list")
+
+    def test_create_member_with_children_links_existing(self):
+        child = Member.objects.create(
+            church=self.church,
+            branch=self.branch,
+            full_name="Child Member",
+            birth_date=date(2010, 1, 1),
+            gender="M",
+            phone="(11) 93333-3333"
+        )
+
+        resp = self.client.post(self.members_url, {
+            "church": self.church.id,
+            "full_name": "Parent Member",
+            "birth_date": "1980-01-01",
+            "gender": "M",
+            "phone": "(11) 92222-2222",
+            "children": [child.id],
+        })
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        parent = Member.objects.get(full_name="Parent Member")
+        # Verificar vínculos bidirecionais
+        self.assertTrue(FamilyRelationship.objects.filter(
+            member=parent, related_member=child, relation_type=FamilyRelationship.RELATION_CHILD
+        ).exists())
+        self.assertTrue(FamilyRelationship.objects.filter(
+            member=child, related_member=parent, relation_type=FamilyRelationship.RELATION_PARENT
+        ).exists())
+
+    def test_update_member_children_links(self):
+        parent = Member.objects.create(
+            church=self.church,
+            branch=self.branch,
+            full_name="Parent Update",
+            birth_date=date(1980, 2, 2),
+            gender="F",
+            phone="(11) 94444-4444"
+        )
+        child1 = Member.objects.create(
+            church=self.church,
+            branch=self.branch,
+            full_name="Child One",
+            birth_date=date(2011, 1, 1),
+            gender="M",
+            phone="(11) 95555-5555"
+        )
+        child2 = Member.objects.create(
+            church=self.church,
+            branch=self.branch,
+            full_name="Child Two",
+            birth_date=date(2012, 2, 2),
+            gender="F",
+            phone="(11) 96666-6666"
+        )
+
+        detail_url = reverse("member-detail", args=[parent.id])
+        resp1 = self.client.patch(detail_url, {"children": [child1.id]})
+        self.assertEqual(resp1.status_code, status.HTTP_200_OK)
+        self.assertTrue(FamilyRelationship.objects.filter(
+            member=parent, related_member=child1, relation_type=FamilyRelationship.RELATION_CHILD
+        ).exists())
+
+        resp2 = self.client.patch(detail_url, {"children": [child2.id]})
+        self.assertEqual(resp2.status_code, status.HTTP_200_OK)
+        self.assertFalse(FamilyRelationship.objects.filter(
+            member=parent, related_member=child1, relation_type=FamilyRelationship.RELATION_CHILD
+        ).exists())
+        self.assertTrue(FamilyRelationship.objects.filter(
+            member=parent, related_member=child2, relation_type=FamilyRelationship.RELATION_CHILD
+        ).exists())
 
 
 class SpouseSynchronizationTest(TestCase):

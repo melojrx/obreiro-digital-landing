@@ -14,7 +14,9 @@ import {
   Shield,
   ArrowRight,
   Users,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +54,7 @@ import {
 import {
   CreateMemberData, 
   Member, 
+  MemberSummary,
   membersService,
   MINISTERIAL_FUNCTION_CHOICES,
   MEMBERSHIP_STATUS_CHOICES
@@ -255,6 +258,11 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     state: string;
   }>>([]);
   const [churchesLoading, setChurchesLoading] = useState(false);
+  const [selectedChildren, setSelectedChildren] = useState<MemberSummary[]>(member?.children || []);
+  const [childSearch, setChildSearch] = useState('');
+  const [childrenOptions, setChildrenOptions] = useState<MemberSummary[]>([]);
+  const [childSelectId, setChildSelectId] = useState<string>('');
+  const [childrenLoading, setChildrenLoading] = useState(false);
   
   // Estado para membros disponíveis para cônjuge
   const [availableSpouses, setAvailableSpouses] = useState<Array<{
@@ -562,6 +570,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         spouseValue && spouseValue !== 'non-member'
           ? Number(spouseValue)
           : undefined;
+      const childrenIds = selectedChildren.map((child) => child.id);
 
       const mappedRole = data.system_role === 'denomination_admin' ? 'church_admin' : data.system_role;
       const formData: CreateMemberData = {
@@ -578,7 +587,8 @@ export const MemberForm: React.FC<MemberFormProps> = ({
         spouse: Number.isFinite(spouseId) ? spouseId : undefined,
         
         // Dados familiares
-        children_count: data.children_count || undefined,
+        children_count: data.children_count || (childrenIds.length > 0 ? childrenIds.length : undefined),
+        children: childrenIds,
         
         email: data.email || undefined,
         phone: normalizedPhone,
@@ -664,6 +674,53 @@ export const MemberForm: React.FC<MemberFormProps> = ({
     const formattedValue = formatPhone(value);
     form.setValue(field, formattedValue);
   };
+
+  // Busca e seleção de filhos (membros)
+  const loadChildrenOptions = useCallback(async (term?: string) => {
+    try {
+      setChildrenLoading(true);
+      const response = await membersService.getMembers({
+        search: term || undefined,
+        page: 1,
+      });
+      setChildrenOptions(response.results || []);
+    } catch (error) {
+      console.error('Erro ao buscar membros para filhos', error);
+    } finally {
+      setChildrenLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setSelectedChildren(member?.children || []);
+  }, [member?.children]);
+
+  useEffect(() => {
+    loadChildrenOptions('');
+  }, [loadChildrenOptions]);
+
+  const handleAddChild = () => {
+    if (!childSelectId) return;
+    const childIdNum = Number(childSelectId);
+    if (!Number.isFinite(childIdNum)) return;
+    if (member?.id === childIdNum) return;
+    if (selectedChildren.some((c) => c.id === childIdNum)) return;
+    const found = childrenOptions.find((c) => c.id === childIdNum);
+    if (found) {
+      setSelectedChildren((prev) => [...prev, found]);
+      setChildSelectId('');
+    }
+  };
+
+  const handleRemoveChild = (id: number) => {
+    setSelectedChildren((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const filteredChildrenOptions = childrenOptions.filter(
+    (child) =>
+      child.id !== member?.id &&
+      !selectedChildren.some((c) => c.id === child.id)
+  );
 
   useEffect(() => {
     if (member?.phone) {
@@ -978,12 +1035,97 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                               />
                             </FormControl>
                             <FormDescription>
-                              Número de filhos (opcional)
+                              Número de filhos (opcional). Se vincular filhos abaixo, este valor será ajustado automaticamente.
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                    </div>
+
+                    <div className="rounded-md border p-4 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-blue-600" />
+                        <h5 className="font-medium text-gray-900">Filhos vinculados</h5>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div className="md:col-span-2 space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Buscar membro pelo nome ou CPF"
+                              value={childSearch}
+                              onChange={(e) => {
+                                setChildSearch(e.target.value);
+                                loadChildrenOptions(e.target.value);
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => loadChildrenOptions(childSearch)}
+                              disabled={childrenLoading}
+                            >
+                              <Search className="h-4 w-4 mr-1" />
+                              Buscar
+                            </Button>
+                          </div>
+                          <select
+                            className="w-full border rounded-md p-2 text-sm"
+                            value={childSelectId}
+                            onChange={(e) => setChildSelectId(e.target.value)}
+                          >
+                            <option value="">Selecione um filho (membro)</option>
+                            {childrenLoading && <option>Carregando...</option>}
+                            {!childrenLoading && filteredChildrenOptions.length === 0 && (
+                              <option disabled>Nenhum membro encontrado</option>
+                            )}
+                            {filteredChildrenOptions.map((child) => (
+                              <option key={child.id} value={child.id}>
+                                {child.full_name} {child.age ? `• ${child.age} anos` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="default"
+                            onClick={handleAddChild}
+                            disabled={!childSelectId}
+                            className="w-full"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Adicionar filho
+                          </Button>
+                        </div>
+                      </div>
+
+                      {selectedChildren.length === 0 ? (
+                        <div className="text-sm text-gray-600">
+                          Nenhum filho vinculado. Selecione membros acima para mapear a família.
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedChildren.map((child) => (
+                            <Badge
+                              key={child.id}
+                              variant="secondary"
+                              className="flex items-center gap-2"
+                            >
+                              {child.full_name}
+                              {child.age ? ` • ${child.age} anos` : ''}
+                              <button
+                                type="button"
+                                className="ml-1 text-red-600 hover:text-red-800"
+                                onClick={() => handleRemoveChild(child.id)}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>

@@ -10,7 +10,7 @@ from datetime import date
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .models import Member, MembershipStatusLog, MembershipStatus
+from .models import Member, MembershipStatusLog, MembershipStatus, FamilyRelationship
 from apps.branches.models import Branch
 from apps.core.models import MembershipStatusChoices, MinisterialFunctionChoices, RoleChoices
 from apps.accounts.models import ChurchUser, UserProfile
@@ -53,6 +53,61 @@ def _sync_user_profile_from_member(user, member):
 
     profile.save()
     return profile
+
+
+def _sync_children_relationships(member, child_ids):
+    """
+    Cria/atualiza vínculos familiares (pai/mãe -> filho).
+    child_ids: lista de IDs de membros considerados filhos do member.
+    """
+    if child_ids is None:
+        return
+
+    # Normalizar e deduplicar
+    try:
+        child_ids = [int(cid) for cid in child_ids if cid is not None]
+    except (TypeError, ValueError):
+        raise serializers.ValidationError({"children": "IDs de filhos inválidos."})
+
+    child_ids = list(dict.fromkeys(child_ids))
+
+    # Validar pertencimento à mesma igreja e existência
+    children_qs = Member.objects.filter(id__in=child_ids, church=member.church, is_active=True)
+    found_ids = set(children_qs.values_list('id', flat=True))
+    missing = set(child_ids) - found_ids
+    if missing:
+        raise serializers.ValidationError({"children": f"Filhos inválidos ou fora da igreja: {missing}"})
+
+    # Remover vínculos anteriores (parent/child) para este membro que não estão mais na lista
+    FamilyRelationship.objects.filter(
+        member=member,
+        relation_type=FamilyRelationship.RELATION_CHILD
+    ).exclude(related_member_id__in=child_ids).delete()
+
+    FamilyRelationship.objects.filter(
+        related_member=member,
+        relation_type=FamilyRelationship.RELATION_PARENT
+    ).exclude(member_id__in=child_ids).delete()
+
+    # Criar vínculos bidirecionais
+    for child in children_qs:
+        FamilyRelationship.objects.get_or_create(
+            member=member,
+            related_member=child,
+            relation_type=FamilyRelationship.RELATION_CHILD
+        )
+        FamilyRelationship.objects.get_or_create(
+            member=child,
+            related_member=member,
+            relation_type=FamilyRelationship.RELATION_PARENT
+        )
+
+    # Atualizar contador de filhos, se presente
+    try:
+        member.children_count = len(child_ids)
+        member.save(update_fields=['children_count', 'updated_at'])
+    except Exception:
+        pass
 
 
 class MemberBulkUploadSerializer(serializers.Serializer):
@@ -126,6 +181,8 @@ class MemberSerializer(serializers.ModelSerializer):
     system_user_email = serializers.SerializerMethodField()
     system_user_role = serializers.SerializerMethodField()
     system_user_role_label = serializers.SerializerMethodField()
+    children = serializers.SerializerMethodField()
+    parents = serializers.SerializerMethodField()
     
     class Meta:
         model = Member
@@ -151,7 +208,7 @@ class MemberSerializer(serializers.ModelSerializer):
             'ministerial_function', 'ministerial_function_display',
             
             # Dados familiares
-            'spouse', 'spouse_name', 'children_count', 'responsible',
+            'spouse', 'spouse_name', 'children_count', 'children', 'parents', 'responsible',
             
             # Dados adicionais
             'profession', 'education_level', 'photo', 'notes',
@@ -223,6 +280,35 @@ class MemberSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def _serialize_member_brief(self, member):
+        return {
+            'id': member.id,
+            'full_name': member.full_name,
+            'age': member.age,
+            'gender': member.gender,
+            'birth_date': member.birth_date,
+        }
+
+    def get_children(self, obj):
+        try:
+            children = Member.objects.filter(
+                family_links__member=obj,
+                family_links__relation_type=FamilyRelationship.RELATION_CHILD
+            ).distinct()
+            return [self._serialize_member_brief(child) for child in children]
+        except Exception:
+            return []
+
+    def get_parents(self, obj):
+        try:
+            parents = Member.objects.filter(
+                family_links__member=obj,
+                family_links__relation_type=FamilyRelationship.RELATION_PARENT
+            ).distinct()
+            return [self._serialize_member_brief(parent) for parent in parents]
+        except Exception:
+            return []
+
 
 class MemberListSerializer(serializers.ModelSerializer):
     """
@@ -265,6 +351,12 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True
     )
+    children = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        write_only=True
+    )
     user_email = serializers.EmailField(required=False, write_only=True)
     # REMOVIDO: user_password - senha será gerada automaticamente e enviada por email
     
@@ -301,6 +393,7 @@ class MemberCreateSerializer(serializers.ModelSerializer):
             
             # Dados familiares
             'spouse', 'children_count', 'responsible',
+            'children',
             
             # Dados adicionais
             'profession', 'education_level', 'photo', 'notes',
@@ -423,10 +516,14 @@ class MemberCreateSerializer(serializers.ModelSerializer):
         create_system_user = validated_data.pop('create_system_user', False)
         system_role = validated_data.pop('system_role', None)
         user_email = validated_data.pop('user_email', None)
+        children_ids = validated_data.pop('children', None)
         # NOTA: user_password removido - será gerado automaticamente
         
         # Criar o membro
         member = super().create(validated_data)
+
+        # Sincronizar vínculos de filhos (opcional)
+        _sync_children_relationships(member, children_ids)
         
         # Registrar histórico inicial de função ministerial (se houver)
         if member.ministerial_function:
@@ -561,6 +658,12 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
     )
     user_email = serializers.EmailField(required=False, write_only=True)
     revoke_system_access = serializers.BooleanField(required=False, write_only=True)
+    children = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        write_only=True
+    )
 
     class Meta:
         model = Member
@@ -574,7 +677,9 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             'photo', 'notes', 'accept_sms', 'accept_email', 'accept_whatsapp',
             'branch',
             # Campos para conceder/ajustar/revogar acesso ao sistema
-            'grant_system_access', 'system_role', 'user_email', 'revoke_system_access'
+            'grant_system_access', 'system_role', 'user_email', 'revoke_system_access',
+            # Vínculos familiares
+            'children'
         ]
     
     def validate_cpf(self, value):
@@ -637,12 +742,14 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         system_role = validated_data.pop('system_role', None)
         user_email = validated_data.pop('user_email', None)
         revoke_system_access = validated_data.pop('revoke_system_access', False)
+        children_ids = validated_data.pop('children', None)
         
         old_function = instance.ministerial_function
         new_function = validated_data.get('ministerial_function', old_function)
         old_status = instance.membership_status
         new_status = validated_data.get('membership_status', old_status)
         member = super().update(instance, validated_data)
+        _sync_children_relationships(member, children_ids)
         
         # Lógica de histórico de função ministerial (mantida)
         if new_function != old_function:
