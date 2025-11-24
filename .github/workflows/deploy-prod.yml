@@ -38,6 +38,13 @@ jobs:
           echo "👤 Author: ${{ github.actor }}"
           echo "🎯 Event: ${{ github.event_name }}"
 
+      - name: Validar secrets de produção
+        run: |
+          [ -n "${{ secrets.PROD_VPS_SSH_KEY }}" ] || { echo "❌ Secret PROD_VPS_SSH_KEY ausente ou vazio"; exit 1; }
+          [ -n "${{ secrets.PROD_VPS_HOST }}" ] || { echo "❌ Secret PROD_VPS_HOST ausente ou vazio"; exit 1; }
+          [ -n "${{ secrets.PROD_VPS_USER }}" ] || { echo "❌ Secret PROD_VPS_USER ausente ou vazio"; exit 1; }
+          echo "✅ Secrets de produção encontrados"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
