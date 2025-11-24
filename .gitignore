@@ -486,3 +486,4 @@ logs/
 .env_prod
 .databricks
 TESTE_TRANSFERENCIA_CORRIGIDO.md
+docker/nginx/hml.conf
