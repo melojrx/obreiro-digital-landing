@@ -488,3 +488,4 @@ logs/
 .databricks
 TESTE_TRANSFERENCIA_CORRIGIDO.md
 create_superuser.py
+docker/nginx/hml.conf
