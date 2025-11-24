@@ -1043,90 +1043,93 @@ export const MemberForm: React.FC<MemberFormProps> = ({
                       />
                     </div>
 
-                    <div className="rounded-md border p-4 space-y-4">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-blue-600" />
-                        <h5 className="font-medium text-gray-900">Filhos vinculados</h5>
-                      </div>
+                    {(Number(form.watch('children_count') || 0) > 0 || selectedChildren.length > 0) && (
+                      <div className="rounded-md border p-4 space-y-4 bg-slate-50">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-blue-600" />
+                          <h5 className="font-medium text-gray-900">Filhos vinculados</h5>
+                        </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        <div className="md:col-span-2 space-y-2">
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Buscar membro pelo nome ou CPF"
-                              value={childSearch}
-                              onChange={(e) => {
-                                setChildSearch(e.target.value);
-                                loadChildrenOptions(e.target.value);
-                              }}
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                          <div className="md:col-span-8 space-y-2">
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Buscar membro pelo nome ou CPF"
+                                value={childSearch}
+                                onChange={(e) => {
+                                  setChildSearch(e.target.value);
+                                  loadChildrenOptions(e.target.value);
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => loadChildrenOptions(childSearch)}
+                                disabled={childrenLoading}
+                              >
+                                <Search className="h-4 w-4 mr-1" />
+                                Buscar
+                              </Button>
+                            </div>
+                            <select
+                              className="w-full border rounded-md p-2 text-sm bg-white"
+                              value={childSelectId}
+                              onChange={(e) => setChildSelectId(e.target.value)}
+                            >
+                              <option value="">Selecione um filho (membro)</option>
+                              {childrenLoading && <option>Carregando...</option>}
+                              {!childrenLoading && filteredChildrenOptions.length === 0 && (
+                                <option disabled>Nenhum membro encontrado</option>
+                              )}
+                              {filteredChildrenOptions.map((child) => (
+                                <option key={child.id} value={child.id}>
+                                  {child.full_name} {child.age ? `• ${child.age} anos` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="md:col-span-4 flex md:justify-end">
                             <Button
                               type="button"
-                              variant="secondary"
-                              onClick={() => loadChildrenOptions(childSearch)}
-                              disabled={childrenLoading}
+                              variant="default"
+                              onClick={handleAddChild}
+                              disabled={!childSelectId}
+                              className="w-full md:w-auto"
                             >
-                              <Search className="h-4 w-4 mr-1" />
-                              Buscar
+                              <Plus className="h-4 w-4 mr-1" />
+                              Adicionar filho
                             </Button>
                           </div>
-                          <select
-                            className="w-full border rounded-md p-2 text-sm"
-                            value={childSelectId}
-                            onChange={(e) => setChildSelectId(e.target.value)}
-                          >
-                            <option value="">Selecione um filho (membro)</option>
-                            {childrenLoading && <option>Carregando...</option>}
-                            {!childrenLoading && filteredChildrenOptions.length === 0 && (
-                              <option disabled>Nenhum membro encontrado</option>
-                            )}
-                            {filteredChildrenOptions.map((child) => (
-                              <option key={child.id} value={child.id}>
-                                {child.full_name} {child.age ? `• ${child.age} anos` : ''}
-                              </option>
-                            ))}
-                          </select>
                         </div>
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="default"
-                            onClick={handleAddChild}
-                            disabled={!childSelectId}
-                            className="w-full"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Adicionar filho
-                          </Button>
-                        </div>
-                      </div>
 
-                      {selectedChildren.length === 0 ? (
-                        <div className="text-sm text-gray-600">
-                          Nenhum filho vinculado. Selecione membros acima para mapear a família.
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {selectedChildren.map((child) => (
-                            <Badge
-                              key={child.id}
-                              variant="secondary"
-                              className="flex items-center gap-2"
-                            >
-                              {child.full_name}
-                              {child.age ? ` • ${child.age} anos` : ''}
-                              <button
-                                type="button"
-                                className="ml-1 text-red-600 hover:text-red-800"
-                                onClick={() => handleRemoveChild(child.id)}
+                        {selectedChildren.length === 0 ? (
+                          <div className="text-sm text-gray-600">
+                            Nenhum filho vinculado. Selecione membros acima para mapear a família.
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {selectedChildren.map((child) => (
+                              <Badge
+                                key={child.id}
+                                variant="secondary"
+                                className="flex items-center gap-2 px-3 py-1"
                               >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                                {child.full_name}
+                                {child.age ? ` • ${child.age} anos` : ''}
+                                <button
+                                  type="button"
+                                  className="ml-1 text-red-600 hover:text-red-800"
+                                  onClick={() => handleRemoveChild(child.id)}
+                                  aria-label={`Remover ${child.full_name}`}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
