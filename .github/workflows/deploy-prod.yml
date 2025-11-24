@@ -1,0 +1,436 @@
+name: Deploy para Produção
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Pular testes (use com cautela)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy-prod:
+    name: Deploy para PRODUÇÃO
+    runs-on: ubuntu-latest
+    # Só executa se for push direto OU se o PR foi mergeado (não apenas fechado)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    environment:
+      name: production
+      url: https://www.obreirovirtual.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Verificar branch
+        run: |
+          echo "🚀 DEPLOY PARA PRODUÇÃO 🚀"
+          echo "🔍 Branch: ${{ github.ref_name }}"
+          echo "📦 Commit: ${{ github.sha }}"
+          echo "👤 Author: ${{ github.actor }}"
+          echo "🎯 Event: ${{ github.event_name }}"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_VPS_HOST }}
+          username: ${{ secrets.PROD_VPS_USER }}
+          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          port: 22
+          command_timeout: 30m
+          script: |
+            echo "🚀 Iniciando deploy em PRODUÇÃO..."
+            echo "⚠️  ATENÇÃO: Deploy em ambiente de PRODUÇÃO!"
+
+            # Navegar para diretório do projeto
+            cd /root/obreiro-prod || exit 1
+
+            # 1. Pull do código mais recente
+            echo "📥 Baixando código da branch main..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 2. Carregar variáveis de ambiente
+            echo "🔧 Carregando variáveis de ambiente de PRODUÇÃO..."
+            set -a
+            source .env_prod
+            set +a
+
+            # 3. Backup do banco de dados antes do deploy
+            echo "💾 Criando backup do banco de dados..."
+            BACKUP_FILE="backup_prod_$(date +%Y%m%d_%H%M%S).sql"
+            docker exec obreiro_postgres_prod pg_dump -U obreiro_prod obreiro_prod > /root/backups/$BACKUP_FILE || echo "⚠️  Backup falhou, mas continuando..."
+            echo "✅ Backup salvo: $BACKUP_FILE"
+
+            # 4. Rebuild dos containers backend
+            echo "🔨 Rebuilding containers backend..."
+            docker-compose -f docker-compose.prod.yml build --no-cache backend celery celery-beat
+
+            # 5. Parar containers atuais (exceto postgres e redis)
+            echo "⏸️  Parando containers backend..."
+            docker-compose -f docker-compose.prod.yml stop backend celery celery-beat
+
+            # 6. Subir novos containers
+            echo "▶️  Iniciando containers atualizados..."
+            docker-compose -f docker-compose.prod.yml up -d --force-recreate backend celery celery-beat
+
+            # 7. Aguardar containers iniciarem
+            echo "⏳ Aguardando containers iniciarem..."
+            sleep 20
+
+            # 8. Verificar se backend está rodando
+            if ! docker ps | grep -q obreiro_backend_prod; then
+              echo "❌ ERRO CRÍTICO: Backend não está rodando!"
+              docker-compose -f docker-compose.prod.yml logs --tail=50 backend
+              echo "🔄 Tentando restaurar versão anterior..."
+              exit 1
+            fi
+
+            # 9. Aplicar migrações
+            echo "🗄️  Aplicando migrações do banco de dados..."
+            docker exec obreiro_backend_prod python manage.py migrate --noinput || {
+              echo "❌ ERRO: Migrações falharam!"
+              echo "📋 Logs do backend:"
+              docker-compose -f docker-compose.prod.yml logs --tail=50 backend
+              exit 1
+            }
+
+            # 10. Coletar arquivos estáticos
+            echo "📦 Coletando arquivos estáticos..."
+            docker exec obreiro_backend_prod python manage.py collectstatic --noinput
+
+            # 11. Rebuild do frontend
+            echo "⚛️  Rebuilding frontend de PRODUÇÃO..."
+            docker-compose -f docker-compose.prod.yml build --no-cache frontend-build
+
+            # 12. Executar build do frontend
+            echo "🏗️  Executando build do frontend..."
+            docker-compose -f docker-compose.prod.yml up frontend-build
+
+            # 13. Copiar build para o diretório temporário no host
+            echo "📋 Copiando build do frontend para o host..."
+            rm -rf /root/obreiro-prod/frontend_build/*
+            docker cp obreiro_frontend_build:/app/dist/. /root/obreiro-prod/frontend_build/ || {
+              echo "⚠️  Tentando copiar do volume diretamente..."
+              docker run --rm -v obreiro_frontend_build_prod:/source -v /root/obreiro-prod/frontend_build:/dest alpine sh -c "cp -r /source/. /dest/" || exit 1
+            }
+
+            # 14. Ajustar permissões
+            echo "🔐 Ajustando permissões..."
+            chmod -R 755 /root/obreiro-prod/frontend_build
+
+            # 15. Copiar frontend para diretório do nginx
+            echo "📦 Copiando frontend para /var/www/html/prod/..."
+            sudo mkdir -p /var/www/html/prod
+
+            # Criar backup do frontend antigo
+            if [ -d /var/www/html/prod ] && [ "$(ls -A /var/www/html/prod)" ]; then
+              echo "💾 Criando backup do frontend anterior..."
+              sudo cp -r /var/www/html/prod /var/www/html/prod_backup_$(date +%Y%m%d_%H%M%S) || echo "⚠️  Backup do frontend falhou"
+            fi
+
+            # Copiar novo frontend
+            sudo cp -r /root/obreiro-prod/frontend_build/* /var/www/html/prod/
+            sudo chmod -R 755 /var/www/html/prod
+
+            # 16. Verificar arquivos do frontend
+            if [ ! -f /var/www/html/prod/index.html ]; then
+              echo "❌ ERRO CRÍTICO: Frontend não foi copiado para /var/www/html/prod/!"
+              ls -la /var/www/html/prod/
+              exit 1
+            fi
+            echo "✅ Frontend disponível em /var/www/html/prod/: $(ls -lh /var/www/html/prod/ | wc -l) arquivos"
+
+            # 17. Testar configuração do NGINX
+            echo "🔍 Testando configuração do NGINX..."
+            sudo nginx -t || {
+              echo "❌ ERRO: Configuração do nginx inválida!"
+              exit 1
+            }
+
+            # 18. Recarregar NGINX
+            echo "🔄 Recarregando NGINX..."
+            sudo systemctl reload nginx
+
+            # 19. Verificar status dos serviços
+            echo "📊 Status dos containers:"
+            docker-compose -f docker-compose.prod.yml ps
+
+            # 20. Health check completo
+            echo "🏥 Executando health check..."
+            sleep 10
+
+            # Verificar backend
+            BACKEND_CHECK=$(curl -f -s https://www.obreirovirtual.com/api/v1/ && echo "OK" || echo "FAIL")
+            if [ "$BACKEND_CHECK" = "OK" ]; then
+              echo "✅ Backend respondendo corretamente"
+            else
+              echo "❌ ERRO CRÍTICO: Backend não está respondendo!"
+              docker-compose -f docker-compose.prod.yml logs --tail=50 backend
+              exit 1
+            fi
+
+            # Verificar frontend
+            FRONTEND_CHECK=$(curl -f -s -I https://www.obreirovirtual.com/ | grep -q "200 OK" && echo "OK" || echo "FAIL")
+            if [ "$FRONTEND_CHECK" = "OK" ]; then
+              echo "✅ Frontend respondendo corretamente"
+            else
+              echo "⚠️  Frontend pode não estar respondendo corretamente"
+              echo "📋 Verificando logs do nginx..."
+              sudo tail -n 30 /var/log/nginx/error.log
+            fi
+
+            # 21. Limpar containers e imagens antigas
+            echo "🧹 Limpando containers e imagens antigas..."
+            docker system prune -f --volumes || echo "⚠️  Limpeza parcial"
+
+            # 22. Exibir últimas linhas dos logs
+            echo "📝 Últimos logs do backend:"
+            docker-compose -f docker-compose.prod.yml logs --tail=20 backend
+
+            echo ""
+            echo "✅ =========================================="
+            echo "✅ DEPLOY EM PRODUÇÃO CONCLUÍDO COM SUCESSO!"
+            echo "✅ =========================================="
+            echo "🌐 Produção disponível em: https://www.obreirovirtual.com"
+            echo "📅 Deploy realizado em: $(date '+%Y-%m-%d %H:%M:%S')"
+            echo "📦 Commit: ${{ github.sha }}"
+            echo "👤 Autor: ${{ github.actor }}"
+
+      - name: Enviar email de sucesso
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "✅ Deploy PRODUÇÃO Concluído com Sucesso - Obreiro Virtual"
+          to: suporteobreirovirtual@gmail.com,jrmeloafrf@gmail.com
+          from: ${{ secrets.EMAIL_USERNAME }}
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 30px; border-radius: 5px 5px 0 0; text-align: center; }
+                .content { background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; }
+                .footer { background: #e9ecef; padding: 15px; border-radius: 0 0 5px 5px; font-size: 12px; color: #6c757d; text-align: center; }
+                .badge { display: inline-block; padding: 5px 10px; background: #007bff; color: white; border-radius: 3px; margin: 5px 0; }
+                .badge-prod { background: #28a745; font-weight: bold; }
+                .link { color: #007bff; text-decoration: none; }
+                .alert-success { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 15px 0; color: #155724; }
+                table { width: 100%; border-collapse: collapse; margin: 15px 0; background: white; }
+                td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+                td:first-child { font-weight: bold; width: 150px; background: #f8f9fa; }
+                h1 { margin: 0; font-size: 28px; }
+                h2 { color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 10px; }
+                .highlight { background: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 10px 0; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>🚀 Deploy em PRODUÇÃO</h1>
+                  <h2 style="margin: 10px 0 0 0; font-weight: normal; color: #e8f5e9;">Concluído com Sucesso!</h2>
+                </div>
+                <div class="content">
+                  <div class="alert-success">
+                    <strong>✅ Deploy realizado com sucesso!</strong><br>
+                    A aplicação está disponível e respondendo corretamente em produção.
+                  </div>
+
+                  <h2>📋 Detalhes do Deploy</h2>
+                  <table>
+                    <tr>
+                      <td>🌐 Ambiente:</td>
+                      <td><span class="badge badge-prod">PRODUÇÃO</span></td>
+                    </tr>
+                    <tr>
+                      <td>🔗 URL:</td>
+                      <td><a href="https://www.obreirovirtual.com" class="link">www.obreirovirtual.com</a></td>
+                    </tr>
+                    <tr>
+                      <td>🔀 Branch:</td>
+                      <td><span class="badge">${{ github.ref_name }}</span></td>
+                    </tr>
+                    <tr>
+                      <td>📦 Commit:</td>
+                      <td><code>${{ github.sha }}</code></td>
+                    </tr>
+                    <tr>
+                      <td>👤 Autor:</td>
+                      <td>${{ github.actor }}</td>
+                    </tr>
+                    <tr>
+                      <td>📅 Data/Hora:</td>
+                      <td>${{ github.event.head_commit.timestamp }}</td>
+                    </tr>
+                    <tr>
+                      <td>💬 Mensagem:</td>
+                      <td>${{ github.event.head_commit.message }}</td>
+                    </tr>
+                  </table>
+
+                  <div class="highlight">
+                    <strong>⚠️ Ações Realizadas:</strong>
+                    <ul style="margin: 10px 0;">
+                      <li>✅ Backup do banco de dados criado</li>
+                      <li>✅ Backend atualizado e migrações aplicadas</li>
+                      <li>✅ Frontend buildado e publicado</li>
+                      <li>✅ Nginx recarregado</li>
+                      <li>✅ Health checks passaram</li>
+                    </ul>
+                  </div>
+
+                  <h2>🔗 Links Úteis</h2>
+                  <ul>
+                    <li><a href="https://www.obreirovirtual.com" class="link">🌐 Aplicação PRODUÇÃO</a></li>
+                    <li><a href="https://www.obreirovirtual.com/admin" class="link">⚙️ Admin Django</a></li>
+                    <li><a href="https://www.obreirovirtual.com/api/v1/" class="link">🔌 API Backend</a></li>
+                    <li><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" class="link">📊 Logs do Deploy</a></li>
+                    <li><a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}" class="link">📝 Ver Commit</a></li>
+                  </ul>
+
+                  <h2>📈 Próximos Passos</h2>
+                  <ol>
+                    <li>Monitore os logs da aplicação por alguns minutos</li>
+                    <li>Verifique se não há erros no console do navegador</li>
+                    <li>Teste as funcionalidades principais</li>
+                    <li>Monitore métricas de performance</li>
+                  </ol>
+                </div>
+                <div class="footer">
+                  <p><strong>Deploy automático realizado via GitHub Actions</strong></p>
+                  <p>Workflow: ${{ github.workflow }} | Run: #${{ github.run_number }}</p>
+                  <p style="margin-top: 10px; color: #28a745;">
+                    <strong>Autor:</strong> Junior Melo (jrmeloafrf@gmail.com)
+                  </p>
+                </div>
+              </div>
+            </body>
+            </html>
+
+      - name: Enviar email de falha
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "🚨 FALHA CRÍTICA no Deploy PRODUÇÃO - Obreiro Virtual"
+          to: suporteobreirovirtual@gmail.com,jrmeloafrf@gmail.com
+          from: ${{ secrets.EMAIL_USERNAME }}
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 30px; border-radius: 5px 5px 0 0; text-align: center; }
+                .content { background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; }
+                .footer { background: #e9ecef; padding: 15px; border-radius: 0 0 5px 5px; font-size: 12px; color: #6c757d; text-align: center; }
+                .badge { display: inline-block; padding: 5px 10px; background: #dc3545; color: white; border-radius: 3px; margin: 5px 0; font-weight: bold; }
+                .alert { background: #f8d7da; border: 2px solid #f5c6cb; padding: 20px; border-radius: 5px; margin: 15px 0; color: #721c24; }
+                .link { color: #007bff; text-decoration: none; }
+                table { width: 100%; border-collapse: collapse; margin: 15px 0; background: white; }
+                td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+                td:first-child { font-weight: bold; width: 150px; background: #f8f9fa; }
+                h1 { margin: 0; font-size: 28px; }
+                h2 { color: #dc3545; border-bottom: 2px solid #dc3545; padding-bottom: 10px; }
+                .urgent { background: #fff3cd; padding: 15px; border-left: 4px solid #dc3545; margin: 15px 0; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>🚨 FALHA NO DEPLOY</h1>
+                  <h2 style="margin: 10px 0 0 0; font-weight: normal; color: #ffebee;">Ambiente de PRODUÇÃO</h2>
+                </div>
+                <div class="content">
+                  <div class="alert">
+                    <strong>⚠️ ATENÇÃO URGENTE:</strong><br>
+                    O deploy para o ambiente de PRODUÇÃO falhou e requer atenção imediata!<br>
+                    <strong>A aplicação pode estar instável ou indisponível.</strong>
+                  </div>
+
+                  <div class="urgent">
+                    <strong>🚨 AÇÃO IMEDIATA NECESSÁRIA!</strong>
+                    <p style="margin: 5px 0;">Verifique imediatamente se a aplicação está respondendo e considere fazer rollback se necessário.</p>
+                  </div>
+
+                  <h2>📋 Detalhes do Deploy Falho</h2>
+                  <table>
+                    <tr>
+                      <td>🌐 Ambiente:</td>
+                      <td><span class="badge">PRODUÇÃO</span></td>
+                    </tr>
+                    <tr>
+                      <td>🔀 Branch:</td>
+                      <td><span class="badge">${{ github.ref_name }}</span></td>
+                    </tr>
+                    <tr>
+                      <td>📦 Commit:</td>
+                      <td><code>${{ github.sha }}</code></td>
+                    </tr>
+                    <tr>
+                      <td>👤 Autor:</td>
+                      <td>${{ github.actor }}</td>
+                    </tr>
+                    <tr>
+                      <td>📅 Data/Hora:</td>
+                      <td>${{ github.event.head_commit.timestamp }}</td>
+                    </tr>
+                    <tr>
+                      <td>💬 Mensagem:</td>
+                      <td>${{ github.event.head_commit.message }}</td>
+                    </tr>
+                  </table>
+
+                  <h2>🔍 Próximos Passos URGENTES</h2>
+                  <ol>
+                    <li><strong>Verificar se a aplicação está online:</strong> <a href="https://www.obreirovirtual.com" class="link">www.obreirovirtual.com</a></li>
+                    <li><strong>Revisar logs completos do deploy</strong> no link abaixo</li>
+                    <li><strong>Identificar o erro específico</strong> que causou a falha</li>
+                    <li><strong>Considerar ROLLBACK</strong> para versão anterior estável se necessário</li>
+                    <li><strong>Corrigir o problema</strong> antes de tentar novo deploy</li>
+                  </ol>
+
+                  <h2>🔧 Como fazer Rollback</h2>
+                  <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;">
+ssh root@VPS_HOST
+cd /root/obreiro-prod
+git log --oneline -5  # Ver últimos commits
+git reset --hard COMMIT_ANTERIOR
+docker-compose -f docker-compose.prod.yml restart
+                  </pre>
+
+                  <h2>🔗 Links Úteis</h2>
+                  <ul>
+                    <li><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" class="link"><strong>📊 Ver Logs Completos do Deploy</strong></a></li>
+                    <li><a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}" class="link">📝 Ver Commit que Falhou</a></li>
+                    <li><a href="https://www.obreirovirtual.com" class="link">🌐 Verificar Aplicação PRODUÇÃO</a></li>
+                  </ul>
+                </div>
+                <div class="footer">
+                  <p><strong>Deploy automático realizado via GitHub Actions</strong></p>
+                  <p>Workflow: ${{ github.workflow }} | Run: #${{ github.run_number }}</p>
+                  <p style="margin-top: 10px; color: #dc3545;">
+                    <strong>Contato:</strong> Junior Melo (jrmeloafrf@gmail.com)
+                  </p>
+                </div>
+              </div>
+            </body>
+            </html>

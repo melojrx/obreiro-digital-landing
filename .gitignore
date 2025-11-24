@@ -479,6 +479,7 @@ server_config.sh
 static_prod/
 media_prod/
 frontend_build/
+frontend-build/
 logs/
 
 # Arquivos de ambiente específicos
@@ -486,4 +487,5 @@ logs/
 .env_prod
 .databricks
 TESTE_TRANSFERENCIA_CORRIGIDO.md
+create_superuser.py
 docker/nginx/hml.conf

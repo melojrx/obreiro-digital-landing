@@ -1,242 +1,74 @@
-# 📊 Dashboard Super Admin - Plano de Implementação
+# 📊 Dashboard Super Admin - Plano de Implementação (versão enxuta)
 
 ## 🎯 Visão Geral
-
-Dashboard executiva para **Super Admins (Nível 4)** - desenvolvedores e proprietários da plataforma SaaS. Fornece visão estratégica completa do negócio, métricas de crescimento, saúde financeira e uso da plataforma.
-
----
+Dashboard para **Super Admins (Nível 4 / is_superuser)** acompanharem a saúde da plataforma com métricas que já temos ou que exigem baixo esforço. Foco em poucos KPIs confiáveis, sem dependência de dados externos.
 
 ## 👤 Perfil do Usuário
+- Criados via `createsuperuser` (Django).
+- Acesso irrestrito; app dedicado `platform_admin` no backend para centralizar regras e queries da dashboard.
 
-### SUPER_ADMIN (Nível 4)
-- **Quem são:** Desenvolvedores e proprietários da plataforma
-- **Criação:** Exclusivamente via comando Django (`createsuperuser`)
-- **Acesso:** Irrestrito a todos os dados da plataforma
-- **Objetivo:** Monitorar saúde do negócio, crescimento, receitas e uso do sistema
+## 📈 KPIs Essenciais (cards)
+- **Usuários do sistema (CustomUser)**
+  - Total
+  - Ativos nos últimos 30 dias (last_login)
+  - Novos no mês atual
+- **Denominações / Igrejas / Filiais**
+  - Total de denominações
+  - Total de igrejas e novas no mês
+  - Total de filiais (branches)
+- **Membros / Visitantes**
+  - Total de membros
+  - Total de visitantes
+- **Planos**
+  - Igrejas por plano (`subscription_plan`)
+  - Igrejas com assinatura expirada/expirando em 30 dias (`subscription_end_date`)
 
----
-
-## 📈 KPIs e Métricas Essenciais
-
-### 1️⃣ **Visão Geral do Negócio** (Cards Principais)
-
-#### Usuários e Crescimento
-- **Total de Usuários Cadastrados**
-  - Valor absoluto
-  - Crescimento % vs mês anterior
-  - Gráfico sparkline (últimos 7 dias)
-
-- **Novos Usuários (Mês Atual)**
-  - Quantidade de novos cadastros no mês
-  - Comparativo com mês anterior
-  - Meta mensal (configurável)
-
-- **Usuários Ativos (30 dias)**
-  - Usuários que fizeram login nos últimos 30 dias
-  - Taxa de ativação (ativos/total)
-  - Tendência de engajamento
-
-- **Taxa de Retenção**
-  - Usuários que retornam após primeiro login
-  - Coorte mensal de retenção
-  - Benchmark: >60% retenção em 30 dias
-
-#### Igrejas e Organizações
-- **Total de Igrejas Cadastradas**
-  - Total de churches ativas
-  - Crescimento % vs mês anterior
-  - Distribuição por estado/região
-
-- **Total de Denominações**
-  - Denominações cadastradas
-  - Igrejas por denominação (média)
-  - Top 5 denominações por número de igrejas
-
-- **Total de Congregações/Filiais**
-  - Branches ativas
-  - Média de filiais por igreja
-  - Igrejas sem filiais (potencial de crescimento)
-
-- **Novas Igrejas (Mês Atual)**
-  - Novas churches este mês
-  - Conversão trial → pago
-  - Churn rate (cancelamentos)
-
-#### Membros e Engajamento
-- **Total de Membros Cadastrados**
-  - Soma de todos os members no sistema
-  - Média de membros por igreja
-  - Distribuição por função ministerial
-
-- **Total de Visitantes Registrados**
-  - Visitantes via QR Code
-  - Taxa de conversão visitante → membro
-  - Igrejas com maior captação
-
-- **Atividades Criadas (Mês)**
-  - Total de atividades/eventos
-  - Igrejas mais ativas
-  - Tipos de atividades mais comuns
-
-### 2️⃣ **Métricas Financeiras** (SaaS)
-
-#### Receita e MRR
-- **MRR (Monthly Recurring Revenue)**
-  - Receita recorrente mensal
-  - Crescimento % vs mês anterior
-  - Projeção anual (ARR)
-
-- **Receita por Plano**
-  - Basic: R$ 0/mês × N igrejas
-  - Professional: R$ 99/mês × N igrejas
-  - Enterprise: R$ 299/mês × N igrejas
-  - Denomination: Sob consulta
-
-- **Lifetime Value (LTV)**
-  - Valor médio por igreja ao longo do tempo
-  - LTV por plano
-  - Tempo médio de permanência
-
-- **Churn Rate**
-  - Taxa de cancelamento mensal
-  - Motivos de cancelamento
-  - Valor de receita perdida
-
-#### Planos e Conversão
+## 📊 Blocos de visão rápida
 - **Distribuição por Plano**
-  - Gráfico pizza: % de igrejas em cada plano
-  - Receita por plano
-  - Oportunidade de upsell
+  - Tabela simples: plano, # igrejas, % do total.
+- **Uso básico por igreja**
+  - Top 10 igrejas por quantidade de membros.
+  - Top 10 igrejas por novos membros no mês (se `created_at` for usado).
+- **Atividade recente**
+  - Logins nas últimas 24h/7d (contagem de usuários com last_login no período).
+  - Membros criados no mês.
+- **Qualidade de dados**
+  - % de membros sem data de nascimento.
+  - % de igrejas sem CNPJ ou sem logo/capa (se campos existirem).
 
-- **Igrejas em Trial**
-  - Quantidade em período de teste
-  - Dias restantes médio
-  - Taxa de conversão trial → pago
+## 🧭 Escopo inicial do app `platform_admin` (backend)
+- Endpoints agregadores com consultas diretas (ORM) para:
+  - Contagens (users, denominações, igrejas, filiais, membros, visitantes).
+  - Distribuição por plano e assinaturas expirando.
+  - Atividade de login (last_login) e novos usuários/membros no mês.
+  - Top N igrejas por membros e por novos membros no mês.
+  - Indicadores de dados faltantes (membros sem birth_date; igrejas sem CNPJ/logo/capa se aplicável).
+- Permissão: somente `is_superuser` (ou papel SUPER_ADMIN se existir abstração).
 
-- **Igrejas Vencidas**
-  - Assinaturas expiradas
-  - Valor em risco
-  - Tempo médio até cancelamento
+## 🖥️ Frontend (novo dashboard)
+- Página dedicada ao Super Admin com o mesmo look & feel da plataforma:
+  - Grid de cards com KPIs principais.
+  - Tabelas simples para planos e rankings de igrejas.
+  - Gráfico leve de linha/barras para novos usuários/membros no mês (últimos 12 meses) usando endpoints agregados.
+  - Indicadores de expiração de assinatura (lista curta com igreja, plano, data).
 
-- **Taxa de Conversão Trial → Pago**
-  - % de conversão histórica
-  - Benchmark: >40% conversão
-  - Fatores de sucesso na conversão
+## 🗂️ Fontes de dados disponíveis/baixo esforço
+- `CustomUser`: total, last_login para ativos.
+- `Church`, `Branch`, `Denomination`: contagens; `subscription_plan` e `subscription_end_date`.
+- `Member`, `Visitor`: contagens; `created_at` para novos.
+- Campos de qualidade: `Member.birth_date`; `Church.cnpj/logo/cover_image` (se já existirem).
 
-### 3️⃣ **Métricas de Uso e Saúde da Plataforma**
+## 🚧 Fora do escopo inicial (pode ficar para fase 2)
+- MRR/LTV/churn real (exige billing real).
+- Mapas geográficos e heatmaps complexos.
+- Coortes avançadas e adoção por feature detalhada.
+- Dados externos (IBGE, concorrência, etc.).
 
-#### Adoção de Funcionalidades
-- **Taxa de Adoção por Feature**
-  - % de igrejas usando cada funcionalidade:
-    - Gestão de Membros: X%
-    - Registro de Visitantes: X%
-    - QR Codes: X%
-    - Atividades/Eventos: X%
-    - Ministérios: X%
-    - Sistema de Oração: X%
-
-- **Igrejas Power Users**
-  - Top 10 igrejas por uso (ações/mês)
-  - Média de features utilizadas
-  - Igrejas com baixo uso (risco churn)
-
-#### Performance e Limites
-- **Uso de Limites por Plano**
-  - Igrejas próximas ao limite de membros
-  - Igrejas próximas ao limite de filiais
-  - Oportunidades de upgrade
-
-- **Membros por Igreja**
-  - Distribuição (histograma)
-  - Média, mediana, percentis
-  - Igrejas com >80% do limite
-
-- **Filiais por Igreja**
-  - Distribuição
-  - Igrejas com potencial de expansão
-  - Utilização média por plano
-
-### 4️⃣ **Métricas Geográficas**
-
-#### Mapa Interativo do Brasil
-- **Visualização Principal:**
-  - Mapa geográfico do Brasil com SVG responsivo
-  - Marcadores customizados em formato de igrejinha (🏛️/⛪) para cada localização
-  - Cores diferenciadas por densidade (escala de calor)
-  - Hover mostrando detalhes: Estado, Quantidade de igrejas, Total de usuários
-  - Click no estado para drill-down com lista de cidades
-
-- **Legenda Interativa:**
-  - **Por Estado:** Tabela lateral com:
-    - Nome do estado (sigla + nome completo)
-    - Quantidade de igrejas cadastradas
-    - Total de usuários (membros + visitantes)
-    - Total de membros ativos
-    - Planos mais utilizados no estado
-    - Taxa de crescimento nos últimos 3 meses
-  
-  - **Por Região:** Cards agrupados:
-    - Norte, Nordeste, Centro-Oeste, Sudeste, Sul
-    - Total de igrejas por região
-    - % do total nacional
-    - Média de membros por igreja
-    - Potencial de expansão (score 0-100)
-
-- **Distribuição por Estado (Top 10)**
-  - Ranking dos estados com mais igrejas
-  - Gráfico de barras horizontais
-  - Indicador de saturação vs população do estado
-  - Destaque para estados estratégicos
-
-- **Oportunidades de Expansão**
-  - Análise de estados com baixa penetração
-  - Score de oportunidade baseado em:
-    - População do estado
-    - PIB per capita
-    - Número de igrejas evangélicas (dados do IBGE)
-    - Concorrência (outros sistemas)
-    - Presença atual da plataforma
-  - Sugestão de regiões prioritárias para marketing
-
-- **Distribuição por Cidade (Top 20)**
-  - Cidades com mais igrejas cadastradas
-  - Destaque para capitais vs interior
-  - Densidade por habitante
-  - Potencial de marketing local
-  - Clusters geográficos (áreas de concentração)
-
-### 5️⃣ **Métricas de Qualidade e Suporte**
-
-- **Dados de Completude**
-  - % de perfis completos
-  - % de igrejas com logo/capa
-  - % de membros com foto
-
-- **Qualidade dos Dados**
-  - Membros sem data de nascimento
-  - Igrejas sem CNPJ
-  - Dados obrigatórios faltantes
-
----
-
-## 📊 Gráficos e Visualizações
-
-### Gráficos de Linha (Evolução Temporal)
-
-1. **Evolução de Usuários**
-   - Linha: Total acumulado de usuários
-   - Barras: Novos usuários por mês
-   - Período: Últimos 12 meses
-
-2. **Evolução de Igrejas**
-   - Linha: Total acumulado de igrejas
-   - Barras: Novas igrejas por mês
-   - Segmentado por plano (cores)
-
-3. **Evolução de Receita (MRR)**
-   - Linha: MRR ao longo do tempo
-   - Área empilhada por plano
-   - Linha de meta
+## 📌 Próximos passos sugeridos
+1) Criar app `platform_admin` (Django) com endpoints de agregação e permissão `is_superuser`.
+2) Implementar consultas agregadas para KPIs definidos acima.
+3) Criar página de dashboard no frontend (rota protegida para SUPER_ADMIN) com cards/tabelas/gráfico simples.
+4) Adicionar testes básicos de API (permissão e payload) e snapshot simples no frontend (se aplicável).
 
 4. **Taxa de Crescimento (%)**
    - MoM Growth Rate (usuários, igrejas, receita)

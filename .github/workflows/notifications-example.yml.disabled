@@ -1,0 +1,149 @@
+# Este arquivo está desabilitado (.disabled)
+# Para habilitar, remova a extensão .disabled e configure os secrets
+
+# Exemplo de como adicionar notificações aos workflows
+# Adicione este step ao final dos seus workflows
+
+# ========================================
+# NOTIFICAÇÃO DISCORD
+# ========================================
+# Adicione o secret: DISCORD_WEBHOOK_URL
+# https://discord.com/developers/docs/resources/webhook
+
+name: Exemplo - Notificações
+
+on:
+  workflow_dispatch:
+
+jobs:
+  example:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exemplo - Notificar Discord (Sucesso)
+        if: success()
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "✅ Deploy HML Concluído",
+                "description": "Deploy realizado com sucesso!",
+                "color": 3066993,
+                "fields": [
+                  {
+                    "name": "Branch",
+                    "value": "${{ github.ref_name }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Commit",
+                    "value": "`${{ github.sha }}`",
+                    "inline": true
+                  },
+                  {
+                    "name": "Autor",
+                    "value": "${{ github.actor }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "URL",
+                    "value": "https://hml.obreirovirtual.com"
+                  }
+                ],
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+              }]
+            }'
+
+      - name: Exemplo - Notificar Discord (Falha)
+        if: failure()
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "❌ Deploy HML Falhou",
+                "description": "Houve um erro durante o deploy",
+                "color": 15158332,
+                "fields": [
+                  {
+                    "name": "Branch",
+                    "value": "${{ github.ref_name }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Commit",
+                    "value": "`${{ github.sha }}`",
+                    "inline": true
+                  },
+                  {
+                    "name": "Logs",
+                    "value": "[Ver logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                  }
+                ],
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+              }]
+            }'
+
+# ========================================
+# NOTIFICAÇÃO SLACK
+# ========================================
+# Adicione o secret: SLACK_WEBHOOK_URL
+# https://api.slack.com/messaging/webhooks
+
+      - name: Exemplo - Notificar Slack
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            COLOR="good"
+            EMOJI=":white_check_mark:"
+          else
+            COLOR="danger"
+            EMOJI=":x:"
+          fi
+
+          curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "attachments": [{
+                "color": "'$COLOR'",
+                "title": "'"$EMOJI"' Deploy HML - '"$STATUS"'",
+                "fields": [
+                  {
+                    "title": "Branch",
+                    "value": "${{ github.ref_name }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Autor",
+                    "value": "${{ github.actor }}",
+                    "short": true
+                  },
+                  {
+                    "title": "URL",
+                    "value": "<https://hml.obreirovirtual.com|HML>",
+                    "short": false
+                  }
+                ]
+              }]
+            }'
+
+# ========================================
+# NOTIFICAÇÃO EMAIL (GitHub Actions nativo)
+# ========================================
+# Configuração em: Settings → Notifications
+# Notificações de workflow são enviadas automaticamente
+
+# ========================================
+# TELEGRAM
+# ========================================
+# Adicione os secrets: TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID
+# https://core.telegram.org/bots#creating-a-new-bot
+
+      - name: Exemplo - Notificar Telegram
+        if: success()
+        run: |
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "parse_mode=Markdown" \
+            -d "text=✅ *Deploy HML Concluído*%0A%0ABranch: \`${{ github.ref_name }}\`%0ACommit: \`${{ github.sha }}\`%0AAutor: ${{ github.actor }}%0A%0A🌐 https://hml.obreirovirtual.com"

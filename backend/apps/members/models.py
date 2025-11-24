@@ -518,23 +518,24 @@ class Member(BaseModel):
             raise ValidationError("Início da membresia não pode ser anterior ao nascimento")
         if self.membership_start_date and self.membership_start_date > today:
             raise ValidationError("Início da membresia não pode ser no futuro")
-        if self.membership_end_date and self.membership_start_date and self.membership_end_date <= self.membership_start_date:
-            raise ValidationError("Fim da membresia deve ser posterior ao início")
-    
+
     def _validate_spouse_data(self):
-        """Valida consistência dos dados do cônjuge"""
-        # Se não é casado, limpar dados do cônjuge
+        """Valida consistência dos dados do cônjuge antes de salvar"""
         if self.marital_status != 'married':
             self.spouse = None
             return
-        
-        # Se o cônjuge for o próprio membro, limpar
-        if self.spouse == self:
+
+        if self.spouse and self.spouse_id == self.id:
             self.spouse = None
+            return
+
+        # Garantir que o cônjuge pertença à mesma igreja
+        if self.spouse and self.spouse.church_id != self.church_id:
+            raise ValidationError("Cônjuge deve pertencer à mesma igreja.")
 
     def _sync_spouse_relationship(self, old_spouse):
         """Sincroniza relacionamento bidirecional de cônjuge após salvar"""
-        # Cenário 1: membro deixou de ser casado ou definiu cônjuge não-membro
+        # Se não está casado ou cônjuge não foi definido, limpar vínculo anterior
         if self.marital_status != 'married' or not self.spouse_id:
             if old_spouse and old_spouse.spouse_id == self.pk:
                 Member.objects.filter(pk=old_spouse.pk).update(
@@ -544,10 +545,9 @@ class Member(BaseModel):
                 )
             return
 
-        # Cenário 2: membro casado com outro membro
         new_spouse = self.spouse
 
-        # Cônjuge anterior diferente: limpar vínculo recíproco
+        # Se tinha cônjuge anterior diferente, limpar vínculo recíproco
         if old_spouse and old_spouse.pk != new_spouse.pk and old_spouse.spouse_id == self.pk:
             Member.objects.filter(pk=old_spouse.pk).update(
                 spouse=None,
@@ -555,14 +555,13 @@ class Member(BaseModel):
                 updated_at=timezone.now()
             )
 
-        # Atualizar cônjuge atual para refletir o relacionamento
+        # Garantir vínculo bidirecional com novo cônjuge
         if new_spouse.spouse_id != self.pk or new_spouse.marital_status != 'married':
             Member.objects.filter(pk=new_spouse.pk).update(
                 spouse=self.pk,
                 marital_status='married',
                 updated_at=timezone.now()
             )
-
     def _update_spouse_on_death(self, old_membership_status):
         """Atualiza cônjuge quando membro falece"""
         if self.membership_status == 'deceased' and old_membership_status != 'deceased' and self.spouse_id:
@@ -723,6 +722,63 @@ class Member(BaseModel):
             reason=reason,
             transferred_by=None  # TODO: Adicionar usuário
         )
+
+
+class FamilyRelationship(BaseModel):
+    """
+    Relacionamento familiar entre membros (pai/mãe/filho).
+    Direção importa:
+    - relation_type = 'child'  => related_member é filho do member
+    - relation_type = 'parent' => related_member é pai/mãe do member
+    """
+
+    RELATION_CHILD = 'child'
+    RELATION_PARENT = 'parent'
+
+    RELATION_CHOICES = [
+        (RELATION_CHILD, 'Filho(a)'),
+        (RELATION_PARENT, 'Pai/Mãe'),
+    ]
+
+    member = models.ForeignKey(
+        'members.Member',
+        on_delete=models.CASCADE,
+        related_name='family_links',
+        verbose_name="Membro",
+    )
+    related_member = models.ForeignKey(
+        'members.Member',
+        on_delete=models.CASCADE,
+        related_name='related_family_links',
+        verbose_name="Membro Relacionado",
+    )
+    relation_type = models.CharField(
+        max_length=10,
+        choices=RELATION_CHOICES,
+        verbose_name="Tipo de Relação",
+    )
+
+    class Meta:
+        verbose_name = "Relacionamento Familiar"
+        verbose_name_plural = "Relacionamentos Familiares"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['member', 'related_member', 'relation_type'],
+                name='unique_family_relationship'
+            ),
+            models.CheckConstraint(
+                check=~models.Q(member=models.F('related_member')),
+                name='family_relationship_not_self'
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['member', 'relation_type']),
+            models.Index(fields=['related_member', 'relation_type']),
+        ]
+
+    def __str__(self):
+        label = dict(self.RELATION_CHOICES).get(self.relation_type, self.relation_type)
+        return f"{self.member.full_name} -> {self.related_member.full_name} ({label})"
 
 
 class MembershipStatus(BaseModel):

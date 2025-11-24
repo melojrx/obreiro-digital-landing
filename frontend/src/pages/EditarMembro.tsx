@@ -58,7 +58,7 @@ const EditarMembro: React.FC = () => {
     try {
       setSaving(true);
       // NOTA: user_password removido - senha gerada automaticamente pelo backend
-      const { create_system_user, system_role, user_email, church, ...memberUpdateData } = (data as any);
+      const { create_system_user, system_role, user_email, remove_system_access, church, ...memberUpdateData } = (data as any);
       const previousStatus = member?.membership_status ?? null;
       const previousFunction = member?.ministerial_function ?? null;
       const memberHadSystemUser = Boolean(member?.user);
@@ -66,12 +66,26 @@ const EditarMembro: React.FC = () => {
       // Preparar dados de atualização
       const updateData: any = { ...memberUpdateData };
       
+      const normalizedRole = system_role === 'denomination_admin' ? 'church_admin' : system_role;
+      const accessRevoked = Boolean(memberHadSystemUser && remove_system_access);
+      const roleChanged = Boolean(
+        memberHadSystemUser &&
+        !remove_system_access &&
+        normalizedRole &&
+        normalizedRole !== (member?.system_user_role || '')
+      );
+
       // Se for para conceder acesso ao sistema, adicionar campos necessários
       if (!memberHadSystemUser && create_system_user && system_role && user_email) {
-        const normalizedRole = system_role === 'denomination_admin' ? 'church_admin' : system_role;
         updateData.grant_system_access = true;
         updateData.system_role = normalizedRole;
         updateData.user_email = user_email;
+      } else if (memberHadSystemUser) {
+        if (remove_system_access) {
+          updateData.revoke_system_access = true;
+        } else if (roleChanged && normalizedRole) {
+          updateData.system_role = normalizedRole;
+        }
       }
       
       // Atualizar membro (e conceder acesso se solicitado)
@@ -91,6 +105,19 @@ const EditarMembro: React.FC = () => {
         const chosenLabel = roleLabel(system_role);
         toast.success(`Usuário do sistema criado como ${chosenLabel}!`, {
           description: `Credenciais enviadas para ${user_email}.`
+        });
+      } else if (accessRevoked) {
+        toast.success('Acesso ao sistema removido', {
+          description: 'O membro não poderá mais fazer login até que o acesso seja reativado.'
+        });
+      } else if (roleChanged) {
+        const roleLabel = (role: string) => (
+          role === 'denomination_admin' ? 'Administrador da Denominação (Nível 3)' :
+          role === 'church_admin' ? 'Administrador da Igreja (Nível 2)' :
+          role === 'secretary' ? 'Secretário(a) (Nível 1)' : role
+        );
+        toast.success('Papel de acesso atualizado', {
+          description: `Novo papel: ${roleLabel(normalizedRole ?? '')}.`
         });
       }
 

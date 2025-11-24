@@ -278,20 +278,5 @@ class MemberBulkImportService:
         return flattened
 
     def _is_duplicate(self, payload: Dict[str, Any]) -> bool:
-        cpf = payload.get("cpf")
-        email = payload.get("email")
-        birth_date = payload.get("birth_date")
-
-        qs = Member.objects.filter(is_active=True)
-        if cpf:
-            filter_kwargs = {"cpf": cpf}
-            if self.church.denomination_id:
-                filter_kwargs["church__denomination_id"] = self.church.denomination_id
-            else:
-                filter_kwargs["church"] = self.church
-            return qs.filter(**filter_kwargs).exists()
-
-        if email and birth_date:
-            return qs.filter(church=self.church, email=email, birth_date=birth_date).exists()
-
+        # Duplicidade de CPF/e-mail é permitida para membros/visitantes.
         return False

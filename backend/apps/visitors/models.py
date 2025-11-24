@@ -345,15 +345,6 @@ class Visitor(BaseModel):
                     member_data[field] = None
         
         # VALIDAÇÃO DE CPF DUPLICADO SE NÃO FOR VAZIO
-        if member_data.get('cpf'):
-            existing_member = Member.objects.filter(
-                cpf=member_data['cpf'],
-                church=self.church
-            ).exclude(pk=getattr(self.converted_member, 'pk', None)).first()
-            
-            if existing_member:
-                raise ValueError(f"Já existe um membro com o CPF {member_data['cpf']} nesta igreja: {existing_member.full_name}")
-        
         # CONVERSÃO COM TRANSAÇÃO ATÔMICA
         try:
             with transaction.atomic():

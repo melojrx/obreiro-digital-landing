@@ -121,6 +121,20 @@ export interface Member {
   
   // Dados familiares
   children_count?: number;
+  children?: Array<{
+    id: number;
+    full_name: string;
+    age?: number | null;
+    gender?: string | null;
+    birth_date?: string;
+  }>;
+  parents?: Array<{
+    id: number;
+    full_name: string;
+    age?: number | null;
+    gender?: string | null;
+    birth_date?: string;
+  }>;
   
   created_at: string;
   updated_at: string;
@@ -240,7 +254,9 @@ export interface CreateMemberData {
   create_system_user?: boolean;
   system_role?: string;
   user_email?: string;
+  revoke_system_access?: boolean;
   user_password?: string;
+  children?: number[];
   
   // Novo campo para status ministerial inicial
   initial_ministerial_status?: string;
