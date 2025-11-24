@@ -1,0 +1,170 @@
+name: Deploy para Homologação
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Pular testes (use com cautela)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy-hml:
+    name: Deploy para HML
+    runs-on: ubuntu-latest
+    environment:
+      name: homologation
+      url: https://hml.obreirovirtual.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Verificar branch
+        run: |
+          echo "🔍 Branch: ${{ github.ref_name }}"
+          echo "📦 Commit: ${{ github.sha }}"
+          echo "👤 Author: ${{ github.actor }}"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HML_VPS_HOST }}
+          username: ${{ secrets.HML_VPS_USER }}
+          key: ${{ secrets.HML_VPS_SSH_KEY }}
+          port: 22
+          command_timeout: 30m
+          script: |
+            echo "🚀 Iniciando deploy em HML..."
+
+            # Navegar para diretório do projeto
+            cd /root/obreiro-hml || exit 1
+
+            # 1. Pull do código mais recente
+            echo "📥 Baixando código da branch develop..."
+            git fetch origin develop
+            git reset --hard origin/develop
+
+            # 2. Carregar variáveis de ambiente
+            echo "🔧 Carregando variáveis de ambiente..."
+            set -a
+            source .env_hml
+            set +a
+
+            # 3. Rebuild dos containers backend
+            echo "🔨 Rebuilding containers backend..."
+            docker-compose -f docker-compose.hml.yml build --no-cache backend_hml celery_hml celery_beat_hml
+
+            # 4. Parar containers atuais
+            echo "⏸️  Parando containers..."
+            docker-compose -f docker-compose.hml.yml stop backend_hml celery_hml celery_beat_hml
+
+            # 5. Subir novos containers
+            echo "▶️  Iniciando containers atualizados..."
+            docker-compose -f docker-compose.hml.yml up -d --force-recreate backend_hml celery_hml celery_beat_hml
+
+            # 6. Aguardar containers iniciarem
+            echo "⏳ Aguardando containers iniciarem..."
+            sleep 15
+
+            # 7. Verificar se backend está rodando
+            if ! docker ps | grep -q obreiro_backend_hml; then
+              echo "❌ Erro: Backend não está rodando!"
+              docker-compose -f docker-compose.hml.yml logs --tail=50 backend_hml
+              exit 1
+            fi
+
+            # 8. Aplicar migrações
+            echo "🗄️  Aplicando migrações do banco de dados..."
+            docker exec obreiro_backend_hml python manage.py migrate --noinput
+
+            # 9. Coletar arquivos estáticos
+            echo "📦 Coletando arquivos estáticos..."
+            docker exec obreiro_backend_hml python manage.py collectstatic --noinput
+
+            # 10. Rebuild do frontend
+            echo "⚛️  Rebuilding frontend..."
+            docker-compose -f docker-compose.hml.yml build frontend_hml
+
+            # 11. Executar build do frontend
+            echo "🏗️  Executando build do frontend..."
+            docker-compose -f docker-compose.hml.yml run --rm frontend_hml
+
+            # 12. Copiar build para o host
+            echo "📋 Copiando build do frontend para o host..."
+            rm -rf /root/obreiro-hml/frontend-build/*
+            docker cp obreiro_frontend_hml:/app/dist/. /root/obreiro-hml/frontend-build/ || {
+              echo "⚠️  Tentando copiar do volume diretamente..."
+              docker run --rm -v obreiro_frontend_build_hml:/source -v /root/obreiro-hml/frontend-build:/dest alpine sh -c "cp -r /source/. /dest/"
+            }
+
+            # 13. Ajustar permissões
+            echo "🔐 Ajustando permissões..."
+            chmod -R 755 /root/obreiro-hml/frontend-build
+
+            # 14. Verificar arquivos do frontend
+            if [ ! -f /root/obreiro-hml/frontend-build/index.html ]; then
+              echo "❌ Erro: Build do frontend não foi copiado corretamente!"
+              ls -la /root/obreiro-hml/frontend-build/
+              exit 1
+            fi
+            echo "✅ Frontend build copiado: $(ls -lh /root/obreiro-hml/frontend-build/ | wc -l) arquivos"
+
+            # 15. Testar configuração do NGINX
+            echo "🔍 Testando configuração do NGINX..."
+            sudo nginx -t
+
+            # 16. Recarregar NGINX
+            echo "🔄 Recarregando NGINX..."
+            sudo systemctl reload nginx
+
+            # 17. Verificar status dos serviços
+            echo "📊 Status dos containers:"
+            docker-compose -f docker-compose.hml.yml ps
+
+            # 18. Health check do backend
+            echo "🏥 Executando health check..."
+            sleep 5
+
+            # Verificar backend
+            if curl -f -s https://hml.obreirovirtual.com/api/v1/ > /dev/null; then
+              echo "✅ Backend respondendo corretamente"
+            else
+              echo "⚠️  Backend não está respondendo, verificando logs..."
+              docker-compose -f docker-compose.hml.yml logs --tail=30 backend_hml
+            fi
+
+            # Verificar frontend
+            if curl -f -s -I https://hml.obreirovirtual.com/ | grep -q "200 OK"; then
+              echo "✅ Frontend respondendo corretamente"
+            else
+              echo "⚠️  Frontend pode não estar respondendo corretamente"
+            fi
+
+            # 19. Exibir últimas linhas dos logs
+            echo "📝 Últimos logs do backend:"
+            docker-compose -f docker-compose.hml.yml logs --tail=20 backend_hml
+
+            echo ""
+            echo "✅ Deploy concluído com sucesso!"
+            echo "🌐 HML disponível em: https://hml.obreirovirtual.com"
+            echo "📅 Deploy realizado em: $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: Notificar sucesso
+        if: success()
+        run: |
+          echo "✅ Deploy em HML concluído com sucesso!"
+          echo "🌐 URL: https://hml.obreirovirtual.com"
+          echo "📦 Commit: ${{ github.sha }}"
+          echo "👤 Por: ${{ github.actor }}"
+
+      - name: Notificar falha
+        if: failure()
+        run: |
+          echo "❌ Deploy em HML falhou!"
+          echo "🔍 Verifique os logs acima para mais detalhes"
+          echo "📦 Commit: ${{ github.sha }}"
