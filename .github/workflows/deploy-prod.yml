@@ -45,12 +45,18 @@ jobs:
           [ -n "${{ secrets.PROD_VPS_USER }}" ] || { echo "❌ Secret PROD_VPS_USER ausente ou vazio"; exit 1; }
           echo "✅ Secrets de produção encontrados"
 
+      - name: Preparar chave SSH de produção
+        run: |
+          echo "${{ secrets.PROD_VPS_SSH_KEY }}" | sed 's/^[[:space:]]\+//' > /tmp/prod_key
+          chmod 600 /tmp/prod_key
+          ssh-keygen -lf /tmp/prod_key
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROD_VPS_HOST }}
           username: ${{ secrets.PROD_VPS_USER }}
-          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          key_path: /tmp/prod_key
           port: 22
           command_timeout: 30m
           script: |
