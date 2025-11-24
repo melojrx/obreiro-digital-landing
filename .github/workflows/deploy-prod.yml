@@ -410,11 +410,11 @@ jobs:
 
                   <h2>🔧 Como fazer Rollback</h2>
                   <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;">
-ssh root@VPS_HOST
-cd /root/obreiro-prod
-git log --oneline -5  # Ver últimos commits
-git reset --hard COMMIT_ANTERIOR
-docker-compose -f docker-compose.prod.yml restart
+                    ssh root@VPS_HOST
+                    cd /root/obreiro-prod
+                    git log --oneline -5
+                    git reset --hard COMMIT_ANTERIOR
+                    docker-compose -f docker-compose.prod.yml restart
                   </pre>
 
                   <h2>🔗 Links Úteis</h2>
