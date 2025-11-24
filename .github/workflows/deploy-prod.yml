@@ -48,7 +48,13 @@ jobs:
       - name: Preparar chave SSH de produção
         run: |
           KEY_PATH="$GITHUB_WORKSPACE/.ssh_prod_key"
-          printf '%s' "${{ secrets.PROD_VPS_SSH_KEY }}" | sed 's/^[[:space:]]\+//' > "$KEY_PATH"
+          python - <<'PY'
+import os, textwrap
+key = """${{ secrets.PROD_VPS_SSH_KEY }}"""
+key = textwrap.dedent(key).strip() + "\n"
+with open(os.environ["KEY_PATH"], "w", encoding="utf-8") as f:
+    f.write(key)
+PY
           chmod 600 "$KEY_PATH"
           ssh-keygen -lf "$KEY_PATH"
           echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
