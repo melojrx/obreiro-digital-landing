@@ -47,16 +47,18 @@ jobs:
 
       - name: Preparar chave SSH de produção
         run: |
-          echo "${{ secrets.PROD_VPS_SSH_KEY }}" | sed 's/^[[:space:]]\+//' > /tmp/prod_key
-          chmod 600 /tmp/prod_key
-          ssh-keygen -lf /tmp/prod_key
+          KEY_PATH="$GITHUB_WORKSPACE/.ssh_prod_key"
+          printf '%s' "${{ secrets.PROD_VPS_SSH_KEY }}" | sed 's/^[[:space:]]\+//' > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          ssh-keygen -lf "$KEY_PATH"
+          echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROD_VPS_HOST }}
           username: ${{ secrets.PROD_VPS_USER }}
-          key_path: /tmp/prod_key
+          key_path: ${{ env.KEY_PATH }}
           port: 22
           command_timeout: 30m
           script: |
