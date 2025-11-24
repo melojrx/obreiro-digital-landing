@@ -138,22 +138,17 @@ services:
     build:
       context: ./frontend
       dockerfile: ../docker/frontend/Dockerfile
-      target: production
+      target: build
       args:
         - VITE_API_URL=https://hml.obreirovirtual.com/api/v1
         - VITE_ENABLE_SSE=false
         - VITE_NOTIFICATION_POLLING_INTERVAL=60000
     container_name: obreiro_frontend_hml
+    volumes:
+      - frontend_build_hml:/app/dist
     networks:
       - obreiro_network_hml
-    restart: unless-stopped
-    ports:
-      - "3001:80"  # Porta DIFERENTE da produção
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    command: ["sh", "-c", "echo 'Frontend build completed'"]
 
 # =================================
 # Volumes Persistentes HML
@@ -163,6 +158,8 @@ volumes:
     driver: local
   redis_data_hml:
     driver: local
+  frontend_build_hml:
+    name: obreiro_frontend_build_hml
 
 # =================================
 # Rede Isolada HML
