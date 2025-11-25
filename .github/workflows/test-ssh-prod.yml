@@ -1,0 +1,51 @@
+name: Teste SSH Produção
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ssh:
+    name: Testar Conexão SSH PROD
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Validar secrets
+        run: |
+          [ -n "${{ secrets.PROD_VPS_SSH_KEY }}" ] || { echo "❌ PROD_VPS_SSH_KEY vazio"; exit 1; }
+          [ -n "${{ secrets.PROD_VPS_HOST }}" ] || { echo "❌ PROD_VPS_HOST vazio"; exit 1; }
+          [ -n "${{ secrets.PROD_VPS_USER }}" ] || { echo "❌ PROD_VPS_USER vazio"; exit 1; }
+          echo "✅ Todos os secrets estão presentes"
+
+      - name: Teste de Conexão SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_VPS_HOST }}
+          username: ${{ secrets.PROD_VPS_USER }}
+          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          port: 22
+          command_timeout: 2m
+          script: |
+            echo "✅ SSH conectado com sucesso!"
+            echo "📍 Hostname: $(hostname)"
+            echo "👤 Usuário: $(whoami)"
+            echo ""
+
+            echo "🔍 Verificando diretório /root/obreiro-digital-landing:"
+            if [ -d /root/obreiro-digital-landing ]; then
+              echo "✅ Diretório existe"
+              cd /root/obreiro-digital-landing
+              echo "📂 Branch atual: $(git branch --show-current)"
+              echo "📝 Arquivos .env:"
+              ls -la .env* 2>/dev/null || echo "Nenhum arquivo .env* encontrado"
+              echo ""
+              echo "🐳 Docker containers ativos:"
+              docker ps --format "table {{.Names}}\t{{.Status}}" | grep obreiro || echo "Nenhum container obreiro rodando"
+            else
+              echo "❌ Diretório /root/obreiro-digital-landing NÃO existe!"
+              echo "📂 Conteúdo de /root/:"
+              ls -la /root/ | grep obreiro
+              exit 1
+            fi

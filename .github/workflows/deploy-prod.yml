@@ -58,7 +58,7 @@ jobs:
             echo "⚠️  ATENÇÃO: Deploy em ambiente de PRODUÇÃO!"
 
             # Navegar para diretório do projeto
-            cd /root/obreiro-prod || exit 1
+            cd /root/obreiro-digital-landing || exit 1
 
             # 1. Pull do código mais recente
             echo "📥 Baixando código da branch main..."
@@ -124,15 +124,15 @@ jobs:
 
             # 13. Copiar build para o diretório temporário no host
             echo "📋 Copiando build do frontend para o host..."
-            rm -rf /root/obreiro-prod/frontend_build/*
-            docker cp obreiro_frontend_build:/app/dist/. /root/obreiro-prod/frontend_build/ || {
+            rm -rf /root/obreiro-digital-landing/frontend_build/*
+            docker cp obreiro_frontend_build:/app/dist/. /root/obreiro-digital-landing/frontend_build/ || {
               echo "⚠️  Tentando copiar do volume diretamente..."
-              docker run --rm -v obreiro_frontend_build_prod:/source -v /root/obreiro-prod/frontend_build:/dest alpine sh -c "cp -r /source/. /dest/" || exit 1
+              docker run --rm -v obreiro_frontend_build_prod:/source -v /root/obreiro-digital-landing/frontend_build:/dest alpine sh -c "cp -r /source/. /dest/" || exit 1
             }
 
             # 14. Ajustar permissões
             echo "🔐 Ajustando permissões..."
-            chmod -R 755 /root/obreiro-prod/frontend_build
+            chmod -R 755 /root/obreiro-digital-landing/frontend_build
 
             # 15. Copiar frontend para diretório do nginx
             echo "📦 Copiando frontend para /var/www/html/prod/..."
@@ -145,7 +145,7 @@ jobs:
             fi
 
             # Copiar novo frontend
-            sudo cp -r /root/obreiro-prod/frontend_build/* /var/www/html/prod/
+            sudo cp -r /root/obreiro-digital-landing/frontend_build/* /var/www/html/prod/
             sudo chmod -R 755 /var/www/html/prod
 
             # 16. Verificar arquivos do frontend
