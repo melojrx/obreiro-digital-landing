@@ -40,17 +40,17 @@ jobs:
 
       - name: Validar secrets de produção
         run: |
-          [ -n "${{ secrets.PROD_VPS_SSH_KEY }}" ] || { echo "❌ Secret PROD_VPS_SSH_KEY ausente ou vazio"; exit 1; }
-          [ -n "${{ secrets.PROD_VPS_HOST }}" ] || { echo "❌ Secret PROD_VPS_HOST ausente ou vazio"; exit 1; }
-          [ -n "${{ secrets.PROD_VPS_USER }}" ] || { echo "❌ Secret PROD_VPS_USER ausente ou vazio"; exit 1; }
-          echo "✅ Secrets de produção encontrados"
+          [ -n "${{ secrets.HML_VPS_SSH_KEY }}" ] || { echo "❌ Secret HML_VPS_SSH_KEY ausente ou vazio"; exit 1; }
+          [ -n "${{ secrets.HML_VPS_HOST }}" ] || { echo "❌ Secret HML_VPS_HOST ausente ou vazio"; exit 1; }
+          [ -n "${{ secrets.HML_VPS_USER }}" ] || { echo "❌ Secret HML_VPS_USER ausente ou vazio"; exit 1; }
+          echo "✅ Secrets encontrados (HML e PROD na mesma VPS)"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.PROD_VPS_HOST }}
-          username: ${{ secrets.PROD_VPS_USER }}
-          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          host: ${{ secrets.HML_VPS_HOST }}
+          username: ${{ secrets.HML_VPS_USER }}
+          key: ${{ secrets.HML_VPS_SSH_KEY }}
           port: 22
           command_timeout: 30m
           script: |
