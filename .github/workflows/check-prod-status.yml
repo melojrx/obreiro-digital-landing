@@ -1,0 +1,46 @@
+name: Verificar Status PROD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Verificar Código e Migrações PROD
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verificar Status na VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HML_VPS_HOST }}
+          username: ${{ secrets.HML_VPS_USER }}
+          key: ${{ secrets.HML_VPS_SSH_KEY }}
+          port: 22
+          command_timeout: 2m
+          script: |
+            echo "=== STATUS DE PRODUÇÃO NA VPS ==="
+            echo ""
+            cd /root/obreiro-digital-landing
+
+            echo "1. COMMIT ATUAL:"
+            git log -1 --oneline
+            echo ""
+
+            echo "2. BRANCH ATUAL:"
+            git branch --show-current
+            echo ""
+
+            echo "3. ÚLTIMO PULL:"
+            git log -1 --format="%ai - %s"
+            echo ""
+
+            echo "4. MIGRAÇÕES APLICADAS (últimas 10):"
+            docker exec obreiro_backend_prod python manage.py showmigrations --plan | tail -20
+            echo ""
+
+            echo "5. VERIFICAR SE TABELA members_child EXISTE:"
+            docker exec obreiro_postgres_prod psql -U obreiro_prod -d obreiro_prod -c "\dt members_child" 2>/dev/null || echo "Tabela members_child NÃO EXISTE"
+            echo ""
+
+            echo "6. CONTAINERS RODANDO:"
+            docker ps --filter "name=obreiro.*prod" --format "table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}"

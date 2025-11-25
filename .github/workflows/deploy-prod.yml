@@ -40,17 +40,17 @@ jobs:
 
       - name: Validar secrets de produção
         run: |
-          [ -n "${{ secrets.PROD_VPS_SSH_KEY }}" ] || { echo "❌ Secret PROD_VPS_SSH_KEY ausente ou vazio"; exit 1; }
-          [ -n "${{ secrets.PROD_VPS_HOST }}" ] || { echo "❌ Secret PROD_VPS_HOST ausente ou vazio"; exit 1; }
-          [ -n "${{ secrets.PROD_VPS_USER }}" ] || { echo "❌ Secret PROD_VPS_USER ausente ou vazio"; exit 1; }
-          echo "✅ Secrets de produção encontrados"
+          [ -n "${{ secrets.HML_VPS_SSH_KEY }}" ] || { echo "❌ Secret HML_VPS_SSH_KEY ausente ou vazio"; exit 1; }
+          [ -n "${{ secrets.HML_VPS_HOST }}" ] || { echo "❌ Secret HML_VPS_HOST ausente ou vazio"; exit 1; }
+          [ -n "${{ secrets.HML_VPS_USER }}" ] || { echo "❌ Secret HML_VPS_USER ausente ou vazio"; exit 1; }
+          echo "✅ Secrets encontrados (HML e PROD na mesma VPS)"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.PROD_VPS_HOST }}
-          username: ${{ secrets.PROD_VPS_USER }}
-          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          host: ${{ secrets.HML_VPS_HOST }}
+          username: ${{ secrets.HML_VPS_USER }}
+          key: ${{ secrets.HML_VPS_SSH_KEY }}
           port: 22
           command_timeout: 30m
           script: |
@@ -58,7 +58,7 @@ jobs:
             echo "⚠️  ATENÇÃO: Deploy em ambiente de PRODUÇÃO!"
 
             # Navegar para diretório do projeto
-            cd /root/obreiro-prod || exit 1
+            cd /root/obreiro-digital-landing || exit 1
 
             # 1. Pull do código mais recente
             echo "📥 Baixando código da branch main..."
@@ -124,15 +124,15 @@ jobs:
 
             # 13. Copiar build para o diretório temporário no host
             echo "📋 Copiando build do frontend para o host..."
-            rm -rf /root/obreiro-prod/frontend_build/*
-            docker cp obreiro_frontend_build:/app/dist/. /root/obreiro-prod/frontend_build/ || {
+            rm -rf /root/obreiro-digital-landing/frontend_build/*
+            docker cp obreiro_frontend_build:/app/dist/. /root/obreiro-digital-landing/frontend_build/ || {
               echo "⚠️  Tentando copiar do volume diretamente..."
-              docker run --rm -v obreiro_frontend_build_prod:/source -v /root/obreiro-prod/frontend_build:/dest alpine sh -c "cp -r /source/. /dest/" || exit 1
+              docker run --rm -v obreiro_frontend_build_prod:/source -v /root/obreiro-digital-landing/frontend_build:/dest alpine sh -c "cp -r /source/. /dest/" || exit 1
             }
 
             # 14. Ajustar permissões
             echo "🔐 Ajustando permissões..."
-            chmod -R 755 /root/obreiro-prod/frontend_build
+            chmod -R 755 /root/obreiro-digital-landing/frontend_build
 
             # 15. Copiar frontend para diretório do nginx
             echo "📦 Copiando frontend para /var/www/html/prod/..."
@@ -145,7 +145,7 @@ jobs:
             fi
 
             # Copiar novo frontend
-            sudo cp -r /root/obreiro-prod/frontend_build/* /var/www/html/prod/
+            sudo cp -r /root/obreiro-digital-landing/frontend_build/* /var/www/html/prod/
             sudo chmod -R 755 /var/www/html/prod
 
             # 16. Verificar arquivos do frontend
@@ -175,12 +175,12 @@ jobs:
             echo "🏥 Executando health check..."
             sleep 10
 
-            # Verificar backend
-            BACKEND_CHECK=$(curl -f -s https://www.obreirovirtual.com/api/v1/ && echo "OK" || echo "FAIL")
-            if [ "$BACKEND_CHECK" = "OK" ]; then
-              echo "✅ Backend respondendo corretamente"
+            # Verificar backend (aceita 200, 401, 403 como resposta válida)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://www.obreirovirtual.com/api/v1/)
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+              echo "✅ Backend respondendo corretamente (HTTP $HTTP_CODE)"
             else
-              echo "❌ ERRO CRÍTICO: Backend não está respondendo!"
+              echo "❌ ERRO CRÍTICO: Backend não está respondendo (HTTP $HTTP_CODE)!"
               docker-compose -f docker-compose.prod.yml logs --tail=50 backend
               exit 1
             fi
