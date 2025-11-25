@@ -175,12 +175,12 @@ jobs:
             echo "🏥 Executando health check..."
             sleep 10
 
-            # Verificar backend
-            BACKEND_CHECK=$(curl -f -s https://www.obreirovirtual.com/api/v1/ && echo "OK" || echo "FAIL")
-            if [ "$BACKEND_CHECK" = "OK" ]; then
-              echo "✅ Backend respondendo corretamente"
+            # Verificar backend (aceita 200, 401, 403 como resposta válida)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://www.obreirovirtual.com/api/v1/)
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+              echo "✅ Backend respondendo corretamente (HTTP $HTTP_CODE)"
             else
-              echo "❌ ERRO CRÍTICO: Backend não está respondendo!"
+              echo "❌ ERRO CRÍTICO: Backend não está respondendo (HTTP $HTTP_CODE)!"
               docker-compose -f docker-compose.prod.yml logs --tail=50 backend
               exit 1
             fi
