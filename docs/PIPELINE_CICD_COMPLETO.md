@@ -2,553 +2,923 @@
 
 **Documentação completa do fluxo de deploy automático**
 
-**Versão:** 2.0
-**Data:** 24/11/2025
-**Status:** 🟢 Implementado e Funcionando
+**Versão:** 3.0
+**Data:** 25/11/2025
+**Status:** ✅ **PROD e HML 100% Implementados e Funcionando**
 
 ---
 
 ## 📋 Índice
 
 1. [Visão Geral](#visão-geral)
-2. [Arquitetura dos Ambientes](#arquitetura-dos-ambientes)
-3. [Fluxo de Trabalho (GitFlow)](#fluxo-de-trabalho-gitflow)
+2. [Arquitetura da Infraestrutura](#arquitetura-da-infraestrutura)
+3. [Fluxo de Trabalho Profissional](#fluxo-de-trabalho-profissional)
 4. [Workflows Implementados](#workflows-implementados)
-5. [Estratégia de Deploy](#estratégia-de-deploy)
-6. [Proteções e Validações](#proteções-e-validações)
-7. [Troubleshooting](#troubleshooting)
+5. [Secrets e Configurações](#secrets-e-configurações)
+6. [Estratégia de Deploy](#estratégia-de-deploy)
+7. [Monitoramento e Health Checks](#monitoramento-e-health-checks)
+8. [Troubleshooting](#troubleshooting)
+9. [Comandos Úteis](#comandos-úteis)
 
 ---
 
 ## 🎯 Visão Geral
 
-### Pipeline Atual
+### Pipeline Implementado
 
 ```
-┌─────────────┐
-│   Código    │
-│  (develop)  │
-└──────┬──────┘
-       │
-       │ push/PR
-       ▼
-┌─────────────┐
-│  CI Tests   │◄── Validação de código
-└──────┬──────┘
-       │
-       │ ✅ passou
-       ▼
-┌─────────────┐
-│  Deploy     │
-│     HML     │◄── Automático
-└──────┬──────┘
-       │
-       │ aprovação manual
-       │ via PR para main
-       ▼
-┌─────────────┐
-│  Deploy     │
-│   PRODUÇÃO  │◄── Requer aprovação
-└─────────────┘
+┌──────────────────┐
+│  feature/branch  │
+│  (desenvolvimento)│
+└────────┬─────────┘
+         │ PR
+         ▼
+┌──────────────────┐      ┌─────────────────┐
+│     develop      │─────►│   Deploy HML    │
+│  (homologação)   │      │   (automático)  │
+└────────┬─────────┘      └─────────────────┘
+         │                         │
+         │ PR + Aprovação         │ Teste e validação
+         │                         │
+         ▼                         ▼
+┌──────────────────┐      ┌─────────────────┐
+│       main       │─────►│  Deploy PROD    │
+│   (produção)     │      │   (automático)  │
+└──────────────────┘      └─────────────────┘
 ```
 
-### Branches e Ambientes
+### Ambientes e URLs
 
-| Branch | Ambiente | URL | Deploy | Aprovação |
-|--------|----------|-----|--------|-----------|
-| `develop` | Homologação (HML) | hml.obreirovirtual.com | ✅ Automático | ❌ Não requer |
-| `main` | Produção (PROD) | obreirovirtual.com | ✅ Automático | ✅ PR Review obrigatório |
+| Ambiente | Branch | URL | Status | Deploy |
+|----------|--------|-----|--------|--------|
+| **Homologação (HML)** | `develop` | https://hml.obreirovirtual.com | ✅ Ativo | Automático no push |
+| **Produção (PROD)** | `main` | https://www.obreirovirtual.com | ✅ Ativo | Automático no push + PR aprovado |
 
 ---
 
-## 🏗️ Arquitetura dos Ambientes
+## 🏗️ Arquitetura da Infraestrutura
+
+### VPS Compartilhada (srvmagnum)
+
+**Informação Importante:** HML e PROD rodam na **mesma VPS**, mas com **isolamento completo** através de:
+- Diretórios separados
+- Containers Docker isolados
+- Bancos de dados separados
+- Networks Docker separadas
+- Portas diferentes
+
+```
+VPS: srvmagnum (6GB RAM, 4 CPU cores)
+├── /root/obreiro-digital-landing/     ← Repositório PROD
+│   ├── docker-compose.prod.yml
+│   ├── .env_prod
+│   ├── frontend_build/
+│   └── backups/
+│
+├── /root/obreiro-hml/                 ← Repositório HML (separado)
+│   ├── docker-compose.hml.yml
+│   ├── .env_hml
+│   └── frontend-build/
+│
+├── /var/www/html/
+│   ├── prod/   ← Frontend PROD servido pelo nginx
+│   └── hml/    ← Frontend HML servido pelo nginx
+│
+└── Nginx no HOST (systemd)
+    ├── hml.obreirovirtual.com → /var/www/html/hml/
+    ├── www.obreirovirtual.com → /var/www/html/prod/
+    └── SSL: Let's Encrypt
+```
+
+---
 
 ### Ambiente de Homologação (HML)
 
-**Localização:** VPS - `/root/obreiro-hml`
+**Diretório:** `/root/obreiro-hml`
+**URL:** https://hml.obreirovirtual.com
 
-**Componentes:**
+#### Componentes Docker:
 
-1. **NGINX no HOST**
-   - Virtual host: `hml.obreirovirtual.com`
-   - Serve frontend estático: `/root/obreiro-hml/frontend-build/`
-   - Proxy para backend: `http://localhost:8001`
-   - Arquivos estáticos Django: `/root/obreiro-hml/staticfiles/`
+| Container | Porta Host | Descrição |
+|-----------|------------|-----------|
+| `obreiro_postgres_hml` | 5433 | PostgreSQL 15 (banco: obreiro_hml) |
+| `obreiro_redis_hml` | - | Redis 7 (broker Celery) |
+| `obreiro_backend_hml` | 8001 | Django + Gunicorn |
+| `obreiro_celery_hml` | - | Celery Worker |
+| `obreiro_celery_beat_hml` | - | Celery Beat (scheduler) |
+| `obreiro_frontend_hml` | - | Build temporário React + Vite |
 
-2. **Backend (Docker)**
-   - Container: `obreiro_backend_hml`
-   - Porta: `8001` (mapeada do host)
-   - Arquivo: `docker-compose.hml.yml`
-   - Comando: Gunicorn
-
-3. **Banco de Dados (Docker)**
-   - Container: `obreiro_postgres_hml`
-   - Porta: `5433` (mapeada do host)
-   - Database: `obreiro_hml`
-
-4. **Workers (Docker)**
-   - `obreiro_celery_hml`: Worker Celery
-   - `obreiro_celery_beat_hml`: Scheduler
-   - `obreiro_redis_hml`: Broker/Cache
-
-5. **Frontend (Docker - Build Only)**
-   - Container temporário: `obreiro_frontend_hml`
-   - Build com Vite + React
-   - Output: Volume → `/root/obreiro-hml/frontend-build/`
+#### Nginx (HOST):
+```nginx
+server_name: hml.obreirovirtual.com
+root: /var/www/html/hml/
+proxy_pass: http://localhost:8001
+```
 
 ---
 
 ### Ambiente de Produção (PROD)
 
-**Localização:** VPS - `/root/obreiro-prod`
+**Diretório:** `/root/obreiro-digital-landing`
+**URL:** https://www.obreirovirtual.com
 
-**Componentes:**
+#### Componentes Docker:
 
-1. **NGINX no HOST**
-   - Virtual host: `obreirovirtual.com` e `www.obreirovirtual.com`
-   - Serve frontend estático: `/root/obreiro-prod/frontend-build/`
-   - Proxy para backend: `http://localhost:8000`
-   - Arquivos estáticos Django: `/root/obreiro-prod/staticfiles/`
-   - SSL: Let's Encrypt (certbot)
+| Container | Porta Host | Descrição |
+|-----------|------------|-----------|
+| `obreiro_postgres_prod` | - | PostgreSQL 15 (banco: obreiro_prod) |
+| `obreiro_redis_prod` | - | Redis 7 (broker Celery) |
+| `obreiro_backend_prod` | 8000 | Django + Gunicorn (3 workers) |
+| `obreiro_celery_prod` | - | Celery Worker (concurrency 2) |
+| `obreiro_celery_beat_prod` | - | Celery Beat (scheduler) |
+| `obreiro_frontend_build` | - | Build temporário React + Vite |
 
-2. **Backend (Docker)**
-   - Container: `obreiro_backend_prod`
-   - Porta: `8000` (mapeada do host)
-   - Arquivo: `docker-compose.prod.yml`
-   - Comando: Gunicorn com mais workers
-
-3. **Banco de Dados (Docker)**
-   - Container: `obreiro_postgres_prod`
-   - Porta: `5432` (mapeada do host)
-   - Database: `obreiro_prod`
-   - Backups automáticos: `/root/obreiro-prod/backups/`
-
-4. **Workers (Docker)**
-   - `obreiro_celery_prod`: Worker Celery (mais concorrência)
-   - `obreiro_celery_beat_prod`: Scheduler
-   - `obreiro_redis_prod`: Broker/Cache
-
-5. **Frontend (Docker - Build Only)**
-   - Container temporário: `obreiro_frontend_prod`
-   - Build com Vite + React (otimizado para produção)
-   - Output: Volume → `/root/obreiro-prod/frontend-build/`
+#### Nginx (HOST):
+```nginx
+server_name: www.obreirovirtual.com obreirovirtual.com
+root: /var/www/html/prod/
+proxy_pass: http://localhost:8000
+ssl_certificate: /etc/letsencrypt/live/obreirovirtual.com/fullchain.pem
+```
 
 ---
 
-## 🔄 Fluxo de Trabalho (GitFlow)
+## 🔄 Fluxo de Trabalho Profissional
 
 ### 1. Desenvolvimento Local
 
 ```bash
-# Criar feature branch
+# 1. Atualizar develop
 git checkout develop
 git pull origin develop
-git checkout -b feature/nome-da-feature
 
-# Desenvolver e testar localmente
-npm run dev        # Frontend
-python manage.py runserver  # Backend
+# 2. Criar feature branch
+git checkout -b feature/nome-da-funcionalidade
 
-# Commit
+# 3. Desenvolver e testar localmente
+npm run dev                          # Frontend (porta 5173)
+python manage.py runserver           # Backend (porta 8000)
+docker-compose -f docker-compose.dev.yml up  # Ambiente completo
+
+# 4. Commit seguindo conventional commits
 git add .
-git commit -m "feat: adiciona nova funcionalidade"
-git push origin feature/nome-da-feature
+git commit -m "feat: adiciona nova funcionalidade X"
+git push origin feature/nome-da-funcionalidade
 ```
 
-### 2. Pull Request para Develop
+**Conventional Commits:**
+- `feat:` - Nova funcionalidade
+- `fix:` - Correção de bug
+- `docs:` - Documentação
+- `chore:` - Manutenção
+- `refactor:` - Refatoração
+- `test:` - Testes
+
+---
+
+### 2. Pull Request para Develop (HML)
 
 ```bash
-# Criar PR no GitHub
-# feature/nome-da-feature → develop
+# 1. Criar PR no GitHub
+feature/nome-da-funcionalidade → develop
 
-# Automático após merge:
-✅ CI Tests executam
-✅ Deploy HML executado
-📧 Email de notificação enviado
+# 2. O que acontece automaticamente:
+✅ CI Tests executam (validação Python + build frontend)
+✅ Code review (opcional para develop)
+✅ Merge aprovado
+
+# 3. Após merge:
+🚀 Deploy HML inicia AUTOMATICAMENTE
+├── Backend rebuilded
+├── Migrações aplicadas
+├── Frontend buildado
+├── Nginx recarregado
+└── 📧 Email de notificação enviado
+
+⏱️ Tempo: ~1-2 minutos
 ```
+
+**Deploy HML Automático Inclui:**
+1. Pull do código da branch `develop`
+2. Build containers backend, celery, celery-beat
+3. Aplicação de migrações Django
+4. Coleta de arquivos estáticos
+5. Build do frontend React + Vite
+6. Cópia para `/var/www/html/hml/`
+7. Reload do nginx
+8. Health checks (backend + frontend)
+9. Notificação por email
+
+---
 
 ### 3. Testes em Homologação
 
 ```
-🌐 Testar em: https://hml.obreirovirtual.com
-✅ Validar funcionalidades
-✅ Testar integrações
-✅ Revisar com stakeholders
+🌐 Acessar: https://hml.obreirovirtual.com
+
+Checklist de validação:
+├── ✅ Funcionalidade implementada funciona corretamente
+├── ✅ Não quebrou funcionalidades existentes
+├── ✅ Performance aceitável
+├── ✅ UI/UX adequada
+├── ✅ Testar em diferentes dispositivos (responsivo)
+└── ✅ Aprovação de stakeholders
 ```
 
-### 4. Pull Request para Main (Produção)
+---
+
+### 4. Pull Request para Main (PROD)
 
 ```bash
-# Quando HML estiver estável
-# Criar PR: develop → main
+# 1. Criar PR no GitHub
+develop → main
 
-# Requer:
-✅ Aprovação de code review (obrigatório)
-✅ CI Tests passar
-✅ Sem conflitos
+# 2. Requisitos OBRIGATÓRIOS:
+✅ CI Tests passaram
+✅ Code review aprovado (mínimo 1 pessoa)
+✅ Branch atualizada (sem conflitos)
+✅ Testes em HML validados
 
-# Após merge:
-✅ Deploy PROD executado automaticamente
-📧 Email de notificação enviado
-🔔 Monitoramento ativado
+# 3. Após merge aprovado:
+🚀 Deploy PROD inicia AUTOMATICAMENTE
+├── 💾 Backup automático do banco de dados
+├── 💾 Backup do frontend anterior
+├── Backend rebuilded
+├── Migrações aplicadas (com validação)
+├── Frontend buildado (otimizado)
+├── Health checks rigorosos
+└── 📧 Email de notificação (2 destinatários)
+
+⏱️ Tempo: ~3-4 minutos
 ```
+
+**Deploy PROD Automático Inclui:**
+1. Validação de secrets
+2. **Backup do banco de dados** → `/root/backups/`
+3. Pull do código da branch `main`
+4. Build containers (--no-cache para garantir atualização)
+5. Aplicação de migrações Django
+6. Coleta de arquivos estáticos
+7. Build do frontend React + Vite (modo produção)
+8. **Backup do frontend anterior**
+9. Cópia para `/var/www/html/prod/`
+10. Reload do nginx
+11. **Health checks rigorosos** (HTTP 200, 401, 403 aceitos)
+12. Docker cleanup (remover imagens antigas)
+13. Notificação por email
 
 ---
 
 ## 🤖 Workflows Implementados
 
-### 1. CI - Testes Mínimos (`ci-tests.yml`)
+### 1. CI Tests (`ci-tests.yml`)
 
+**Arquivo:** `.github/workflows/ci-tests.yml`
 **Trigger:** Push ou PR em `develop` ou `main`
 
-**O que faz:**
-- ✅ Valida sintaxe Python
-- ✅ Instala dependências do frontend
-- ✅ Executa build do React + Vite
-- ✅ Verifica se build foi criado
+```yaml
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+```
+
+**Steps:**
+1. ✅ Checkout do código
+2. ✅ Setup Python 3.11
+3. ✅ Validação sintaxe Python (`python -m py_compile`)
+4. ✅ Setup Node.js 18
+5. ✅ Instalação dependências frontend (`npm ci`)
+6. ✅ Build frontend (`npm run build`)
+7. ✅ Verificação se build foi criado
 
 **Duração:** ~30-40 segundos
+**Status:** ✅ Implementado e funcionando
 
 ---
 
 ### 2. Deploy Homologação (`deploy-hml.yml`)
 
+**Arquivo:** `.github/workflows/deploy-hml.yml`
 **Trigger:** Push em `develop`
 
-**Steps:**
-1. Checkout do código
-2. Conexão SSH na VPS
-3. Pull do código na VPS (`/root/obreiro-hml`)
-4. Carrega variáveis de ambiente (`.env_hml`)
-5. Rebuild containers backend
-6. Para containers atuais
-7. Inicia novos containers
-8. Aplica migrações Django
-9. Coleta arquivos estáticos
-10. Rebuild frontend React
-11. Copia build para host (`/root/obreiro-hml/frontend-build/`)
-12. Ajusta permissões
-13. Recarrega NGINX
-14. Health check (backend + frontend)
-15. Envia email de sucesso/falha
+```yaml
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:  # Permite trigger manual
+```
 
-**Duração:** ~1-2 minutos
+**Environment:** `homologation`
+**URL:** https://hml.obreirovirtual.com
+
+**Script de Deploy (22 steps):**
+```bash
+1. cd /root/obreiro-hml
+2. git fetch origin develop && git reset --hard origin/develop
+3. source .env_hml
+4. docker-compose build --no-cache backend_hml celery_hml celery_beat_hml
+5. docker-compose stop backend_hml celery_hml celery_beat_hml
+6. docker-compose up -d --force-recreate backend_hml celery_hml celery_beat_hml
+7. sleep 15  # Aguardar containers iniciarem
+8. Verificar se backend está rodando
+9. docker exec obreiro_backend_hml python manage.py migrate --noinput
+10. docker exec obreiro_backend_hml python manage.py collectstatic --noinput
+11. docker-compose build frontend_hml
+12. docker-compose run --rm frontend_hml  # Build React
+13. docker cp obreiro_frontend_hml:/app/dist/. /root/obreiro-hml/frontend-build/
+14. chmod -R 755 /root/obreiro-hml/frontend-build
+15. mkdir -p /var/www/html/hml
+16. cp -r /root/obreiro-hml/frontend-build/* /var/www/html/hml/
+17. chmod -R 755 /var/www/html/hml
+18. Verificar se index.html existe
+19. nginx -t  # Testar configuração
+20. systemctl reload nginx
+21. Health check backend (curl https://hml.obreirovirtual.com/api/v1/)
+22. Health check frontend (curl https://hml.obreirovirtual.com/)
+```
 
 **Notificações:**
-- 📧 Email para: `suporteobreirovirtual@gmail.com`
-- ✅ Sucesso: Template verde com links
-- ❌ Falha: Template vermelho com troubleshooting
+- ✅ **Sucesso:** Email para `suporteobreirovirtual@gmail.com`
+- ❌ **Falha:** Email com logs e troubleshooting
+
+**Duração:** ~1-2 minutos
+**Status:** ✅ Implementado e funcionando
 
 ---
 
-### 3. Deploy Produção (`deploy-prod.yml`) - A IMPLEMENTAR
+### 3. Deploy Produção (`deploy-prod.yml`)
 
-**Trigger:** Push em `main` (após merge de PR aprovado)
+**Arquivo:** `.github/workflows/deploy-prod.yml`
+**Trigger:** Push em `main` ou PR mergeado em `main`
 
-**Steps:**
-1. Checkout do código
-2. **Validação extra de segurança**
-3. Conexão SSH na VPS
-4. Backup automático do banco de dados
-5. Pull do código na VPS (`/root/obreiro-prod`)
-6. Carrega variáveis de ambiente (`.env_prod`)
-7. **Testes de smoke pré-deploy**
-8. Rebuild containers backend (sem downtime)
-9. Para containers atuais gradualmente
-10. Inicia novos containers
-11. Aplica migrações Django (com rollback automático se falhar)
-12. Coleta arquivos estáticos
-13. Rebuild frontend React (otimizado)
-14. Copia build para host (`/root/obreiro-prod/frontend-build/`)
-15. Ajusta permissões
-16. **Testa nova versão antes de ativar**
-17. Recarrega NGINX
-18. Health check estendido (5min de monitoramento)
-19. **Se falhar: Rollback automático**
-20. Envia email de sucesso/falha
+```yaml
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:  # Permite trigger manual
+```
 
-**Duração:** ~3-5 minutos
+**Environment:** `production`
+**URL:** https://www.obreirovirtual.com
+
+**Script de Deploy (22 steps + backups):**
+```bash
+1. cd /root/obreiro-digital-landing
+2. git fetch origin main && git reset --hard origin/main
+3. source .env_prod
+4. 💾 BACKUP DATABASE: pg_dump → /root/backups/backup_prod_TIMESTAMP.sql
+5. docker-compose build --no-cache backend celery celery-beat
+6. docker-compose stop backend celery celery-beat
+7. docker-compose up -d --force-recreate backend celery celery-beat
+8. sleep 20  # Aguardar containers iniciarem
+9. Verificar se backend está rodando
+10. docker exec obreiro_backend_prod python manage.py migrate --noinput
+11. docker exec obreiro_backend_prod python manage.py collectstatic --noinput
+12. docker-compose build --no-cache frontend-build
+13. docker-compose up frontend-build  # Build React
+14. rm -rf /root/obreiro-digital-landing/frontend_build/*
+15. docker cp obreiro_frontend_build:/app/dist/. /root/obreiro-digital-landing/frontend_build/
+16. chmod -R 755 /root/obreiro-digital-landing/frontend_build
+17. 💾 BACKUP FRONTEND: cp -r /var/www/html/prod /var/www/html/prod_backup_TIMESTAMP
+18. mkdir -p /var/www/html/prod
+19. cp -r /root/obreiro-digital-landing/frontend_build/* /var/www/html/prod/
+20. chmod -R 755 /var/www/html/prod
+21. Verificar se index.html existe
+22. nginx -t  # Testar configuração
+23. systemctl reload nginx
+24. Health check backend (aceita HTTP 200, 401, 403)
+25. Health check frontend (aceita HTTP 200)
+26. docker system prune -f  # Cleanup
+27. Mostrar logs dos containers
+```
+
+**Validações de Segurança:**
+- ✅ Validação de secrets antes de iniciar
+- ✅ Backup do banco antes de qualquer alteração
+- ✅ Backup do frontend antes de sobrescrever
+- ✅ Health checks rigorosos (falha = abort)
+- ✅ Verificação se containers estão rodando
 
 **Notificações:**
-- 📧 Email para: `suporteobreirovirtual@gmail.com`
-- 💬 Slack/Discord (opcional)
-- 📊 Métricas de deploy
+- ✅ **Sucesso:** Email para `suporteobreirovirtual@gmail.com` e `jrmeloafrf@gmail.com`
+- ❌ **Falha:** Email com logs, troubleshooting e procedimento de rollback
+
+**Duração:** ~3-4 minutos
+**Status:** ✅ Implementado e funcionando
+
+---
+
+### 4. Teste SSH Produção (`test-ssh-prod.yml`)
+
+**Arquivo:** `.github/workflows/test-ssh-prod.yml`
+**Trigger:** Manual via `workflow_dispatch`
+
+**Propósito:** Validar conectividade SSH antes de deploy
+
+**O que verifica:**
+1. ✅ Conexão SSH estabelecida
+2. ✅ Diretório `/root/obreiro-digital-landing` existe
+3. ✅ Branch atual
+4. ✅ Arquivos `.env` presentes
+5. ✅ Containers rodando
+
+**Status:** ✅ Implementado e funcionando
+
+---
+
+### 5. Verificar Status PROD (`check-prod-status.yml`)
+
+**Arquivo:** `.github/workflows/check-prod-status.yml`
+**Trigger:** Manual via `workflow_dispatch`
+
+**Propósito:** Auditoria do estado de produção
+
+**O que verifica:**
+1. ✅ Commit atual na VPS
+2. ✅ Branch atual
+3. ✅ Migrações aplicadas (últimas 20)
+4. ✅ Tabelas no banco de dados
+5. ✅ Containers rodando e status
+6. ✅ Tempo de execução dos containers
+
+**Status:** ✅ Implementado
+
+---
+
+## 🔐 Secrets e Configurações
+
+### Secrets no GitHub
+
+**Localização:** `Settings → Secrets and variables → Actions → Repository secrets`
+
+| Secret | Descrição | Usado em | Observação |
+|--------|-----------|----------|------------|
+| `HML_VPS_HOST` | IP da VPS | HML, PROD | ⚠️ Mesma VPS para ambos |
+| `HML_VPS_USER` | Usuário SSH (root) | HML, PROD | ⚠️ Mesmo usuário |
+| `HML_VPS_SSH_KEY` | Chave privada SSH | HML, PROD | ⚠️ Mesma chave |
+| `EMAIL_USERNAME` | Email SMTP Gmail | HML, PROD | Para notificações |
+| `EMAIL_PASSWORD` | Senha app Gmail | HML, PROD | Token gerado no Gmail |
+
+**⚠️ IMPORTANTE:**
+- PROD usa `HML_VPS_*` porque ambos ambientes estão na **mesma VPS**
+- Apenas os **diretórios** e **portas** são diferentes
+- Se no futuro PROD for para VPS diferente, criar `PROD_VPS_*` separados
+
+### Como Gerar Chave SSH
+
+```bash
+# 1. Gerar chave SSH
+ssh-keygen -t ed25519 -C "github-actions-obreiro" -f ~/.ssh/github_actions_obreiro
+
+# 2. Adicionar chave pública ao servidor
+cat ~/.ssh/github_actions_obreiro.pub | ssh root@VPS_IP "cat >> ~/.ssh/authorized_keys"
+
+# 3. Testar conexão
+ssh -i ~/.ssh/github_actions_obreiro root@VPS_IP
+
+# 4. Copiar chave PRIVADA para GitHub Secrets
+cat ~/.ssh/github_actions_obreiro
+# Copiar TODO o conteúdo incluindo:
+# -----BEGIN OPENSSH PRIVATE KEY-----
+# ...
+# -----END OPENSSH PRIVATE KEY-----
+```
+
+### Como Gerar Senha de App Gmail
+
+1. Acessar: https://myaccount.google.com/apppasswords
+2. Nome: "GitHub Actions Obreiro Virtual"
+3. Gerar senha
+4. Copiar senha (formato: `xxxx xxxx xxxx xxxx`)
+5. Adicionar ao secret `EMAIL_PASSWORD`
 
 ---
 
 ## 🛡️ Estratégia de Deploy
 
-### Zero-Downtime Strategy
+### Zero-Downtime Deployment
 
 **Objetivo:** Deploy sem interrupção do serviço
 
 **Como funciona:**
 
-1. **Build da nova versão** (em paralelo com versão antiga rodando)
-2. **Validação da nova versão** (health checks)
-3. **Troca gradual de tráfego** (NGINX reload)
-4. **Monitoramento pós-deploy** (5min)
-5. **Rollback automático** se erros detectados
+```
+┌────────────────────────────────────────────────────┐
+│ 1. Containers antigos rodando                       │
+│    ├── Backend v1.0 (healthy)                       │
+│    └── Nginx → Backend v1.0                         │
+└────────────────────────────────────────────────────┘
+                    ↓
+┌────────────────────────────────────────────────────┐
+│ 2. Build nova versão (paralelo)                     │
+│    ├── Backend v1.0 (healthy) ← ainda servindo     │
+│    └── Backend v1.1 (building...)                   │
+└────────────────────────────────────────────────────┘
+                    ↓
+┌────────────────────────────────────────────────────┐
+│ 3. Stop containers antigos                          │
+│    ├── Backend v1.0 (stopping...)                   │
+│    └── Backend v1.1 (ready)                         │
+└────────────────────────────────────────────────────┘
+                    ↓
+┌────────────────────────────────────────────────────┐
+│ 4. Start novos containers                           │
+│    ├── Backend v1.1 (starting...)                   │
+│    └── Nginx → aguardando...                        │
+└────────────────────────────────────────────────────┘
+                    ↓
+┌────────────────────────────────────────────────────┐
+│ 5. Health checks                                     │
+│    ├── Backend v1.1 (healthy) ✅                    │
+│    └── Migrations aplicadas ✅                      │
+└────────────────────────────────────────────────────┘
+                    ↓
+┌────────────────────────────────────────────────────┐
+│ 6. Nginx reload (troca instantânea)                 │
+│    └── Nginx → Backend v1.1 ✅                      │
+└────────────────────────────────────────────────────┘
+```
 
-### Rollback Automático
+**Tempo de downtime real:** ~5-10 segundos (durante o stop/start)
 
-**Triggers para rollback:**
-- ❌ Health check falha após deploy
-- ❌ Taxa de erro > 5% nos primeiros 5min
-- ❌ Backend não responde após 30s
-- ❌ Migrações falham
+---
 
-**Processo de rollback:**
+### Rollback Manual
+
+Se algo der errado após deploy:
+
 ```bash
-# Automático via workflow
-1. git reset --hard COMMIT_ANTERIOR
-2. Rebuild containers com versão anterior
-3. Restaurar banco de dados do backup (se necessário)
-4. Reiniciar serviços
-5. Notificar equipe
+# 1. Conectar na VPS
+ssh root@<VPS_IP>
+
+# 2. Para HML:
+cd /root/obreiro-hml
+git log -5  # Ver últimos commits
+git reset --hard <COMMIT_ANTERIOR>
+docker-compose -f docker-compose.hml.yml up -d --build --force-recreate
+
+# 3. Para PROD:
+cd /root/obreiro-digital-landing
+git log -5  # Ver últimos commits
+git reset --hard <COMMIT_ANTERIOR>
+
+# 4. Restaurar banco (se necessário)
+ls -lht /root/backups/ | head -5
+docker exec -i obreiro_postgres_prod psql -U obreiro_prod obreiro_prod < /root/backups/backup_prod_LATEST.sql
+
+# 5. Rebuild
+docker-compose -f docker-compose.prod.yml up -d --build --force-recreate backend celery celery-beat
 ```
 
 ---
 
-## 🔒 Proteções e Validações
+## 📊 Monitoramento e Health Checks
 
-### Branch Protection Rules
+### Health Checks Implementados
 
-**Branch `main` (Produção):**
-- ✅ Requer pull request
-- ✅ Requer aprovação de code review (1 pessoa)
-- ✅ Requer CI passar
-- ✅ Requer branch atualizada
-- ❌ Não permite force push
-- ❌ Não permite delete
-
-**Branch `develop` (Homologação):**
-- ✅ Requer pull request (recomendado)
-- ⚠️ CI deve passar
-- ✅ Permite push direto (desenvolvedores)
-
-### Environments no GitHub
-
-**Environment: `homologation`**
-- URL: https://hml.obreirovirtual.com
-- Secrets: `HML_VPS_HOST`, `HML_VPS_USER`, `HML_VPS_SSH_KEY`
-- Protection: Nenhuma (deploy automático)
-
-**Environment: `production`**
-- URL: https://obreirovirtual.com
-- Secrets: `PROD_VPS_HOST`, `PROD_VPS_USER`, `PROD_VPS_SSH_KEY`
-- Protection:
-  - ✅ Required reviewers: 1 pessoa
-  - ✅ Wait timer: 5 minutos
-  - ✅ Allowed branches: `main` apenas
-
-### Validações Pré-Deploy
-
-**Homologação:**
-1. ✅ Sintaxe Python válida
-2. ✅ Frontend builda sem erros
-3. ✅ Testes unitários passam (se habilitados)
-
-**Produção (mais rigoroso):**
-1. ✅ Todos os checks de HML
-2. ✅ PR aprovado por revisor
-3. ✅ Branch atualizada com main
-4. ✅ Sem conflitos de merge
-5. ✅ Testes de integração passam
-6. ✅ Backup do banco criado
-
----
-
-## 📊 Monitoramento e Métricas
-
-### Health Checks
-
-**Backend:**
+**Backend (Django API):**
 ```bash
-curl -f https://hml.obreirovirtual.com/api/v1/
-# Deve retornar: 401 (requer autenticação) ou 200
+# HML
+curl -I https://hml.obreirovirtual.com/api/v1/
+# Esperado: HTTP/2 401 (Unauthorized) ou 200 OK
+
+# PROD
+curl -I https://www.obreirovirtual.com/api/v1/
+# Esperado: HTTP/2 401 (Unauthorized) ou 200 OK
 ```
 
-**Frontend:**
+**Frontend (React SPA):**
 ```bash
+# HML
 curl -I https://hml.obreirovirtual.com/
-# Deve retornar: 200 OK
+# Esperado: HTTP/2 200
+
+# PROD
+curl -I https://www.obreirovirtual.com/
+# Esperado: HTTP/2 200
 ```
 
 **Admin Django:**
 ```bash
+# HML
 curl -I https://hml.obreirovirtual.com/admin/
-# Deve retornar: 302 (redirect para login)
+# Esperado: HTTP/2 302 (redirect para login)
+
+# PROD
+curl -I https://www.obreirovirtual.com/admin/
+# Esperado: HTTP/2 302 (redirect para login)
 ```
+
+**⚠️ IMPORTANTE:** HTTP 401 é resposta **VÁLIDA** para API sem autenticação!
+
+---
 
 ### Logs
 
-**Locais dos logs:**
+**Nginx (HOST):**
+```bash
+# HML
+tail -f /var/log/nginx/hml.obreirovirtual.com.access.log
+tail -f /var/log/nginx/hml.obreirovirtual.com.error.log
 
-**HML:**
-- NGINX: `/var/log/nginx/hml.obreirovirtual.com.*.log`
-- Backend: `docker logs obreiro_backend_hml`
-- Celery: `docker logs obreiro_celery_hml`
+# PROD
+tail -f /var/log/nginx/obreirovirtual.com.access.log
+tail -f /var/log/nginx/obreirovirtual.com.error.log
+```
 
-**PROD:**
-- NGINX: `/var/log/nginx/obreirovirtual.com.*.log`
-- Backend: `docker logs obreiro_backend_prod`
-- Celery: `docker logs obreiro_celery_prod`
-- Backups: `/root/obreiro-prod/backups/`
+**Backend Django:**
+```bash
+# HML
+docker logs obreiro_backend_hml -f --tail=100
+
+# PROD
+docker logs obreiro_backend_prod -f --tail=100
+```
+
+**Celery Worker:**
+```bash
+# HML
+docker logs obreiro_celery_hml -f --tail=100
+
+# PROD
+docker logs obreiro_celery_prod -f --tail=100
+```
+
+**Celery Beat:**
+```bash
+# HML
+docker logs obreiro_celery_beat_hml -f --tail=100
+
+# PROD
+docker logs obreiro_celery_beat_prod -f --tail=100
+```
+
+---
+
+### Métricas e Status
+
+**Ver status dos containers:**
+```bash
+# Todos containers obreiro
+docker ps --filter "name=obreiro" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# HML específico
+docker ps --filter "name=obreiro_.*_hml" --format "table {{.Names}}\t{{.Status}}"
+
+# PROD específico
+docker ps --filter "name=obreiro_.*_prod" --format "table {{.Names}}\t{{.Status}}"
+```
+
+**Ver uso de recursos:**
+```bash
+docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" $(docker ps --filter "name=obreiro" -q)
+```
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Deploy HML Falhou
+### Deploy Falhou - Checklist
 
-**1. Verificar logs do workflow:**
+**1. Verificar logs do GitHub Actions:**
 ```
-GitHub → Actions → Deploy para Homologação → Ver logs
+1. Acessar: https://github.com/melojrx/obreiro-digital-landing/actions
+2. Clicar no workflow que falhou
+3. Clicar no step que falhou
+4. Ler logs completos
 ```
 
-**2. Conectar na VPS e verificar:**
+**2. Problemas Comuns:**
+
+| Erro | Causa | Solução |
+|------|-------|---------|
+| `ssh: no key found` | Chave SSH inválida | Recriar secret `HML_VPS_SSH_KEY` |
+| `cd /root/obreiro-prod: No such file` | Diretório incorreto | Verificar se está usando `/root/obreiro-digital-landing` |
+| `Backend não está respondendo` | Health check falhou | Verificar se aceita HTTP 401 |
+| `index.html não encontrado` | Frontend não copiado | Verificar permissões em `/var/www/html/` |
+| `nginx -t failed` | Config nginx inválida | Testar configuração manualmente |
+
+**3. Verificar estado na VPS:**
 ```bash
-ssh root@VPS_IP
-cd /root/obreiro-hml
-docker-compose -f docker-compose.hml.yml ps
-docker-compose -f docker-compose.hml.yml logs --tail=50 backend_hml
-```
+ssh root@<VPS_IP>
 
-**3. Problemas comuns:**
-- ❌ **SSH falhou:** Verificar chave em Secrets
-- ❌ **Build falhou:** Erro no código, reverter commit
-- ❌ **Migração falhou:** Verificar models.py, corrigir e redeploy
-- ❌ **Frontend não copia:** Verificar permissões do diretório
+# Ver último commit deployado
+cd /root/obreiro-digital-landing  # ou /root/obreiro-hml
+git log -1
 
----
+# Ver containers rodando
+docker ps | grep obreiro
 
-### Deploy PROD Falhou
+# Ver logs recentes
+docker logs obreiro_backend_prod --tail=50  # ou _hml
 
-**1. NÃO ENTRAR EM PÂNICO** ✋
-
-**2. Verificar se rollback automático foi acionado:**
-```bash
-# Ver logs do workflow
-# Se rollback executou, versão anterior está rodando
-```
-
-**3. Se rollback não executou:**
-```bash
-# Conectar na VPS
-ssh root@VPS_IP
-cd /root/obreiro-prod
-
-# Voltar para commit anterior
-git log -3  # Ver últimos commits
-git reset --hard COMMIT_ANTERIOR
-
-# Redeploy manual
-docker-compose -f docker-compose.prod.yml up -d --build --force-recreate backend
-```
-
-**4. Restaurar banco (apenas se necessário):**
-```bash
-cd /root/obreiro-prod/backups
-ls -lt | head -5  # Ver backups recentes
-# Restaurar último backup antes do deploy
+# Testar backend localmente
+curl http://localhost:8000/api/v1/  # PROD
+curl http://localhost:8001/api/v1/  # HML
 ```
 
 ---
 
-### Health Check Sempre Falha
+### Problemas Específicos
 
-**Diagnóstico:**
+#### Backend não inicia
+
 ```bash
-# Testar localmente na VPS
-curl -v https://hml.obreirovirtual.com/api/v1/
+# Ver logs detalhados
+docker logs obreiro_backend_prod --tail=200
 
-# Verificar se container está rodando
-docker ps | grep obreiro_backend
+# Verificar se banco está acessível
+docker exec obreiro_backend_prod python manage.py check
 
-# Verificar logs
-docker logs obreiro_backend_hml --tail=100
+# Testar migrations
+docker exec obreiro_backend_prod python manage.py showmigrations
 
-# Testar diretamente no container
-docker exec obreiro_backend_hml curl http://localhost:8000/api/v1/
+# Restartar backend
+docker restart obreiro_backend_prod
+```
+
+#### Frontend não carrega
+
+```bash
+# Verificar se arquivos existem
+ls -lh /var/www/html/prod/  # ou hml/
+
+# Verificar se index.html existe
+cat /var/www/html/prod/index.html
+
+# Verificar permissões
+ls -la /var/www/html/prod/
+
+# Recopiar frontend
+docker cp obreiro_frontend_build:/app/dist/. /root/obreiro-digital-landing/frontend_build/
+sudo cp -r /root/obreiro-digital-landing/frontend_build/* /var/www/html/prod/
+sudo chmod -R 755 /var/www/html/prod/
+sudo systemctl reload nginx
+```
+
+#### Migrações falharam
+
+```bash
+# Ver quais migrações estão pendentes
+docker exec obreiro_backend_prod python manage.py showmigrations | grep "\[ \]"
+
+# Aplicar migrations manualmente
+docker exec obreiro_backend_prod python manage.py migrate --noinput
+
+# Se falhar, ver erro específico
+docker exec obreiro_backend_prod python manage.py migrate
+
+# Rollback última migration (se necessário)
+docker exec obreiro_backend_prod python manage.py migrate <app_name> <migration_number>
 ```
 
 ---
 
 ## 📚 Comandos Úteis
 
-### Deploy Manual (Emergency)
+### Deploy Manual (Emergência)
 
-**HML:**
 ```bash
+# HML
+ssh root@<VPS_IP>
 cd /root/obreiro-hml
 git pull origin develop
-docker-compose -f docker-compose.hml.yml up -d --build --force-recreate
-```
+docker-compose -f docker-compose.hml.yml up -d --build --force-recreate backend_hml celery_hml celery_beat_hml
+docker-compose -f docker-compose.hml.yml run --rm frontend_hml
+docker cp obreiro_frontend_hml:/app/dist/. /root/obreiro-hml/frontend-build/
+sudo cp -r /root/obreiro-hml/frontend-build/* /var/www/html/hml/
+sudo systemctl reload nginx
 
-**PROD:**
-```bash
-cd /root/obreiro-prod
+# PROD
+ssh root@<VPS_IP>
+cd /root/obreiro-digital-landing
 git pull origin main
-docker-compose -f docker-compose.prod.yml up -d --build --force-recreate
+docker-compose -f docker-compose.prod.yml up -d --build --force-recreate backend celery celery-beat
+docker-compose -f docker-compose.prod.yml up frontend-build
+docker cp obreiro_frontend_build:/app/dist/. /root/obreiro-digital-landing/frontend_build/
+sudo cp -r /root/obreiro-digital-landing/frontend_build/* /var/www/html/prod/
+sudo systemctl reload nginx
 ```
 
-### Rollback Manual
-
-```bash
-cd /root/obreiro-[hml|prod]
-git log -5  # Ver commits recentes
-git reset --hard COMMIT_SHA
-docker-compose -f docker-compose.[hml|prod].yml up -d --build --force-recreate
-```
-
-### Ver Diferenças entre HML e PROD
+### Verificar Diferenças entre HML e PROD
 
 ```bash
 # Na VPS
-diff /root/obreiro-hml/.env_hml /root/obreiro-prod/.env_prod
-git diff develop main
+diff /root/obreiro-hml/.env_hml /root/obreiro-digital-landing/.env_prod
+
+# No repositório local
+git diff develop main --stat
+git log develop..main --oneline
+```
+
+### Backup Manual do Banco
+
+```bash
+# HML
+docker exec obreiro_postgres_hml pg_dump -U obreiro_hml obreiro_hml > backup_hml_$(date +%Y%m%d_%H%M%S).sql
+
+# PROD
+docker exec obreiro_postgres_prod pg_dump -U obreiro_prod obreiro_prod > /root/backups/backup_prod_$(date +%Y%m%d_%H%M%S).sql
+```
+
+### Restaurar Backup do Banco
+
+```bash
+# HML
+docker exec -i obreiro_postgres_hml psql -U obreiro_hml obreiro_hml < backup_hml_XXXXXXXX.sql
+
+# PROD
+docker exec -i obreiro_postgres_prod psql -U obreiro_prod obreiro_prod < /root/backups/backup_prod_XXXXXXXX.sql
+```
+
+### Limpeza de Docker
+
+```bash
+# Remover containers parados
+docker container prune -f
+
+# Remover imagens não usadas
+docker image prune -a -f
+
+# Remover volumes não usados (CUIDADO!)
+docker volume prune -f
+
+# Limpeza completa
+docker system prune -a -f --volumes
 ```
 
 ---
 
-## 🎯 Próximas Melhorias
+## 🎯 Melhorias Futuras
 
-### Curto Prazo (1-2 semanas)
-- [ ] Implementar workflow de deploy para PROD
-- [ ] Adicionar testes E2E com Playwright
-- [ ] Configurar alertas no Slack/Discord
-- [ ] Implementar backup automático diário
+### Curto Prazo (1 mês)
+- [ ] Adicionar testes E2E com Playwright nos workflows
+- [ ] Implementar notificações no Discord/Slack
+- [ ] Adicionar métricas de performance nos deploys
+- [ ] Criar workflow de rollback automático
 
-### Médio Prazo (1-2 meses)
-- [ ] Blue-Green deployment
-- [ ] Canary releases (1% → 10% → 100%)
-- [ ] Monitoramento com Prometheus + Grafana
-- [ ] Logs centralizados (ELK Stack)
+### Médio Prazo (3 meses)
+- [ ] Separar PROD em VPS dedicada
+- [ ] Implementar Blue-Green deployment
+- [ ] Adicionar monitoramento com Prometheus + Grafana
+- [ ] Implementar logs centralizados (ELK Stack)
+- [ ] Adicionar testes de carga automatizados
 
-### Longo Prazo (3-6 meses)
+### Longo Prazo (6 meses)
 - [ ] Deploy multi-região
 - [ ] Auto-scaling baseado em carga
-- [ ] Disaster recovery plan
-- [ ] Compliance e auditoria
+- [ ] Disaster recovery automático
+- [ ] Compliance e auditoria automatizada
+- [ ] A/B testing automatizado
 
 ---
 
-## 📞 Contatos
+## 📞 Contatos e Suporte
 
-**Suporte Técnico:**
-- Email: suporteobreirovirtual@gmail.com
-- GitHub Issues: https://github.com/melojrx/obreiro-digital-landing/issues
+**Equipe Técnica:**
+- Junior Melo - jrmeloafrf@gmail.com
+- Suporte: suporteobreirovirtual@gmail.com
 
-**Documentação:**
-- Pipeline CI/CD: Este documento
+**Links Úteis:**
+- Repositório: https://github.com/melojrx/obreiro-digital-landing
+- Issues: https://github.com/melojrx/obreiro-digital-landing/issues
+- Actions: https://github.com/melojrx/obreiro-digital-landing/actions
+
+**Documentação Relacionada:**
 - Setup GitHub Actions: `docs/GITHUB_ACTIONS_SETUP.md`
-- Comandos Úteis: `docs/COMANDOS_UTEIS_DEPLOY.md`
-- Testes Pré-Commit: `docs/TESTES_PRE_COMMIT.md`
+- Análise de Arquitetura: `ANALISE_ARQUITETURA_COMPLETA.md`
+- Comandos Docker: `docs/COMANDOS_UTEIS_DEPLOY.md`
 
 ---
 
-**Última atualização:** 24/11/2025
-**Versão:** 2.0
+**Última atualização:** 25/11/2025
+**Versão:** 3.0
 **Autor:** Junior Melo
-**Status:** ✅ HML Implementado | 🔄 PROD Em Implementação
+**Status:** ✅ **PROD e HML 100% Funcionais**
+
+---
+
+## 📝 Changelog
+
+### v3.0 (25/11/2025)
+- ✅ Deploy de PRODUÇÃO implementado e funcionando
+- ✅ Correção de diretórios (usando `/root/obreiro-digital-landing`)
+- ✅ Health checks corrigidos (aceita HTTP 401)
+- ✅ Secrets consolidados (HML_VPS_* para ambos ambientes)
+- ✅ Backup automático de banco e frontend
+- ✅ Workflows de teste SSH e verificação de status
+- ✅ Documentação completa atualizada
+
+### v2.0 (24/11/2025)
+- ✅ Deploy de HML implementado
+- ✅ CI Tests implementados
+- ✅ Notificações por email
+- ✅ Migração nginx para HOST
+
+### v1.0 (Inicial)
+- ✅ Estrutura básica do projeto
