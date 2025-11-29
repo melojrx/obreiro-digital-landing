@@ -88,7 +88,7 @@ jobs:
 
             # 10. Rebuild do frontend
             echo "⚛️  Rebuilding frontend..."
-            docker-compose -f docker-compose.hml.yml build frontend_hml
+            docker-compose -f docker-compose.hml.yml build --no-cache frontend_hml
 
             # 11. Executar build do frontend
             echo "🏗️  Executando build do frontend..."
