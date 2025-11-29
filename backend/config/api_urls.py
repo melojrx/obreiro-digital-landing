@@ -51,6 +51,9 @@ urlpatterns = [
     
     # Core (health check, etc)
     path('core/', include('apps.core.urls')),
+
+    # Dashboard Super Admin
+    path('platform/', include('apps.platform_admin.urls')),
     
     # Visitantes (inclui endpoints públicos e administrativos)
     path('visitors/', include('apps.visitors.urls')),

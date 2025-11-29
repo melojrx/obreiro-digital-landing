@@ -56,6 +56,8 @@ class CustomAuthToken(ObtainAuthToken):
                 'full_name': user.full_name,
                 'phone': user.phone,
                 'is_profile_complete': user.is_profile_complete,
+                'is_superuser': user.is_superuser,
+                'is_staff': user.is_staff,
             }
         })
 
@@ -257,6 +259,8 @@ def me(request):
         'is_active': user.is_active,
         'date_joined': user.date_joined,
         'is_profile_complete': user.is_profile_complete,
+        'is_superuser': user.is_superuser,
+        'is_staff': user.is_staff,
         'subscription_plan': user.subscription_plan,
         'profile': profile_data,
         'intended_role': intended_role,

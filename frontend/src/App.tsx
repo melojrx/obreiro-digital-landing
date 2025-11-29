@@ -35,6 +35,9 @@ import QRCodesPage from "./pages/QRCodesPage";
 import RegistroVisitante from "./pages/RegistroVisitante";
 import RegistroSucesso from "./pages/RegistroSucesso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import SuperAdminFinance from "./pages/SuperAdminFinance";
+import SuperAdminQuality from "./pages/SuperAdminQuality";
 import EsqueciSenha from "./pages/EsqueciSenha";
 import RedefinirSenha from "./pages/RedefinirSenha";
 import NotFound, { Pagamento } from "./pages/NotFound";
@@ -378,6 +381,30 @@ const AppContent = () => {
         element={
           <ProtectedRoute level="auth_complete">
             <EditChurchPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/platform-admin/dashboard" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <SuperAdminDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/platform-admin/financeiro" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <SuperAdminFinance />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/platform-admin/qualidade" 
+        element={
+          <ProtectedRoute level="auth_complete">
+            <SuperAdminQuality />
           </ProtectedRoute>
         } 
       />

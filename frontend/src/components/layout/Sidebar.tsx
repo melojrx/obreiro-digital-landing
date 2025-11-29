@@ -13,6 +13,10 @@ import {
   Menu,
   ChevronLeft,
   X,
+  Shield,
+  BarChart3,
+  PieChart,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/hooks/useSidebar';
@@ -46,14 +50,13 @@ const Sidebar: React.FC = () => {
   const permissions = usePermissions();
   const activeChurch = useCurrentActiveChurch();
 
-  const navigation: NavItem[] = [
+  let navigation: NavItem[] = [
     {
       title: 'Menu Principal',
       icon: LayoutDashboard,
       href: '/dashboard',
       children: [
         { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
-        // Igrejas (exibido apenas se o usuário tiver permissão para gerenciar)
         ...(permissions.canCreateChurches ? [
           { title: 'Igrejas', icon: Church, href: '/denominacao/churches' }
         ] : []),
@@ -61,14 +64,6 @@ const Sidebar: React.FC = () => {
         { title: 'Visitantes', icon: UserPlus, href: '/visitantes' },
       ]
     },
-    // {
-    //   title: 'Comunicação',
-    //   icon: MessageSquare,
-    //   href: '#',
-    //   children: [
-    //     { title: 'Pedidos de Oração', icon: HandHeart, href: '/pedidos-oracao' },
-    //   ]
-    // },
     {
       title: 'Administração',
       icon: Settings,
@@ -78,6 +73,33 @@ const Sidebar: React.FC = () => {
       ]
     }
   ];
+
+  if (user?.is_superuser) {
+    navigation = [
+      {
+        title: 'Dashboard Plataforma',
+        icon: Shield,
+        href: '/platform-admin/dashboard',
+        children: [
+          {
+            title: 'Estatísticas Gerais',
+            icon: BarChart3,
+            href: '/platform-admin/dashboard',
+          },
+          {
+            title: 'Financeiro',
+            icon: PieChart,
+            href: '/platform-admin/financeiro',
+          },
+          {
+            title: 'Qualidade de Dados',
+            icon: AlertTriangle,
+            href: '/platform-admin/qualidade',
+          },
+        ],
+      },
+    ];
+  }
 
   const handleLogout = async () => {
     await logout();

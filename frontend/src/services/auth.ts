@@ -72,6 +72,7 @@ export interface User {
   full_name: string;
   first_name: string;
   last_name: string;
+  is_superuser?: boolean;
   phone?: string;
   subscription_plan?: string;
   profile?: {

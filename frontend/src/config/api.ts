@@ -191,6 +191,19 @@ export const API_ENDPOINTS = {
     churchTree: (id: number) => `/hierarchy/churches/${id}/tree/`,
     navigation: '/hierarchy/navigation/',
   },
+
+  // Dashboard Super Admin
+  platform: {
+    overview: '/platform/overview/',
+    planDistribution: '/platform/distributions/plans/',
+    topChurches: '/platform/rankings/top-churches/',
+    topChurchesVisitors: '/platform/rankings/top-churches-visitors/',
+    activitySummary: '/platform/activity/summary/',
+    activityLogins: '/platform/activity/logins/',
+    newMembers: '/platform/members/new-this-month/',
+    subscriptions: '/platform/subscriptions/expiring/',
+    geoMap: '/platform/geography/map-data/',
+  },
   
   // Membros
   members: {

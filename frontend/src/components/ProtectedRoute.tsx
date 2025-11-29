@@ -52,6 +52,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       console.log('❌ ProtectedRoute: Precisa estar autenticado, redirecionando para login');
       return <Navigate to="/login" state={{ from: location }} replace />;
     }
+    // Redirecionar super admin para o dashboard de plataforma quando tentar acessar o dashboard padrão
+    if (user?.is_superuser && location.pathname === '/dashboard') {
+      return <Navigate to="/platform-admin/dashboard" replace />;
+    }
     if (isAuthenticated && !profileComplete) {
       console.log('✅ ProtectedRoute: Já autenticado, mas perfil incompleto, redirecionando para etapa-2');
       return <Navigate to="/cadastro/etapa-2" replace />;
@@ -86,6 +90,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (needsChurchSetup) {
         console.log('✅ ProtectedRoute: Usuário precisa criar/vincular igreja, redirecionando para onboarding');
         return <Navigate to="/onboarding" replace />;
+      }
+      if (user?.is_superuser) {
+        return <Navigate to="/platform-admin/dashboard" replace />;
       }
       console.log('✅ ProtectedRoute: Já autenticado e perfil completo, redirecionando para dashboard');
       return <Navigate to="/dashboard" replace />;

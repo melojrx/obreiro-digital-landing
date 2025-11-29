@@ -24,6 +24,11 @@ def visitor_registered_notification(sender, instance, created, **kwargs):
     # Só notificar para registros via QR code
     if instance.registration_source != 'qr_code':
         return
+
+    # Evitar quebra quando igreja/filial não estiverem preenchidas
+    if not instance.church:
+        print("⚠️ Visitante criado sem igreja associada; notificação ignorada.")
+        return
     
     try:
         # Dados para o template
@@ -33,6 +38,9 @@ def visitor_registered_notification(sender, instance, created, **kwargs):
             'church': instance.church,
             'registration_date': instance.created_at,
         }
+
+        branch_name = instance.branch.name if instance.branch else "Filial não informada"
+        church_name = instance.church.name if instance.church else "Igreja não informada"
         
         # Renderizar template HTML (se existir)
         try:
@@ -46,8 +54,8 @@ Novo Visitante Registrado via QR Code
 Nome: {instance.full_name}
 E-mail: {instance.email}
 Telefone: {instance.phone}
-Igreja: {instance.church.name}
-Filial: {instance.branch.name}
+Igreja: {church_name}
+Filial: {branch_name}
 Data: {instance.created_at.strftime('%d/%m/%Y às %H:%M')}
 
 Primeira visita: {'Sim' if instance.first_visit else 'Não'}
@@ -65,7 +73,7 @@ Sistema Obreiro Digital
         recipients = []
         
         # Pastor responsável pela filial
-        if instance.branch.pastor and instance.branch.pastor.email:
+        if instance.branch and instance.branch.pastor and instance.branch.pastor.email:
             recipients.append(instance.branch.pastor.email)
         
         # Buscar outros usuários administrativos da igreja
@@ -94,7 +102,7 @@ Sistema Obreiro Digital
         # Enviar notificação
         if recipients:
             send_mail(
-                subject=f'[{instance.church.short_name}] Novo Visitante: {instance.full_name}',
+                subject=f'[{instance.church.short_name or instance.church.name}] Novo Visitante: {instance.full_name}',
                 message=plain_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=recipients,
@@ -105,7 +113,7 @@ Sistema Obreiro Digital
             print(f"📧 Notificação enviada para {len(recipients)} destinatário(s) sobre novo visitante: {instance.full_name}")
         
         # Log do evento
-        print(f"🆕 Novo visitante registrado via QR Code: {instance.full_name} ({instance.church.name} - {instance.branch.name})")
+        print(f"🆕 Novo visitante registrado via QR Code: {instance.full_name} ({church_name} - {branch_name})")
         
     except Exception as e:
         print(f"❌ Erro ao enviar notificação de novo visitante: {e}")
@@ -130,7 +138,15 @@ def visitor_converted_notification(sender, instance, created, **kwargs):
     if instance.conversion_date < timezone.now() - timedelta(minutes=5):
         return
     
+    # Evitar quebra quando igreja/filial não estiverem preenchidas
+    if not instance.church:
+        print("⚠️ Visitante convertido sem igreja associada; notificação ignorada.")
+        return
+
     try:
+        branch_name = instance.branch.name if instance.branch else "Filial não informada"
+        church_name = instance.church.name if instance.church else "Igreja não informada"
+
         # Dados para notificação
         context = {
             'visitor': instance,
@@ -146,8 +162,8 @@ Visitante Convertido em Membro
 
 Visitante: {instance.full_name}
 Membro ID: {instance.converted_member.id if instance.converted_member else 'N/A'}
-Igreja: {instance.church.name}
-Filial: {instance.branch.name}
+Igreja: {church_name}
+Filial: {branch_name}
 Data da Conversão: {instance.conversion_date.strftime('%d/%m/%Y às %H:%M')}
 
 Notas da Conversão: {instance.conversion_notes or 'Nenhuma'}
@@ -159,7 +175,7 @@ Sistema Obreiro Digital
         # Lista de destinatários
         recipients = []
         
-        if instance.branch.pastor and instance.branch.pastor.email:
+        if instance.branch and instance.branch.pastor and instance.branch.pastor.email:
             recipients.append(instance.branch.pastor.email)
         
         # Buscar administrativos
@@ -186,7 +202,7 @@ Sistema Obreiro Digital
         # Enviar notificação
         if recipients:
             send_mail(
-                subject=f'[{instance.church.short_name}] Visitante Convertido: {instance.full_name}',
+                subject=f'[{instance.church.short_name or instance.church.name}] Visitante Convertido: {instance.full_name}',
                 message=plain_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=recipients,
